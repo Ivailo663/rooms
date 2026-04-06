@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@football/shared": ["packages/shared"]
+    },
+    "noEmitOnError": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  }
+}
