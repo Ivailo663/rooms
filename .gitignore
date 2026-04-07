@@ -12,6 +12,8 @@ coverage/
 .env.*
 !.env.example
 
+serviceAccountKey.json
+
 .next/
 .nuxt/
 .out/
