@@ -1,26 +1,41 @@
-import './assets/main.css'
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import PrimeVue from 'primevue/config'
-import Aura from '@primeuix/themes/aura'
-import App from './App.vue'
-import router from './router'
-import './firebase'
-import { useAuthStore } from './stores/auth'
+import "./assets/main.css";
+import { createApp } from "vue";
+import { createPinia } from "pinia";
+import PrimeVue from "primevue/config";
+import Lara from "@primeuix/themes/lara";
+//@ts-ignore
+import App from "./App.vue";
+import router from "./router";
+import "./firebase";
+import { VueQueryPlugin, QueryClient } from "@tanstack/vue-query";
+import { useAuthStore } from "./stores/auth";
 
-const app = createApp(App)
+const app = createApp(App);
 
 app.use(PrimeVue, {
   theme: {
-    preset: Aura,
+    preset: Lara,
+    options: {
+      darkModeSelector: ".dark-system",
+    },
   },
-})
+});
 
-app.use(router)
-app.use(createPinia())
+app.use(router);
+app.use(createPinia());
 
-const { init } = useAuthStore()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 60,
+    },
+  },
+});
 
-await init()
+app.use(VueQueryPlugin, { queryClient });
 
-app.mount('#app')
+const { init } = useAuthStore();
+
+await init();
+
+app.mount("#app");

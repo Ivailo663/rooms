@@ -18,8 +18,6 @@ export const useAuthStore = defineStore('auth', () => {
       },
     })
 
-    console.log(data, 'data after login')
-
     userDBState.value = data
   }
 
