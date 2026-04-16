@@ -1,8 +1,7 @@
 import { Pool } from "pg";
 
 export const pool = new Pool({
-  connectionString: "postgresql://root:root@localhost:5433/test_db",
-  port: 5433,
+  connectionString: process.env.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,

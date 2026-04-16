@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer } from "http";
 import { initPostgres, pool } from "./postgres.js";
 import cors from "cors";
 import { Server } from "socket.io";
@@ -45,7 +44,7 @@ app.post("/user", async (req, res) => {
   }
 
   const { rows: created } = await pool.query(
-    `INSERT INTO accounts (email)
+    `INSERT INTO public.accounts (email)
      VALUES ($1)
      RETURNING *`,
     [email],
@@ -57,40 +56,47 @@ app.post("/user", async (req, res) => {
 app.get("/user", async (req, res) => {
   const { email } = req.user;
 
-  const { rows } = await pool.query(`SELECT * FROM accounts WHERE email = $1`, [
-    email,
-  ]);
+  const { rows } = await pool.query(
+    `SELECT * FROM public.accounts WHERE email = $1`,
+    [email],
+  );
 
   res.send(rows[0]);
 });
 
-app.post("/playgrounds", async function (req, res) {
+app.post("/rooms", async function (req, res) {
   const { name, description, creator_id, host_id } = req.body;
 
   await pool.query("BEGIN");
 
   const result = await pool.query(
-    `INSERT INTO public.playgrounds (name, description, creator_id, host_id)
+    `INSERT INTO public.rooms (name, description, creator_id, host_id)
     VALUES ($1, $2, $3, $4)
     RETURNING id`,
     [name, description, creator_id, host_id],
   );
 
-  const playgroundId = result.rows[0].id;
+  const roomId = result.rows[0].id;
 
   await pool.query(
-    `INSERT INTO playground_players (playground_id, account_id)
+    `INSERT INTO room_players (room_id, account_id)
      VALUES ($1, $2)`,
-    [playgroundId, host_id],
+    [roomId, host_id],
   );
 
   await pool.query("COMMIT");
 
-  res.send("Playground created!");
+  res.send("room created!");
 });
 
-app.get("/playgrounds", async function (req, res) {
-  const { rows } = await pool.query(`
+app.get("/rooms", async function (req, res) {
+  const isHost = req.query.hosted === "true";
+  const userId = Number(req.query.user_id);
+
+  const operator = isHost ? "=" : "!=";
+
+  const { rows } = await pool.query(
+    `
     SELECT 
       p.id,
       p.name,
@@ -101,24 +107,27 @@ app.get("/playgrounds", async function (req, res) {
           'name', a.name
         )
       ) as players
-    FROM playgrounds p
-    LEFT JOIN playground_players pp ON pp.playground_id = p.id
-    LEFT JOIN accounts a ON a.id = pp.account_id
+    FROM rooms p
+    LEFT JOIN room_players rp ON rp.room_id = p.id
+    LEFT JOIN accounts a ON a.id = rp.account_id
+    WHERE p.host_id ${operator} $1
     GROUP BY p.id
-  `);
+  `,
+    [userId],
+  );
 
   res.send(rows);
 });
 
 app.post("/join", async function (req, res) {
-  const { playground_id, account_id, joined_at } = req.body;
+  const { room_id, account_id, joined_at } = req.body;
 
   await pool.query("BEGIN");
 
   await pool.query(
-    `INSERT INTO public.playground_players (playground_id, account_id, joined_at)
+    `INSERT INTO public.room_players (room_id, account_id, joined_at)
     VALUES ($1, $2, $3)`,
-    [playground_id, account_id, joined_at],
+    [room_id, account_id, joined_at],
   );
 
   const { rows } = await pool.query(`
@@ -132,24 +141,24 @@ app.post("/join", async function (req, res) {
           'name', a.name
         )
       ) as players
-    FROM playgrounds p
-    LEFT JOIN playground_players pp ON pp.playground_id = p.id
-    LEFT JOIN accounts a ON a.id = pp.account_id
+    FROM rooms p
+    LEFT JOIN room_players rp ON rp.room_id = p.id
+    LEFT JOIN accounts a ON a.id = rp.account_id
     GROUP BY p.id
   `);
 
-  io.emit("playgrounds:updated", rows);
+  io.emit("rooms:updated", rows);
 
   await pool.query("COMMIT");
 });
 
 app.post("/leave", async function (req, res) {
-  const { playground_id, account_id } = req.body;
+  const { room_id, account_id } = req.body;
 
   await pool.query("BEGIN");
 
   await pool.query(
-    `DELETE FROM public.playground_players WHERE account_id = ${account_id} AND playground_id = ${playground_id}`,
+    `DELETE FROM public.room_players WHERE account_id = ${account_id} AND room_id = ${room_id}`,
   );
 
   const { rows } = await pool.query(`
@@ -163,13 +172,13 @@ app.post("/leave", async function (req, res) {
           'name', a.name
         )
       ) as players
-    FROM playgrounds p
-    LEFT JOIN playground_players pp ON pp.playground_id = p.id
-    LEFT JOIN accounts a ON a.id = pp.account_id
+    FROM rooms p
+    LEFT JOIN room_players rp ON rp.room_id = p.id
+    LEFT JOIN accounts a ON a.id = rp.account_id
     GROUP BY p.id
   `);
 
-  io.emit("playgrounds:updated", rows);
+  io.emit("rooms:updated", rows);
 
   await pool.query("COMMIT");
 });
@@ -181,18 +190,10 @@ const httpServer = app.listen(port, () => {
 const io = new Server(httpServer, {
   cors: {
     origin: "http://localhost:5173",
-    credentials: false,
+    methods: ["GET", "POST"],
   },
 });
 
 io.on("connection", (socket) => {
   console.log("a user connected");
 });
-
-// "@vitest/eslint-plugin": "^1.5.0",
-// "@vue/eslint-config-prettier": "^10.2.0",
-// "@vue/eslint-config-typescript": "^14.6.0",
-// "@vue/test-utils": "^2.4.6",
-// "@vue/tsconfig": "^0.8.1",
-// "eslint-plugin-playwright": "^2.3.0",
-// "eslint-plugin-vue": "~10.5.1",
