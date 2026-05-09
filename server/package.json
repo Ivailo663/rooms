@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon --legacy-watch app.js",
+    "dev": "nodemon --watch . --ext ts,json --exec tsx app.ts",
+    "start": "tsx app.ts",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:pull": "prisma db pull --schema prisma/schema.prisma",
     "typecheck": "tsc --noEmit"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@prisma/client": "^7.8.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
     "firebase-admin": "^13.7.0",
@@ -20,6 +24,7 @@
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
+    "prisma": "^7.8.0",
     "typescript": "^5.9.3"
   },
   "optionalDependencies": {

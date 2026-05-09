@@ -61,3 +61,7 @@
 body {
   min-height: 100vh;
 }
+
+.p-card {
+  border: 1px solid var(--p-gray-200) !important;
+}

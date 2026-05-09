@@ -3,91 +3,58 @@
     <!-- <h1 v-if="Boolean(state.connected)">{{ state.connected }}</h1> -->
 
     <!-- <h2>{{ socketmsg }}</h2> -->
-    <div class="px-5">
-      <div class="flex justify-between">
-        <Button
-          type="button"
-          label="Create a room"
-          severity="secondary"
-          @click="visible = true"
-        />
 
-        <SelectButton
-          v-model="room"
-          :options="roomOptions"
-          optionLabel="label"
-          optionValue="value"
-          dataKey="label"
-        />
+    <div class="flex">
+      <div class="flex flex-col items-center" v-if="!isHostedRooms">
+        <DatePicker v-model="date" inline class="my-inline-datepicker !mb-5" />
+
+        <Timeline />
       </div>
 
-      <Timeline />
+      <div class="px-5 flex-1">
+        <div class="flex justify-between !mb-5">
+          <SelectButton
+            v-model="room"
+            :options="roomOptions"
+            optionLabel="label"
+            optionValue="value"
+            dataKey="label"
+          />
 
-      <div class="flex">
-        <Cards
-          :rooms="rooms[isHostedRooms ? 'hosted' : 'others']"
-          :key="isHostedRooms.toString()"
-        />
+          <Button
+            v-if="isHostedRooms"
+            type="button"
+            label="Create a room"
+            severity="secondary"
+            @click="visible = true"
+          />
+        </div>
+
+        <HostedRooms v-if="isHostedRooms" />
+
+        <JoinableRooms v-else />
       </div>
     </div>
   </main>
 
-  <Dialog
-    v-model:visible="visible"
-    modal
-    header="Edit Profile"
-    :style="{ width: '25rem' }"
-  >
-    <span class="text-surface-500 dark:text-surface-400 block mb-8!"
-      >Update your information.</span
-    >
-    <div class="flex items-center gap-4 mb-4!">
-      <label for="name" class="font-semibold w-24">name</label>
-      <InputText
-        id="name"
-        class="flex-auto"
-        autocomplete="off"
-        v-model="name"
-      />
-    </div>
-    <div class="flex items-center gap-4 mb-4!">
-      <label for="name" class="font-semibold w-24">description</label>
-      <Textarea
-        id="name"
-        class="flex-auto"
-        autocomplete="off"
-        v-model="description"
-      />
-    </div>
-    <div class="flex justify-end gap-2">
-      <Button
-        type="button"
-        label="Cancel"
-        severity="secondary"
-        @click="visible = false"
-      ></Button>
-      <Button type="button" label="Save" @click="handleCreateRoom" />
-    </div>
-  </Dialog>
+  <CreateRoomDialog v-model:visible="visible" @save="handleCreateRoom" />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, shallowReactive } from "vue";
-import { SelectButton, Button, InputText, Textarea, Dialog } from "primevue";
+import { ref, computed } from "vue";
+import { SelectButton, Button, DatePicker } from "primevue";
 import { socket } from "../socket";
 import { api } from "@/axios";
 import { useAuthStore } from "../stores/auth";
-
-import { Player } from "@football/shared";
-import Cards from "@/components/Cards.vue";
 import Timeline from "@/components/Timeline.vue";
-import { useQuery, useMutation } from "@tanstack/vue-query";
+import HostedRooms from "@/features/rooms/HostedRooms.vue";
+import JoinableRooms from "@/features/rooms/JoinableRooms.vue";
+import CreateRoomDialog from "@/features/rooms/components/CreateRoomDialog.vue";
 
 const authStore = useAuthStore();
 
 const visible = ref(false);
-const name = ref();
-const description = ref();
+const date = ref();
 
 const isHostedRooms = computed(() => room.value === "hosted");
 const room = ref("hosted");
@@ -102,31 +69,21 @@ const roomOptions = ref([
   },
 ]);
 
-const rooms = shallowReactive({
-  hosted: [],
-  others: [],
-});
-
-const handleCreateRoom = async () => {
+const handleCreateRoom = async ({
+  name,
+  description,
+}: {
+  name: string;
+  description: string;
+}) => {
   await api.post("/rooms", {
-    name: name?.value,
-    description: description?.value,
+    name,
+    description,
     creator_id: authStore?.user?.id,
     host_id: authStore?.user?.id,
   });
-};
 
-const getRooms = async () => {
-  const { data } = await api.get("/rooms", {
-    params: {
-      hosted: isHostedRooms.value,
-      user_id: authStore?.user?.id,
-    },
-  });
-
-  rooms[isHostedRooms.value ? "hosted" : "others"] = data;
-
-  return data;
+  visible.value = false;
 };
 
 const handleJoinRoom = async (room: any) => {
@@ -137,17 +94,39 @@ const handleJoinRoom = async (room: any) => {
   });
 };
 
-const handleLeaveRoom = async (room) => {
+const handleLeaveRoom = async (room: any) => {
   await api.post("leave", {
     playground_id: room.id,
     account_id: authStore?.user?.id,
   });
 };
-
-const { isPending, isError, data, error } = useQuery({
-  queryKey: ["rooms", room],
-  queryFn: getRooms,
-});
 </script>
 
-<style></style>
+<style>
+.my-inline-datepicker {
+  font-size: 0.85rem;
+}
+/* shrink the grid cells */
+.my-inline-datepicker table td {
+  padding: 0;
+}
+
+/* shrink the clickable day */
+.my-inline-datepicker table td > span {
+  width: 1.2rem;
+  height: 1.2rem;
+  line-height: 2rem;
+  font-size: 0.85rem;
+}
+
+/* header tighter */
+.my-inline-datepicker .p-datepicker-header {
+  padding: 0.3rem 0.5rem;
+}
+
+/* optional: weekday labels */
+.my-inline-datepicker th {
+  padding: 0.2rem;
+  font-size: 0.7rem;
+}
+</style>

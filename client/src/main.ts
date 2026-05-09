@@ -9,12 +9,23 @@ import router from "./router";
 import "./firebase";
 import { VueQueryPlugin, QueryClient } from "@tanstack/vue-query";
 import { useAuthStore } from "./stores/auth";
+import { definePreset } from "@primeuix/themes";
 
 const app = createApp(App);
 
+const MyPreset = definePreset(Lara, {
+  components: {
+    card: {
+      root: {
+        shadow: "0px 1px 4px 0px {gray-200}",
+      },
+    },
+  },
+});
+
 app.use(PrimeVue, {
   theme: {
-    preset: Lara,
+    preset: MyPreset,
     options: {
       darkModeSelector: ".dark-system",
     },
