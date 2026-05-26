@@ -1,58 +1,115 @@
 <template>
-  <div class="auth-container flex flex-col gap-5">
-    <InputText v-model="email" placeholder="Email" />
+  <div
+    class="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 !px-4"
+  >
+    <div class="w-full max-w-[380px]">
+      <!-- Brand -->
+      <div class="!mb-8 text-center">
+        <div
+          class="!mx-auto !mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-500 shadow-lg shadow-primary-200/60"
+        >
+          <i class="fa-solid fa-grip text-white" style="font-size: 1.1rem" />
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-surface-900">Rooms</h1>
+        <p class="!mt-1 text-sm text-surface-400">
+          {{
+            isLogin
+              ? "Welcome back. Sign in to continue."
+              : "Create your account to get started."
+          }}
+        </p>
+      </div>
 
-    <Password v-model="password" placeholder="Password" :feedback="false" toggleMask fluid />
+      <!-- Card -->
+      <Card class="!shadow-xl !shadow-surface-300/30">
+        <template #content>
+          <div class="flex flex-col !gap-5 !px-1 !py-1">
+            <div class="flex flex-col !gap-1.5">
+              <label
+                class="flex items-center !gap-1.5 text-xs font-semibold uppercase tracking-widest text-surface-400"
+              >
+                <i class="fa-solid fa-envelope" style="font-size: 0.65rem" />
+                Email
+              </label>
+              <InputText
+                v-model="email"
+                placeholder="you@example.com"
+                class="w-full"
+              />
+            </div>
 
-    <Button @click="handleSubmit">
-      {{ isLogin ? 'Log In' : 'Sign Up' }}
-    </Button>
+            <div class="flex flex-col !gap-1.5">
+              <label
+                class="flex items-center !gap-1.5 text-xs font-semibold uppercase tracking-widest text-surface-400"
+              >
+                <i class="fa-solid fa-lock" style="font-size: 0.65rem" />
+                Password
+              </label>
+              <Password
+                v-model="password"
+                placeholder="••••••••"
+                :feedback="false"
+                toggleMask
+                fluid
+              />
+            </div>
 
-    <Button link @click="isLogin = !isLogin">
-      {{ isLogin ? 'Create account' : 'Already have an account?' }}
-    </Button>
+            <Button
+              :label="isLogin ? 'Sign in' : 'Create account'"
+              :icon="isLogin ? 'fa-solid fa-right-to-bracket' : 'fa-solid fa-user'"
+              :loading="isLoading"
+              class="w-full"
+              @click="handleSubmit"
+            />
+
+            <div class="text-center">
+              <Button
+                link
+                size="small"
+                :label="
+                  isLogin
+                    ? 'New here? Create an account →'
+                    : '← Already have an account?'
+                "
+                @click="isLogin = !isLogin"
+              />
+            </div>
+          </div>
+        </template>
+      </Card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Button, InputText, Password } from 'primevue'
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth'
-// import { useRouter } from 'vue-router'
-import { api } from '@/axios'
+import { ref } from "vue";
+import { Button, Card, InputText, Password } from "primevue";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
 
-const email = ref('')
-const password = ref('')
-const isLogin = ref(true)
-const isLoading = ref(false)
-
-// const router = useRouter()
+const email = ref("");
+const password = ref("");
+const isLogin = ref(true);
+const isLoading = ref(false);
 
 const handleSubmit = async () => {
-  const auth = getAuth()
+  const auth = getAuth();
 
   try {
-    isLoading.value = true
+    isLoading.value = true;
 
     if (isLogin.value) {
-      await signInWithEmailAndPassword(auth, email.value, password.value)
-      // router.push({ name: 'home' })
+      await signInWithEmailAndPassword(auth, email.value, password.value);
     } else {
-      await createUserWithEmailAndPassword(auth, email.value, password.value)
-      await api.post('/user')
-      // router.push({ name: 'home' })
+      await createUserWithEmailAndPassword(auth, email.value, password.value);
     }
   } catch (err) {
-    console.error(err)
+    console.error(err);
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 </script>
-
-<style scoped>
-.auth-container {
-  width: 500px;
-  margin: 5rem auto;
-}
-</style>

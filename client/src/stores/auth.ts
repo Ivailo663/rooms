@@ -13,12 +13,7 @@ export const useAuthStore = defineStore("auth", () => {
   const router = useRouter();
 
   const fetchUser = async () => {
-    const { data } = await api.get("/user", {
-      params: {
-        email: userAuthState.value?.email,
-      },
-    });
-
+    const { data } = await api.post("/user");
     userDBState.value = data;
   };
 

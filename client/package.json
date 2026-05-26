@@ -20,8 +20,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "@fortawesome/free-brands-svg-icons": "^7.2.0",
+    "@fortawesome/free-regular-svg-icons": "^7.2.0",
+    "@fortawesome/free-solid-svg-icons": "^7.2.0",
     "@primeuix/themes": "^2.0.2",
     "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/vue-form": "^1.32.0",
     "@tanstack/vue-query": "^5.99.0",
     "@vueuse/core": "^14.1.0",
     "@vueuse/integrations": "^14.1.0",

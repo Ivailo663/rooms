@@ -13,6 +13,7 @@ const createUser: RequestHandler = asyncHandler(async (_req, res) => {
     update: {},
     create: {
       email,
+      name: email.split("@")[0],
     },
   });
 
