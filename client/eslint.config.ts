@@ -1,24 +1,24 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import tseslint from 'typescript-eslint'
-import pluginVue from 'eslint-plugin-vue'
-import { defineConfig } from 'eslint/config'
+import js from "@eslint/js";
+import globals from "globals";
+import tseslint from "typescript-eslint";
+import pluginVue from "eslint-plugin-vue";
+import { defineConfig } from "eslint/config";
 
 export default defineConfig([
   {
-    files: ['**/*.{js,mjs,cjs,ts,mts,cts,vue}'],
+    files: ["**/*.{js,mjs,cjs,ts,mts,cts,vue}"],
     plugins: { js },
-    extends: ['js/recommended'],
+    extends: ["js/recommended"],
     languageOptions: { globals: globals.browser },
     rules: {
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-      'array-callback-return': 'error',
-      'no-duplicate-imports': 'error',
-      eqeqeq: 'error',
-      'no-constant-condition': 'off',
-      'max-depth': [
-        'error',
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "array-callback-return": "error",
+      "no-duplicate-imports": "error",
+      eqeqeq: "error",
+      "no-constant-condition": "off",
+      "max-depth": [
+        "error",
         {
           max: 3,
         },
@@ -26,5 +26,19 @@ export default defineConfig([
     },
   },
   tseslint.configs.recommended,
-  pluginVue.configs['flat/essential'],
-])
+  pluginVue.configs["flat/recommended"],
+  {
+    files: ["**/*.vue"],
+    languageOptions: {
+      parserOptions: {
+        parser: tseslint.parser,
+        ecmaVersion: "latest",
+        sourceType: "module",
+        extraFileExtensions: [".vue"],
+      },
+    },
+    rules: {
+      "vue/max-attributes-per-line": "off",
+    },
+  },
+]);

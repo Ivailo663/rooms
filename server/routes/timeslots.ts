@@ -60,7 +60,7 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
       },
     },
     orderBy: {
-      id: "asc",
+      order: "asc",
     },
   });
 
@@ -73,6 +73,7 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
     max_players: timeslot.max_players,
     features: timeslot.features as TimeslotResponse["features"],
     day: timeslot.day,
+    enabled: timeslot.enabled,
     players: timeslot.timeslot_players.map(({ accounts }) => ({
       id: accounts.id,
       name: accounts.name,
@@ -81,6 +82,74 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
 
   res.send(response);
 });
+
+const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
+  const account = await getCurrentAccount(res.locals.user.email);
+  const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
+
+  const timeslots = await prisma.roomTimeslot.findMany({
+    where: {
+      roomId,
+      enabled: true,
+      day: req.query.day as string,
+      room: {
+        creatorId: account.id,
+      },
+    },
+    include: {
+      timeslot_players: {
+        include: {
+          accounts: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { label: "asc" },
+  });
+
+  const response: TimeslotResponse[] = timeslots.map((timeslot) => ({
+    id: timeslot.id,
+    name: timeslot.name,
+    message: timeslot.message,
+    price: timeslot.price?.toString() ?? null,
+    label: timeslot.label,
+    max_players: timeslot.max_players,
+    features: timeslot.features as TimeslotResponse["features"],
+    day: timeslot.day,
+    enabled: timeslot.enabled,
+    players: timeslot.timeslot_players.map(({ accounts }) => ({
+      id: accounts.id,
+      name: accounts.name,
+    })),
+  }));
+
+  res.send(response);
+});
+
+const getEnabledTimeslotDays: RequestHandler = asyncHandler(
+  async (req, res) => {
+    const account = await getCurrentAccount(res.locals.user.email);
+    const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
+
+    const rows = await prisma.roomTimeslot.findMany({
+      where: {
+        roomId,
+        enabled: true,
+        room: {
+          creatorId: account.id,
+        },
+      },
+      select: { day: true },
+      distinct: ["day"],
+    });
+
+    res.send(rows.map((r) => r.day));
+  }
+);
 
 const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
@@ -98,6 +167,7 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const timeslot = await prisma.roomTimeslot.create({
     data: {
       roomId: body.room_id,
+      order: body.order,
       day: body.day,
       name: body.name,
       label: body.label,
@@ -110,6 +180,7 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
         : null,
       message: body.message,
       features: body.features,
+      enabled: body.enabled ?? false,
     },
   });
 
@@ -155,6 +226,7 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   }
   if (body.message !== undefined) updateData.message = body.message;
   if (body.features !== undefined) updateData.features = body.features;
+  if (body.enabled !== undefined) updateData.enabled = body.enabled;
 
   const updatedTimeslot = await prisma.roomTimeslot.update({
     where: { id: body.id },
@@ -191,6 +263,8 @@ const deleteTimeslot: RequestHandler = asyncHandler(async (req, res) => {
 
 export const registerTimeslotRoutes = (app: Application) => {
   app.get("/timeslots", getTimeslots);
+  app.get("/timeslots/enabled", getEnabledTimeslots);
+  app.get("/timeslots/enabled/days", getEnabledTimeslotDays);
   app.post("/timeslots", createTimeslot);
   app.put("/timeslots", updateTimeslot);
   app.delete("/timeslots/:id", deleteTimeslot);

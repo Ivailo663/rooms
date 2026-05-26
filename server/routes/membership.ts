@@ -1,74 +1,118 @@
 import type { Application, RequestHandler } from "express";
 import type { Server } from "socket.io";
+import { Prisma } from "@prisma/client";
 import prisma from "../prisma.js";
 import type {
-  JoinRoomRequest,
-  LeaveRoomRequest,
+  JoinTimeslotRequest,
   MutationMessageResponse,
-  RoomWithPlayersResponse,
+  TimeslotMembershipChangedPayload,
 } from "../../packages/shared/index.js";
-import { getRoomsWithPlayers } from "../services/rooms.js";
-import { asyncHandler } from "../utils/http.js";
+import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger, toOptionalDate } from "../utils/validation.js";
 
-const createJoinRoomHandler = (io: Server): RequestHandler =>
+export const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
+
+const getCurrentAccount = async (email: string) => {
+  const account = await prisma.account.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+
+  if (!account) {
+    throw createHttpError(404, "Account not found");
+  }
+
+  return account;
+};
+
+const getUpdatedPlayers = async (
+  timeslotId: number
+): Promise<TimeslotMembershipChangedPayload["players"]> => {
+  const rows = await prisma.timeslotPlayer.findMany({
+    where: { timeslotId },
+    select: { accounts: { select: { id: true, name: true, email: true } } },
+  });
+  return rows.map(({ accounts }) => accounts);
+};
+
+const createJoinTimeslotHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
-    const { room_id, account_id, joined_at } = req.body as JoinRoomRequest;
-    const roomId = toInteger(room_id, "room_id");
-    const accountId = toInteger(account_id, "account_id");
+    const account = await getCurrentAccount(res.locals.user.email);
+    const timeslotId = toInteger(req.params.id, "id");
+    const { joined_at } = (req.body ?? {}) as JoinTimeslotRequest;
     const joinedAt = toOptionalDate(joined_at, "joined_at");
 
-    await prisma.$transaction(async (tx) => {
-      await tx.roomPlayer.deleteMany({
-        where: {
-          roomId,
-          accountId,
-        },
-      });
+    let changed = false;
 
-      await tx.roomPlayer.create({
-        data: {
-          roomId,
-          accountId,
-          joinedAt,
-        },
-      });
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        const timeslot = await tx.roomTimeslot.findUnique({
+          where: { id: timeslotId },
+          select: {
+            max_players: true,
+            _count: { select: { timeslot_players: true } },
+          },
+        });
 
-    const rooms: RoomWithPlayersResponse[] = await getRoomsWithPlayers();
-    io.emit("rooms:updated", rooms);
+        if (!timeslot) {
+          throw createHttpError(404, "Timeslot not found");
+        }
 
-    const response: MutationMessageResponse = {
-      message: "joined room",
-    };
+        const alreadyJoined = await tx.timeslotPlayer.findUnique({
+          where: {
+            timeslotId_accountId: { timeslotId, accountId: account.id },
+          },
+          select: { accountId: true },
+        });
 
+        if (alreadyJoined) {
+          return;
+        }
+
+        if (timeslot._count.timeslot_players >= timeslot.max_players) {
+          throw createHttpError(409, "Timeslot is full");
+        }
+
+        await tx.timeslotPlayer.create({
+          data: { timeslotId, accountId: account.id, joined_at: joinedAt },
+        });
+
+        changed = true;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+
+    if (changed) {
+      console.log("here");
+      const players = await getUpdatedPlayers(timeslotId);
+      const payload: TimeslotMembershipChangedPayload = { timeslotId, players };
+      io.emit(TIMESLOT_MEMBERSHIP_CHANGED_EVENT, payload);
+    }
+
+    const response: MutationMessageResponse = { message: "joined timeslot" };
     res.send(response);
   });
 
-const createLeaveRoomHandler = (io: Server): RequestHandler =>
+const createLeaveTimeslotHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
-    const { room_id, account_id } = req.body as LeaveRoomRequest;
-    const roomId = toInteger(room_id, "room_id");
-    const accountId = toInteger(account_id, "account_id");
+    const account = await getCurrentAccount(res.locals.user.email);
+    const timeslotId = toInteger(req.params.id, "id");
 
-    await prisma.roomPlayer.deleteMany({
-      where: {
-        roomId,
-        accountId,
-      },
+    const result = await prisma.timeslotPlayer.deleteMany({
+      where: { timeslotId, accountId: account.id },
     });
 
-    const rooms: RoomWithPlayersResponse[] = await getRoomsWithPlayers();
-    io.emit("rooms:updated", rooms);
+    if (result.count > 0) {
+      const players = await getUpdatedPlayers(timeslotId);
+      const payload: TimeslotMembershipChangedPayload = { timeslotId, players };
+      io.emit(TIMESLOT_MEMBERSHIP_CHANGED_EVENT, payload);
+    }
 
-    const response: MutationMessageResponse = {
-      message: "left room",
-    };
-
+    const response: MutationMessageResponse = { message: "left timeslot" };
     res.send(response);
   });
 
 export const registerMembershipRoutes = (app: Application, io: Server) => {
-  app.post("/join", createJoinRoomHandler(io));
-  app.post("/leave", createLeaveRoomHandler(io));
+  app.post("/timeslots/:id/join", createJoinTimeslotHandler(io));
+  app.post("/timeslots/:id/leave", createLeaveTimeslotHandler(io));
 };

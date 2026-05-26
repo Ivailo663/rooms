@@ -118,7 +118,7 @@ const getJoinableRooms: RequestHandler = asyncHandler(async (_req, res) => {
           },
         },
         orderBy: {
-          id: "asc",
+          order: "asc",
         },
       },
     },

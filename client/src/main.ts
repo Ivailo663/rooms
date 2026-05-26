@@ -1,5 +1,7 @@
 import "./assets/main.css";
+import "@fortawesome/fontawesome-free/css/all.min.css";
 import { createApp } from "vue";
+import BasicWrapper from "./components/BasicWrapper.vue";
 import { createPinia } from "pinia";
 import PrimeVue from "primevue/config";
 import Lara from "@primeuix/themes/lara";
@@ -14,10 +16,30 @@ import { definePreset } from "@primeuix/themes";
 const app = createApp(App);
 
 const MyPreset = definePreset(Lara, {
+  semantic: {
+    primary: {
+      50: "#eef2ff",
+      100: "#e0e7ff",
+      200: "#c7d2fe",
+      300: "#a5b4fc",
+      400: "#818cf8",
+      500: "#6366f1",
+      600: "#4f46e5",
+      700: "#4338ca",
+      800: "#3730a3",
+      900: "#312e81",
+      950: "#1e1b4b",
+    },
+  },
   components: {
     card: {
       root: {
-        shadow: "0px 1px 4px 0px {gray-200}",
+        shadow:
+          "0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06)",
+        borderRadius: "0.875rem",
+      },
+      body: {
+        padding: "0.85rem",
       },
     },
   },
@@ -32,6 +54,7 @@ app.use(PrimeVue, {
   },
 });
 
+app.component("BasicWrapper", BasicWrapper);
 app.use(router);
 app.use(createPinia());
 

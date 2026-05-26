@@ -3,7 +3,9 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@football/shared": ["packages/shared"]
+      "@football/shared": ["packages/shared"],
+      "@football/server": ["packages/server"],
+      "@football/client": ["packages/client"]
     },
     "noEmitOnError": true,
     "noUnusedLocals": true,

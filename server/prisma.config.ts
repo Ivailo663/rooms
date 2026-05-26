@@ -34,8 +34,8 @@ const loadEnvFile = (filePath: string) => {
   }
 };
 
-loadEnvFile(path.resolve(__dirname, "../.env"));
 loadEnvFile(path.resolve(__dirname, ".env"));
+loadEnvFile(path.resolve(__dirname, "../.env"));
 
 export default defineConfig({
   schema: path.resolve(__dirname, "prisma/schema.prisma"),

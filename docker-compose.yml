@@ -26,7 +26,7 @@ services:
       - /app/node_modules
       - /app/server/node_modules
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://postgres.rubmddylbuklwvnysszw:${POSTGRES_PASSWORD}@aws-0-eu-west-1.pooler.supabase.com:5432/${POSTGRES_DB}
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     command: sh -c "npm install && npx prisma generate --schema=server/prisma/schema.prisma && npx --yes tsx watch --clear-screen=false server/app.ts"

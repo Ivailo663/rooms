@@ -11,6 +11,11 @@ export interface GetTimeslotsParams {
   day: string;
 }
 
+export interface GetEnabledTimeslotsParams {
+  room_id: number;
+  day: string;
+}
+
 export interface AccountEntity {
   id: number;
   email: string;
@@ -55,6 +60,7 @@ export interface TimeslotResponse {
   players: PlayerSummary[];
   max_players: number;
   day: string;
+  enabled: boolean;
 }
 
 export interface TimeslotPlayer {
@@ -75,6 +81,7 @@ export interface TimeslotEntity {
 
 export interface CreateTimeslotRequest {
   day: string;
+  order: number;
   room_id: number;
   name: string;
   label: string;
@@ -83,6 +90,7 @@ export interface CreateTimeslotRequest {
   price?: string | number | null;
   message?: string | null;
   features?: Prisma.InputJsonValue;
+  enabled?: boolean;
 }
 
 export interface UpdateTimeslotRequest {
@@ -94,6 +102,7 @@ export interface UpdateTimeslotRequest {
   price?: string | number | null;
   message?: string | null;
   features?: Prisma.InputJsonValue;
+  enabled?: boolean;
 }
 
 export interface CreateTimeslotResponse {
@@ -127,17 +136,15 @@ export interface CreateRoomResponse {
   message: string;
 }
 
-export interface JoinRoomRequest {
-  room_id: number;
-  account_id: number;
+export interface JoinTimeslotRequest {
   joined_at?: string | null;
-}
-
-export interface LeaveRoomRequest {
-  room_id: number;
-  account_id: number;
 }
 
 export interface MutationMessageResponse {
   message: string;
+}
+
+export interface TimeslotMembershipChangedPayload {
+  timeslotId: number;
+  players: TimeslotPlayer[];
 }

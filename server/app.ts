@@ -17,7 +17,6 @@ const port = Number(process.env.PORT ?? 3000);
 
 app.use(cors());
 app.use(express.json());
-app.use(verifyFirebaseToken);
 
 const httpServer = app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
@@ -30,6 +29,9 @@ const io = new Server(httpServer, {
   },
 });
 
+// Apply auth only to API routes — socket.io transport requests must be excluded
+app.use(["/rooms", "/timeslots", "/user"], verifyFirebaseToken);
+
 registerUserRoutes(app);
 registerRoomRoutes(app);
 registerTimeslotRoutes(app);
@@ -41,7 +43,7 @@ app.use(
     res
       .status(error.status ?? 500)
       .send(error.message ?? "Internal server error");
-  },
+  }
 );
 
 io.on("connection", () => {

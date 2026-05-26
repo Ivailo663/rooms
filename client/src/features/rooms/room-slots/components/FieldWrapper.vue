@@ -1,11 +1,17 @@
 <template>
-  <div class="flex flex-col">
-    <div class="flex justify-between items-center gap-2 !mb-2">
-      <label for="price">{{ props.blockLabel }}</label>
+  <div class="flex flex-col !gap-1.5">
+    <div class="flex items-center justify-between">
+      <label
+        class="text-xs font-semibold uppercase tracking-widest text-surface-400"
+      >
+        {{ props.blockLabel }}
+      </label>
 
-      <div v-if="props.checkbox">
-        <label for="ingredient1" class="!mr-2"> Apply to all slots </label>
-        <Checkbox inputId="ingredient1" name="pizza" value="Cheese" />
+      <div v-if="props.checkbox" class="flex items-center !gap-2">
+        <label for="ingredient1" class="text-xs text-surface-400">
+          Apply to all slots
+        </label>
+        <Checkbox input-id="ingredient1" name="pizza" value="Cheese" />
       </div>
     </div>
 
