@@ -10,7 +10,9 @@
         >
           <i class="fa-solid fa-grip text-white" style="font-size: 1.1rem" />
         </div>
-        <h1 class="text-2xl font-bold tracking-tight text-surface-900">Rooms</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-surface-900">
+          Rooms
+        </h1>
         <p class="!mt-1 text-sm text-surface-400">
           {{
             isLogin
@@ -49,14 +51,16 @@
                 v-model="password"
                 placeholder="••••••••"
                 :feedback="false"
-                toggleMask
+                toggle-mask
                 fluid
               />
             </div>
 
             <Button
               :label="isLogin ? 'Sign in' : 'Create account'"
-              :icon="isLogin ? 'fa-solid fa-right-to-bracket' : 'fa-solid fa-user'"
+              :icon="
+                isLogin ? 'fa-solid fa-right-to-bracket' : 'fa-solid fa-user'
+              "
               :loading="isLoading"
               class="w-full"
               @click="handleSubmit"
@@ -95,9 +99,8 @@ const password = ref("");
 const isLogin = ref(true);
 const isLoading = ref(false);
 
+const auth = getAuth();
 const handleSubmit = async () => {
-  const auth = getAuth();
-
   try {
     isLoading.value = true;
 

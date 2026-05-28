@@ -8,28 +8,34 @@
         Active slots
       </span>
       <span
-        v-if="slots?.length"
+        v-if="filteredSlots?.length"
         class="rounded-full bg-emerald-50 !px-2 !py-0.5 text-xs font-semibold text-emerald-600"
       >
-        {{ slots.length }}
+        {{ filteredSlots.length }}
       </span>
     </div>
 
-    <!-- Legend -->
-    <div class="!mb-4 flex items-center !gap-4">
-      <div class="flex items-center !gap-1.5">
-        <StatusDot color="green" />
-        <span class="text-xs text-surface-400">Now playing</span>
-      </div>
-      <div class="flex items-center !gap-1.5">
-        <StatusDot color="amber" />
-        <span class="text-xs text-surface-400">Upcoming</span>
-      </div>
+    <!-- Filter -->
+    <div class="!mb-4 flex items-center !gap-1">
+      <button
+        v-for="opt in filterOptions"
+        :key="opt.value"
+        class="flex items-center !gap-1.5 rounded-full !px-2.5 !py-1 text-xs font-medium cursor-pointer border-none outline-none"
+        :class="
+          filter === opt.value
+            ? 'bg-primary-700 text-white'
+            : 'bg-transparent text-surface-400 hover:text-surface-600'
+        "
+        @click="filter = opt.value"
+      >
+        <StatusDot v-if="opt.dot" :color="opt.dot as any" />
+        {{ opt.label }}
+      </button>
     </div>
 
     <!-- Empty state -->
     <div
-      v-if="!slots?.length"
+      v-if="!filteredSlots?.length"
       class="flex flex-col items-center rounded-xl border border-dashed border-surface-200 !py-10 text-center"
     >
       <div
@@ -50,7 +56,7 @@
       :style="maxHeight ? { maxHeight: `${maxHeight - 100}px` } : undefined"
     >
       <div
-        v-for="slot in slots"
+        v-for="slot in filteredSlots"
         :key="slot.id"
         class="rounded-xl border border-surface-200 bg-white !p-4 !mb-2"
       >
@@ -65,13 +71,13 @@
               slot.label
             }}</span>
             <StatusDot
-              :color="slotStatus(slot) === 'live' ? 'green' : 'amber'"
-              :ping="slotStatus(slot) === 'live'"
+              :color="slot.status === 'live' ? 'green' : 'amber'"
+              :ping="slot.status === 'live'"
             />
           </div>
 
           <p
-            v-if="slotStatus(slot) === 'live'"
+            v-if="slot.status === 'live'"
             class="italic text-sm font-semibold text-emerald-600"
           >
             {{ now.getMinutes() }} '
@@ -149,19 +155,21 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useQueryClient } from "@tanstack/vue-query";
 import { useGetEnabledTimeslots } from "../../composables/queries";
 import { socket } from "@/socket";
 import type {
   TimeslotResponse,
   TimeslotMembershipChangedPayload,
+  TimeslotStatusChangedPayload,
 } from "@football/shared";
 import { useNow } from "../../composables/useNow";
 import { Button } from "primevue";
 import StatusDot from "@/components/StatusDot.vue";
 
 const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
+const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
 
 const props = defineProps<{
   roomId: number;
@@ -176,13 +184,19 @@ const { data: slots } = useGetEnabledTimeslots({
   day: () => props.selectedDay,
 });
 
-const slotFirstSeen = ref<Record<number, number>>({});
+const filter = ref<"all" | "live" | "upcoming">("all");
 
-watch(slots, (newSlots, oldSlots) => {
-  const oldIds = new Set(oldSlots?.map((s) => s.id) ?? []);
-  newSlots?.forEach((slot) => {
-    if (!oldIds.has(slot.id)) slotFirstSeen.value[slot.id] = Date.now();
-  });
+const filterOptions = [
+  { label: "Show all", value: "all" as const, dot: null },
+  { label: "Now playing", value: "live" as const, dot: "green" },
+  { label: "Upcoming", value: "upcoming" as const, dot: "amber" },
+];
+
+const filteredSlots = computed(() => {
+  if (filter.value === "all") return slots.value;
+  if (filter.value === "live")
+    return slots.value?.filter((s) => s.status === "live");
+  return slots.value?.filter((s) => s.status !== "live");
 });
 
 const handleMembershipChanged = ({
@@ -198,12 +212,37 @@ const handleMembershipChanged = ({
   );
 };
 
+const handleStatusChanged = ({
+  timeslotId,
+  roomId,
+  status,
+}: TimeslotStatusChangedPayload) => {
+  if (status === "scheduled") {
+    if (roomId === props.roomId) {
+      queryClient.invalidateQueries({
+        queryKey: ["timeslots", "enabled", props.roomId, props.selectedDay],
+      });
+    }
+    return;
+  }
+  queryClient.setQueryData<TimeslotResponse[]>(
+    ["timeslots", "enabled", props.roomId, props.selectedDay],
+    (current) => {
+      if (status === "ended")
+        return current?.filter((s) => s.id !== timeslotId);
+      return current?.map((s) => (s.id === timeslotId ? { ...s, status } : s));
+    }
+  );
+};
+
 onMounted(() => {
   socket.on(TIMESLOT_MEMBERSHIP_CHANGED_EVENT, handleMembershipChanged);
+  socket.on(TIMESLOT_STATUS_CHANGED_EVENT, handleStatusChanged);
 });
 
 onBeforeUnmount(() => {
   socket.off(TIMESLOT_MEMBERSHIP_CHANGED_EVENT, handleMembershipChanged);
+  socket.off(TIMESLOT_STATUS_CHANGED_EVENT, handleStatusChanged);
 });
 
 const capacityColor = (slot: TimeslotResponse) => {
@@ -226,31 +265,16 @@ const DAY_LABELS: Record<string, string> = {
   sa: "Saturday",
 };
 
-const getStartMinutes = (slot: TimeslotResponse) =>
-  parseInt(slot.label.split(":")[0] ?? "0", 10) * 60;
-
 const minutesUntilStart = (slot: TimeslotResponse) => {
   const n = now.value;
-  return getStartMinutes(slot) - (n.getHours() * 60 + n.getMinutes());
-};
-
-const slotStatus = (slot: TimeslotResponse): "live" | "next" => {
-  const n = now.value;
-  if (slot.day !== DAY_MAP[n.getDay()]) return "next";
-  const diff = minutesUntilStart(slot);
-  if (diff <= 0 && diff > -60) {
-    const startMs = new Date(n).setHours(0, 0, 0, 0) + getStartMinutes(slot) * 60_000;
-    const appearedAt = slotFirstSeen.value[slot.id];
-    if (appearedAt && appearedAt > startMs) return "next";
-    return "live";
-  }
-  return "next";
+  return slot.start_time - (n.getHours() * 60 + n.getMinutes());
 };
 
 const nextLabel = (slot: TimeslotResponse): string => {
   const n = now.value;
   const diff = minutesUntilStart(slot);
-  if (slot.day === DAY_MAP[n.getDay()] && diff > 0) return `Today ${slot.label}`;
+  if (slot.day === DAY_MAP[n.getDay()] && diff > -60)
+    return `Today ${slot.label}`;
   const daysUntil = (DAY_MAP.indexOf(slot.day) - n.getDay() + 7) % 7 || 7;
   if (daysUntil === 1) return `Tomorrow ${slot.label}`;
   return `Next ${DAY_LABELS[slot.day]}`;

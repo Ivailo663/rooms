@@ -11,6 +11,7 @@ import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerTimeslotRoutes } from "./routes/timeslots.js";
 import { registerUserRoutes } from "./routes/users.js";
 import type { AppError } from "./utils/http.js";
+import { startScheduler } from "./scheduler.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
@@ -36,6 +37,7 @@ registerUserRoutes(app);
 registerRoomRoutes(app);
 registerTimeslotRoutes(app);
 registerMembershipRoutes(app, io);
+startScheduler(io);
 
 app.use(
   (error: AppError, _req: Request, res: Response, _next: NextFunction) => {

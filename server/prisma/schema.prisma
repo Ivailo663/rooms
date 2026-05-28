@@ -31,11 +31,19 @@ model Room {
   @@map("rooms")
 }
 
+enum SlotStatus {
+  scheduled
+  live
+  ended
+}
+
 model RoomTimeslot {
   id               Int              @id @default(autoincrement())
   roomId           Int              @map("room_id")
   order            Int              @default(0)
   available_date   DateTime         @db.Date
+  status           SlotStatus       @default(scheduled)
+  start_time       Int
   label            String           @db.VarChar(5)
   created_at       DateTime?        @default(now()) @db.Timestamptz(6)
   updated_at       DateTime?        @default(now()) @db.Timestamptz(6)
