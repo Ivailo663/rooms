@@ -50,6 +50,8 @@ export interface RoomWithPlayersResponse extends RoomSummaryResponse {
   players: PlayerSummary[];
 }
 
+export type SlotStatus = "scheduled" | "live" | "ended";
+
 export interface TimeslotResponse {
   id: number;
   name: string;
@@ -61,6 +63,8 @@ export interface TimeslotResponse {
   max_players: number;
   day: string;
   enabled: boolean;
+  status: SlotStatus;
+  start_time: number;
 }
 
 export interface TimeslotPlayer {
@@ -85,7 +89,6 @@ export interface CreateTimeslotRequest {
   room_id: number;
   name: string;
   label: string;
-  available_date?: string;
   max_players: number;
   price?: string | number | null;
   message?: string | null;
@@ -97,7 +100,6 @@ export interface UpdateTimeslotRequest {
   id: number;
   name?: string;
   label?: string;
-  available_date?: string;
   max_players?: number;
   price?: string | number | null;
   message?: string | null;
@@ -147,4 +149,22 @@ export interface MutationMessageResponse {
 export interface TimeslotMembershipChangedPayload {
   timeslotId: number;
   players: TimeslotPlayer[];
+}
+
+export interface TimeslotStatusChangedPayload {
+  timeslotId: number;
+  roomId: number;
+  status: SlotStatus;
+}
+
+export interface LiveSlotSummary {
+  id: number;
+  label: string;
+  start_time: number;
+  players_count: number;
+  max_players: number;
+}
+
+export interface HostedRoomResponse extends RoomSummaryResponse {
+  liveSlot: LiveSlotSummary | null;
 }

@@ -9,6 +9,12 @@ import type {
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger } from "../utils/validation.js";
 import { Prisma } from "@prisma/client";
+import { syncSlot } from "../scheduler.js";
+
+const labelToStartTime = (label: string): number => {
+  const [h, m] = label.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+};
 
 const getQueryValue = (value: unknown) => {
   if (Array.isArray(value)) {
@@ -74,6 +80,8 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
     features: timeslot.features as TimeslotResponse["features"],
     day: timeslot.day,
     enabled: timeslot.enabled,
+    status: timeslot.status,
+    start_time: timeslot.start_time,
     players: timeslot.timeslot_players.map(({ accounts }) => ({
       id: accounts.id,
       name: accounts.name,
@@ -91,6 +99,7 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
     where: {
       roomId,
       enabled: true,
+      status: { not: "ended" },
       day: req.query.day as string,
       room: {
         creatorId: account.id,
@@ -108,7 +117,7 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
         },
       },
     },
-    orderBy: { label: "asc" },
+    orderBy: { start_time: "asc" },
   });
 
   const response: TimeslotResponse[] = timeslots.map((timeslot) => ({
@@ -121,6 +130,8 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
     features: timeslot.features as TimeslotResponse["features"],
     day: timeslot.day,
     enabled: timeslot.enabled,
+    status: timeslot.status,
+    start_time: timeslot.start_time,
     players: timeslot.timeslot_players.map(({ accounts }) => ({
       id: accounts.id,
       name: accounts.name,
@@ -171,7 +182,7 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
       day: body.day,
       name: body.name,
       label: body.label,
-      available_date: body.available_date ? new Date(body.available_date) : "", //TODO: Handle optional date properly
+      start_time: labelToStartTime(body.label),
       max_players: body.max_players,
       price: body.price
         ? typeof body.price === "string"
@@ -183,6 +194,8 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
       enabled: body.enabled ?? false,
     },
   });
+
+  await syncSlot(timeslot.id);
 
   const response: CreateTimeslotResponse = {
     id: timeslot.id,
@@ -213,9 +226,10 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const updateData: Partial<Prisma.RoomTimeslotUpdateInput> = {};
 
   if (body.name !== undefined) updateData.name = body.name;
-  if (body.label !== undefined) updateData.label = body.label;
-  if (body.available_date !== undefined)
-    updateData.available_date = new Date(body.available_date);
+  if (body.label !== undefined) {
+    updateData.label = body.label;
+    updateData.start_time = labelToStartTime(body.label);
+  }
   if (body.max_players !== undefined) updateData.max_players = body.max_players;
   if (body.price !== undefined) {
     updateData.price = body.price
@@ -228,10 +242,12 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   if (body.features !== undefined) updateData.features = body.features;
   if (body.enabled !== undefined) updateData.enabled = body.enabled;
 
-  const updatedTimeslot = await prisma.roomTimeslot.update({
+  await prisma.roomTimeslot.update({
     where: { id: body.id },
     data: updateData,
   });
+
+  await syncSlot(body.id);
 
   res.send({ message: "Timeslot updated successfully" });
 });
@@ -257,6 +273,8 @@ const deleteTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   await prisma.roomTimeslot.delete({
     where: { id: timeslotId },
   });
+
+  await syncSlot(timeslotId);
 
   res.send({ message: "Timeslot deleted successfully" });
 });

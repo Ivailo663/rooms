@@ -28,12 +28,58 @@
           >
         </InputGroupAddon>
       </InputGroup>
+
+      <!-- Filter pills -->
+      <div
+        v-if="!isHostedRooms"
+        class="!mt-3 flex w-full max-w-lg flex-wrap items-center justify-center !gap-1.5"
+      >
+        <button
+          v-for="day in DAYS"
+          :key="day.value"
+          type="button"
+          class="relative inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border text-xs font-semibold transition-colors"
+          :class="
+            activeDays.includes(day.value)
+              ? 'border-primary-600 bg-primary-600 text-white'
+              : 'border-surface-200 bg-white text-surface-500 hover:border-primary-200 hover:text-primary-600'
+          "
+          @click="toggleDay(day.value)"
+        >
+          {{ day.label }}
+          <span
+            v-if="day.value === todayValue"
+            class="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full"
+            :class="
+              activeDays.includes(day.value) ? 'bg-white' : 'bg-primary-400'
+            "
+          />
+        </button>
+
+        <span class="!mx-1 h-5 w-px bg-surface-200" />
+
+        <button
+          v-for="filter in quickFilters"
+          :key="filter.value"
+          type="button"
+          class="inline-flex cursor-pointer items-center !gap-1.5 rounded-full border !px-3 !py-1.5 text-xs font-medium transition-colors"
+          :class="
+            activeFilters.includes(filter.value)
+              ? 'border-primary-200 bg-primary-50 text-primary-700'
+              : 'border-surface-200 bg-white text-surface-500 hover:border-primary-200 hover:text-primary-600'
+          "
+          @click="toggleFilter(filter.value)"
+        >
+          <i :class="filter.icon" style="font-size: 0.65rem" />
+          {{ filter.label }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { InputText, InputGroup, InputGroupAddon } from "primevue";
 import { useRoomView } from "@/composables/useRoomView";
 
@@ -45,6 +91,44 @@ const emit = defineEmits<{
 
 const roomView = useRoomView();
 const isHostedRooms = computed(() => roomView.value === "hosted");
+
+const quickFilters = [
+  { label: "Open now", value: "open-now", icon: "fa-solid fa-bolt" },
+  {
+    label: "Has open slots",
+    value: "open-slots",
+    icon: "fa-solid fa-circle-check",
+  },
+  { label: "Top rated", value: "top-rated", icon: "fa-solid fa-star" },
+];
+
+const DAYS = [
+  { label: "Mo", value: "mo" },
+  { label: "Tu", value: "tu" },
+  { label: "We", value: "we" },
+  { label: "Th", value: "th" },
+  { label: "Fr", value: "fr" },
+  { label: "Sa", value: "sa" },
+  { label: "Su", value: "su" },
+];
+
+const todayValue =
+  DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]?.value;
+
+const activeFilters = ref<string[]>([]);
+const activeDays = ref<string[]>([]);
+
+const toggleFilter = (value: string) => {
+  activeFilters.value = activeFilters.value.includes(value)
+    ? activeFilters.value.filter((v) => v !== value)
+    : [...activeFilters.value, value];
+};
+
+const toggleDay = (value: string) => {
+  activeDays.value = activeDays.value.includes(value)
+    ? activeDays.value.filter((v) => v !== value)
+    : [...activeDays.value, value];
+};
 </script>
 
 <style scoped>

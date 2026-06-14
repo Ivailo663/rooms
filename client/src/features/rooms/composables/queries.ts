@@ -22,26 +22,24 @@ import {
 import type {
   GetTimeslotsParams,
   GetEnabledTimeslotsParams,
-  RoomWithPlayersResponse,
+  HostedRoomResponse,
   TimeslotResponse,
   JoinableRoomResponse,
   CreateTimeslotRequest,
   UpdateTimeslotRequest,
   CreateTimeslotResponse,
   MutationMessageResponse,
+  RoomWithPlayersResponse,
 } from "@football/shared";
 
 import { useAuthStore } from "@/stores/auth";
 
 export const useGetHostedRooms = (
-  options?: Omit<
-    UseQueryOptions<RoomWithPlayersResponse[]>,
-    "queryKey" | "queryFn"
-  >
+  options?: Omit<UseQueryOptions<HostedRoomResponse[]>, "queryKey" | "queryFn">
 ) => {
   const authStore = useAuthStore();
 
-  return useQuery<RoomWithPlayersResponse[]>({
+  return useQuery<HostedRoomResponse[]>({
     queryKey: ["hosted-rooms"],
     queryFn: () => getHostedRooms(),
     enabled: !!authStore.user?.id,

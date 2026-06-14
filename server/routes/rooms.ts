@@ -3,7 +3,7 @@ import prisma from "../prisma.js";
 import type {
   CreateRoomRequest,
   CreateRoomResponse,
-  RoomSummaryResponse,
+  HostedRoomResponse,
   JoinableRoomResponse,
 } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
@@ -64,19 +64,44 @@ const getHostedRooms: RequestHandler = asyncHandler(async (_req, res) => {
       description: true,
       price: true,
       address: true,
+      timeslots: {
+        where: { enabled: true, status: "live" },
+        select: {
+          id: true,
+          label: true,
+          start_time: true,
+          max_players: true,
+          day: true,
+          _count: { select: { timeslot_players: true } },
+        },
+        take: 1,
+      },
     },
     orderBy: {
       id: "asc",
     },
   });
 
-  const response: RoomSummaryResponse[] = rooms.map((room) => ({
-    id: room.id,
-    name: room.name,
-    description: room.description,
-    address: room.address,
-    price: room.price?.toString() ?? null,
-  }));
+  const response: HostedRoomResponse[] = rooms.map((room) => {
+    const live = room.timeslots[0] ?? null;
+    return {
+      id: room.id,
+      name: room.name,
+      description: room.description,
+      address: room.address,
+      price: room.price?.toString() ?? null,
+      liveSlot: live
+        ? {
+            id: live.id,
+            label: live.label,
+            start_time: live.start_time,
+            players_count: live._count.timeslot_players,
+            max_players: live.max_players,
+            day: live.day,
+          }
+        : null,
+    };
+  });
 
   res.send(response);
 });

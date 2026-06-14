@@ -1,6 +1,6 @@
 <template>
   <main class="bg-surface-50">
-    <div class="w-full !px-4 !py-8 sm:!px-6 sm:w-[80vw] sm:!mx-auto">
+    <div class="w-full !py-8 sm:!px-6">
       <RoomsHeader v-model:search="search" />
 
       <HostedRooms v-if="isHostedRooms" />
