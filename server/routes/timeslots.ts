@@ -9,6 +9,7 @@ import type {
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger } from "../utils/validation.js";
 import { Prisma } from "@prisma/client";
+import { syncSlot } from "../scheduler.js";
 
 const labelToStartTime = (label: string): number => {
   const [h, m] = label.split(":").map(Number);
@@ -182,7 +183,6 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
       name: body.name,
       label: body.label,
       start_time: labelToStartTime(body.label),
-      available_date: body.available_date ? new Date(body.available_date) : "", //TODO: Handle optional date properly
       max_players: body.max_players,
       price: body.price
         ? typeof body.price === "string"
@@ -194,6 +194,8 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
       enabled: body.enabled ?? false,
     },
   });
+
+  await syncSlot(timeslot.id);
 
   const response: CreateTimeslotResponse = {
     id: timeslot.id,
@@ -228,8 +230,6 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
     updateData.label = body.label;
     updateData.start_time = labelToStartTime(body.label);
   }
-  if (body.available_date !== undefined)
-    updateData.available_date = new Date(body.available_date);
   if (body.max_players !== undefined) updateData.max_players = body.max_players;
   if (body.price !== undefined) {
     updateData.price = body.price
@@ -242,10 +242,12 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   if (body.features !== undefined) updateData.features = body.features;
   if (body.enabled !== undefined) updateData.enabled = body.enabled;
 
-  const updatedTimeslot = await prisma.roomTimeslot.update({
+  await prisma.roomTimeslot.update({
     where: { id: body.id },
     data: updateData,
   });
+
+  await syncSlot(body.id);
 
   res.send({ message: "Timeslot updated successfully" });
 });
@@ -271,6 +273,8 @@ const deleteTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   await prisma.roomTimeslot.delete({
     where: { id: timeslotId },
   });
+
+  await syncSlot(timeslotId);
 
   res.send({ message: "Timeslot deleted successfully" });
 });

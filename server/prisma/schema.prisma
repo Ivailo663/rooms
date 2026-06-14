@@ -41,7 +41,6 @@ model RoomTimeslot {
   id               Int              @id @default(autoincrement())
   roomId           Int              @map("room_id")
   order            Int              @default(0)
-  available_date   DateTime         @db.Date
   status           SlotStatus       @default(scheduled)
   start_time       Int
   label            String           @db.VarChar(5)
@@ -57,7 +56,7 @@ model RoomTimeslot {
   room             Room             @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_room_timeslots_room")
   timeslot_players TimeslotPlayer[]
 
-  @@unique([roomId, available_date, label], map: "unique_room_slot")
+  @@unique([roomId, day, label], map: "unique_room_slot")
   @@map("room_timeslots")
 }
 

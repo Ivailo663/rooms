@@ -2,7 +2,9 @@
   <div class="flex !gap-6 items-start">
     <div ref="formRef" class="flex-1">
       <!-- Day selector -->
-      <div class="!mb-5 flex justify-between items-end">
+      <div
+        class="w-full flex justify-between items-end text-primary uppercase rounded-[10px] !p-3 !mb-5 text-right border border-primary-100 day-banner"
+      >
         <div>
           <p
             class="!mb-2 flex items-center !gap-1.5 text-xs font-semibold uppercase tracking-widest text-surface-400"
@@ -29,168 +31,161 @@
             </template>
           </SelectButton>
         </div>
-
-        <div
-          class="w-full text-[25px] text-primary !font-thin uppercase rounded-[10px] !p-3 !ml-10 text-right border border-primary-100 tracking-[5px] day-banner"
-        >
+        <p class="text-[25px] !font-thin tracking-[5px]">
           {{ DAYS.find((d) => d.value === weekDay)?.full }}
-        </div>
+        </p>
       </div>
 
-      <BasicWrapper>
-        <!-- Slot picker -->
-        <BasicWrapper class="!mb-5">
-          <div class="flex items-start justify-between !gap-4">
-            <div class="flex-1">
-              <p
-                class="!mb-3 flex items-center !gap-1.5 text-xs font-semibold uppercase tracking-widest text-surface-400"
-              >
-                <i class="fa-solid fa-clock" style="font-size: 0.6rem" />
-                Time slots
-              </p>
-              <div class="flex flex-wrap !gap-2">
-                <Button
-                  v-for="(slot, index) in slots"
-                  :key="slot.id"
-                  :label="slot.label"
-                  size="small"
-                  icon="fa-solid fa-clock"
-                  class="!cursor-pointer"
-                  :variant="
-                    index === selectedIndex && !isCreating
-                      ? 'filled'
-                      : 'outlined'
-                  "
-                  @click="selectSlot(index)"
-                />
-              </div>
-              <p
-                v-if="!slots?.length"
-                class="!mt-1 text-xs italic text-surface-300"
-              >
-                No slots for this day yet
-              </p>
-            </div>
-
-            <div class="shrink-0">
-              <p
-                class="!mb-2 text-xs font-semibold uppercase tracking-widest text-surface-400"
-              >
-                Add slot
-              </p>
-              <Select
-                v-model="newTimeslot"
-                :options="TIME_OPTIONS"
-                option-label="name"
-                placeholder="Select time…"
-                show-clear
-                @change="isCreating = !!newTimeslot"
+      <!-- Slot picker -->
+      <BasicWrapper class="!mb-5">
+        <div class="flex items-start justify-between !gap-4">
+          <div class="flex-1">
+            <p
+              class="!mb-3 flex items-center !gap-1.5 text-xs font-semibold uppercase tracking-widest text-surface-400"
+            >
+              <i class="fa-solid fa-clock" style="font-size: 0.6rem" />
+              Time slots
+            </p>
+            <div class="flex flex-wrap !gap-2">
+              <Button
+                v-for="(slot, index) in slots"
+                :key="slot.id"
+                :label="slot.label"
+                size="small"
+                icon="fa-solid fa-clock"
+                class="!cursor-pointer"
+                :variant="
+                  index === selectedIndex && !isCreating ? 'filled' : 'outlined'
+                "
+                @click="selectSlot(index)"
               />
             </div>
-          </div>
-        </BasicWrapper>
-
-        <!-- Form card -->
-        <BasicWrapper class="flex flex-col !gap-5">
-          <template v-if="slots?.length || isCreating">
-            <!-- Launch / Stop -->
-
-            <RoomFormSlot
-              v-model:enabled="enabled"
-              :form="form"
-              :show-enabled-toggle="isCreating"
-              :disabled="!isCreating && enabled"
-            />
-
-            <Button
-              v-if="!isCreating && selectedSlot"
-              :label="enabled ? 'Stop slot' : 'Launch slot'"
-              :icon="enabled ? 'fa-solid fa-stop' : 'fa-solid fa-play'"
-              :severity="enabled ? 'danger' : 'success'"
-              size="large"
-              class="w-full"
-              @click="toggleLaunch"
-            />
-
-            <!-- Creating actions -->
-            <div
-              v-if="isCreating"
-              class="flex justify-end !gap-2 border-t border-surface-100 !pt-3"
+            <p
+              v-if="!slots?.length"
+              class="!mt-1 text-xs italic text-surface-300"
             >
+              No slots for this day yet
+            </p>
+          </div>
+
+          <div class="shrink-0">
+            <p
+              class="!mb-2 text-xs font-semibold uppercase tracking-widest text-surface-400"
+            >
+              Add slot
+            </p>
+            <Select
+              v-model="newTimeslot"
+              :options="TIME_OPTIONS"
+              option-label="name"
+              placeholder="Select time…"
+              show-clear
+              @change="isCreating = !!newTimeslot"
+            />
+          </div>
+        </div>
+      </BasicWrapper>
+
+      <!-- Form card -->
+      <BasicWrapper class="flex flex-col !gap-5">
+        <template v-if="slots?.length || isCreating">
+          <!-- Launch / Stop -->
+
+          <RoomFormSlot
+            v-model:enabled="enabled"
+            :form="form"
+            :show-enabled-toggle="isCreating"
+            :disabled="!isCreating && enabled"
+          />
+
+          <Button
+            v-if="!isCreating && selectedSlot"
+            :label="enabled ? 'Stop slot' : 'Launch slot'"
+            :icon="enabled ? 'fa-solid fa-stop' : 'fa-solid fa-play'"
+            :severity="enabled ? 'danger' : 'success'"
+            size="large"
+            class="w-full"
+            @click="toggleLaunch"
+          />
+
+          <!-- Creating actions -->
+          <div
+            v-if="isCreating"
+            class="flex justify-end !gap-2 border-t border-surface-100 !pt-3"
+          >
+            <Button
+              label="Discard"
+              severity="secondary"
+              outlined
+              icon="fa-solid fa-xmark"
+              size="small"
+              @click="discardNewSlot"
+            />
+            <Button
+              label="Save slot"
+              severity="success"
+              icon="fa-solid fa-check"
+              size="small"
+              :disabled="!newTimeslot"
+              @click="form.handleSubmit()"
+            />
+          </div>
+
+          <!-- Edit actions -->
+          <div
+            v-else-if="selectedSlot"
+            class="flex items-center justify-between border-t border-surface-100 !pt-3"
+          >
+            <Button
+              :label="`Delete ${selectedSlot.label}`"
+              severity="danger"
+              size="small"
+              variant="text"
+              icon="fa-solid fa-trash"
+              @click="deleteSlot"
+            />
+            <div v-if="isDirty" class="flex !gap-2">
               <Button
                 label="Discard"
                 severity="secondary"
                 outlined
-                icon="fa-solid fa-xmark"
+                icon="fa-solid fa-rotate"
                 size="small"
-                @click="discardNewSlot"
+                @click="form.reset()"
               />
               <Button
-                label="Save slot"
+                label="Save"
                 severity="success"
                 icon="fa-solid fa-check"
                 size="small"
-                :disabled="!newTimeslot"
                 @click="form.handleSubmit()"
               />
             </div>
+          </div>
+        </template>
 
-            <!-- Edit actions -->
+        <template v-else>
+          <div class="flex flex-col items-center !py-10 text-center">
             <div
-              v-else-if="selectedSlot"
-              class="flex items-center justify-between border-t border-surface-100 !pt-3"
+              class="!mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-100"
             >
-              <Button
-                :label="`Delete ${selectedSlot.label}`"
-                severity="danger"
-                size="small"
-                variant="text"
-                icon="fa-solid fa-trash"
-                @click="deleteSlot"
-              />
-              <div v-if="isDirty" class="flex !gap-2">
-                <Button
-                  label="Discard"
-                  severity="secondary"
-                  outlined
-                  icon="fa-solid fa-rotate"
-                  size="small"
-                  @click="form.reset()"
-                />
-                <Button
-                  label="Save"
-                  severity="success"
-                  icon="fa-solid fa-check"
-                  size="small"
-                  @click="form.handleSubmit()"
-                />
-              </div>
+              <i class="fa-solid fa-clock text-xl text-surface-300" />
             </div>
-          </template>
-
-          <template v-else>
-            <div class="flex flex-col items-center !py-10 text-center">
-              <div
-                class="!mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-100"
-              >
-                <i class="fa-solid fa-clock text-xl text-surface-300" />
-              </div>
-              <p class="!mb-1 text-sm font-medium text-surface-500">
-                No time slots yet
-              </p>
-              <p class="!mb-4 text-xs text-surface-300">
-                Add your first time slot for this day
-              </p>
-              <Button
-                label="Create a slot"
-                icon="fa-solid fa-plus"
-                variant="text"
-                size="small"
-                @click="isCreating = true"
-              />
-            </div>
-          </template>
-        </BasicWrapper>
+            <p class="!mb-1 text-sm font-medium text-surface-500">
+              No time slots yet
+            </p>
+            <p class="!mb-4 text-xs text-surface-300">
+              Add your first time slot for this day
+            </p>
+            <Button
+              label="Create a slot"
+              icon="fa-solid fa-plus"
+              variant="text"
+              size="small"
+              @click="isCreating = true"
+            />
+          </div>
+        </template>
       </BasicWrapper>
     </div>
 
@@ -292,7 +287,6 @@ const form = useForm({
         day: weekDay.value,
         name: newTimeslot.value.name,
         label: newTimeslot.value.code,
-        available_date: new Date().toISOString().split("T")[0],
         max_players: value.max_players ?? 0,
         price: value.price,
         message: value.message,

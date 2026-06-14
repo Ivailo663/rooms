@@ -8,10 +8,9 @@
         Active slots
       </span>
       <span
-        v-if="filteredSlots?.length"
         class="rounded-full bg-emerald-50 !px-2 !py-0.5 text-xs font-semibold text-emerald-600"
       >
-        {{ filteredSlots.length }}
+        {{ filteredSlots?.length ?? 0 }}
       </span>
     </div>
 
@@ -80,7 +79,12 @@
             v-if="slot.status === 'live'"
             class="italic text-sm font-semibold text-emerald-600"
           >
-            {{ now.getMinutes() }} '
+            {{
+              Math.max(
+                1,
+                now.getHours() * 60 + now.getMinutes() - slot.start_time
+              )
+            }}'
           </p>
           <p v-else class="text-xs text-surface-400">
             {{ nextLabel(slot) }}
@@ -184,12 +188,12 @@ const { data: slots } = useGetEnabledTimeslots({
   day: () => props.selectedDay,
 });
 
-const filter = ref<"all" | "live" | "upcoming">("all");
+const filter = ref<"all" | "live" | "scheduled">("all");
 
 const filterOptions = [
   { label: "Show all", value: "all" as const, dot: null },
   { label: "Now playing", value: "live" as const, dot: "green" },
-  { label: "Upcoming", value: "upcoming" as const, dot: "amber" },
+  { label: "Scheduled", value: "scheduled" as const, dot: "amber" },
 ];
 
 const filteredSlots = computed(() => {

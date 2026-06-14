@@ -9,8 +9,9 @@
         class: 'border border-surface-200 rounded-lg',
       },
     }"
+    @row-expand="onRowExpand"
   >
-    <Column expander style="width: 3rem" />
+    <Column expander style="width: 1rem" />
 
     <Column field="name">
       <template #header>
@@ -28,7 +29,7 @@
       <template #header>
         <div class="flex items-center !gap-1.5">
           <StatusDot color="green" />
-          <span>Now playing</span>
+          <span>Status</span>
         </div>
       </template>
       <template #body="slotProps">
@@ -55,7 +56,6 @@
             <span class="text-sm font-bold italic text-emerald-600">
               {{ elapsedMinutes(slotProps.data.liveSlot.start_time) }}'
             </span>
-            <span class="text-[10px] text-emerald-400">elapsed</span>
           </div>
 
           <div class="h-6 w-px bg-emerald-200" />
@@ -130,6 +130,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { DataTable, Column } from "primevue";
+import type {
+  DataTableExpandedRows,
+  DataTableRowExpandEvent,
+} from "primevue/datatable";
 import { useQueryClient } from "@tanstack/vue-query";
 import RoomSlots from "../room-slots/components/RoomSlots.vue";
 import StatusDot from "@/components/StatusDot.vue";
@@ -143,7 +147,11 @@ import type {
 
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
 
-const expandedRows = ref([]);
+const expandedRows = ref<DataTableExpandedRows>({});
+
+const onRowExpand = (event: DataTableRowExpandEvent) => {
+  expandedRows.value = { [event.data.id]: true };
+};
 const queryClient = useQueryClient();
 const now = useNow();
 
@@ -151,7 +159,7 @@ const { data } = useGetHostedRooms();
 
 const elapsedMinutes = (startTime: number) => {
   const n = now.value;
-  return n.getHours() * 60 + n.getMinutes() - startTime;
+  return Math.max(1, n.getHours() * 60 + n.getMinutes() - startTime);
 };
 
 const handleStatusChanged = ({

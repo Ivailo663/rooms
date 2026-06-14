@@ -89,7 +89,6 @@ export interface CreateTimeslotRequest {
   room_id: number;
   name: string;
   label: string;
-  available_date?: string;
   max_players: number;
   price?: string | number | null;
   message?: string | null;
@@ -101,7 +100,6 @@ export interface UpdateTimeslotRequest {
   id: number;
   name?: string;
   label?: string;
-  available_date?: string;
   max_players?: number;
   price?: string | number | null;
   message?: string | null;
