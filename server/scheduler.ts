@@ -1,10 +1,15 @@
 import type { Server } from "socket.io";
+import type { SlotStatus } from "@prisma/client";
 import prisma from "./prisma.js";
+import { timeslotQueue } from "./queues/timeslotQueue.js";
 import type { TimeslotStatusChangedPayload } from "../packages/shared/index.js";
 
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
 const SLOT_DURATION_MS = 60 * 60 * 1000;
 const SLOT_DURATION_MINUTES = SLOT_DURATION_MS / (60 * 1000);
+
+export const GO_LIVE = "go-live";
+export const GO_ENDED = "go-ended";
 
 const DAY_INDEX: Record<string, number> = {
   su: 0,
@@ -18,43 +23,13 @@ const DAY_INDEX: Record<string, number> = {
 
 type SlotInfo = {
   id: number;
-  roomId: number;
   day: string;
   start_time: number;
 };
 
-const timers = new Map<number, NodeJS.Timeout>();
 let _io: Server;
 
-// Returns the next Date at which this slot should go live.
-// If today is the slot's day and we're still inside or before the window,
-// returns today's occurrence. If the window has already ended today,
-// returns next week's occurrence.
-const nextSlotStart = (day: string, startMinutes: number): Date => {
-  const now = new Date();
-  const target = DAY_INDEX[day];
-  let daysUntil = (target - now.getDay() + 7) % 7;
-
-  if (daysUntil === 0) {
-    const minutesNow = now.getHours() * 60 + now.getMinutes();
-    if (minutesNow >= startMinutes + SLOT_DURATION_MINUTES) daysUntil = 7;
-  }
-
-  const date = new Date(now);
-  date.setDate(date.getDate() + daysUntil);
-  date.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
-  return date;
-};
-
-const cancelTimer = (slotId: number) => {
-  const t = timers.get(slotId);
-  if (t !== undefined) {
-    clearTimeout(t);
-    timers.delete(slotId);
-  }
-};
-
-const emit = (
+export const emit = (
   slotId: number,
   roomId: number,
   status: TimeslotStatusChangedPayload["status"]
@@ -66,109 +41,84 @@ const emit = (
   } satisfies TimeslotStatusChangedPayload);
 };
 
-const goEnded = async (slot: SlotInfo) => {
-  try {
-    await prisma.roomTimeslot.update({
-      where: { id: slot.id },
-      data: { status: "ended" },
-    });
-    emit(slot.id, slot.roomId, "ended");
-
-    await prisma.roomTimeslot.update({
-      where: { id: slot.id },
-      data: { status: "scheduled" },
-    });
-    emit(slot.id, slot.roomId, "scheduled");
-
-    scheduleSlot(slot);
-  } catch (err) {
-    console.error(`Scheduler: goEnded failed for slot ${slot.id}:`, err);
-  }
-};
-
-const goLive = async (slot: SlotInfo) => {
-  try {
-    await prisma.roomTimeslot.update({
-      where: { id: slot.id },
-      data: { status: "live" },
-    });
-    emit(slot.id, slot.roomId, "live");
-    const t = setTimeout(() => goEnded(slot), SLOT_DURATION_MS);
-    timers.set(slot.id, t);
-  } catch (err) {
-    console.error(`Scheduler: goLive failed for slot ${slot.id}:`, err);
-  }
-};
-
-const scheduleSlot = (slot: SlotInfo) => {
-  cancelTimer(slot.id);
-
-  const now = new Date();
-  const start = nextSlotStart(slot.day, slot.start_time);
-  const msToStart = start.getTime() - now.getTime();
-  const msToEnd = start.getTime() + SLOT_DURATION_MS - now.getTime();
-
-  if (msToStart <= 0) {
-    // Server was down during the window — catch up: go live, schedule end for remaining time.
-    prisma.roomTimeslot
-      .update({ where: { id: slot.id }, data: { status: "live" } })
-      .then(() => {
-        emit(slot.id, slot.roomId, "live");
-        const t = setTimeout(() => goEnded(slot), msToEnd);
-        timers.set(slot.id, t);
-      })
-      .catch((err) =>
-        console.error(`Scheduler: catch-up failed for slot ${slot.id}:`, err)
-      );
-    return;
-  }
-
-  const t = setTimeout(() => goLive(slot), msToStart);
-  timers.set(slot.id, t);
-};
-
-const isInsideWindow = (day: string, startMinutes: number): boolean => {
+export const isInsideWindow = (day: string, startMinutes: number): boolean => {
   const now = new Date();
   if (now.getDay() !== DAY_INDEX[day]) return false;
   const minutesNow = now.getHours() * 60 + now.getMinutes();
   return minutesNow >= startMinutes && minutesNow < startMinutes + SLOT_DURATION_MINUTES;
 };
 
-export const syncSlot = async (slotId: number) => {
-  cancelTimer(slotId);
+// Converts a (day, minutes-from-midnight) pair into a "minute hour * * dow"
+// cron pattern. minutesFromMidnight may exceed 1440 (e.g. start_time + 60 for
+// a slot starting at 23:00+), in which case the day-of-week rolls over too.
+const toCron = (day: string, minutesFromMidnight: number): string => {
+  const wrapped = ((minutesFromMidnight % 1440) + 1440) % 1440;
+  const dayOffset = Math.floor(minutesFromMidnight / 1440);
+  const dow = (DAY_INDEX[day] + dayOffset + 7) % 7;
+  return `${wrapped % 60} ${Math.floor(wrapped / 60)} * * ${dow}`;
+};
 
-  const slot = await prisma.roomTimeslot.findUnique({
-    where: { id: slotId },
-    select: { id: true, roomId: true, day: true, start_time: true, status: true, enabled: true },
-  });
+const liveSchedulerId = (slotId: number) => `slot-${slotId}-live`;
+const endSchedulerId = (slotId: number) => `slot-${slotId}-end`;
 
-  if (!slot?.enabled) return;
+const scheduleSlotJobs = async (slot: SlotInfo) => {
+  await timeslotQueue.upsertJobScheduler(
+    liveSchedulerId(slot.id),
+    { pattern: toCron(slot.day, slot.start_time) },
+    { name: GO_LIVE, data: { slotId: slot.id } }
+  );
+  await timeslotQueue.upsertJobScheduler(
+    endSchedulerId(slot.id),
+    { pattern: toCron(slot.day, slot.start_time + SLOT_DURATION_MINUTES) },
+    { name: GO_ENDED, data: { slotId: slot.id } }
+  );
+};
 
-  if (slot.status === "live" && !isInsideWindow(slot.day, slot.start_time)) {
-    goEnded(slot);
-  } else {
-    scheduleSlot(slot);
+const removeSlotJobs = async (slotId: number) => {
+  await timeslotQueue.removeJobScheduler(liveSchedulerId(slotId));
+  await timeslotQueue.removeJobScheduler(endSchedulerId(slotId));
+};
+
+// Fixes up slots whose transition was missed while the server was down:
+// stuck "live" past the end of the window, or should already be "live" but
+// isn't yet, by enqueuing an immediate one-off job.
+const catchUp = async (slot: SlotInfo & { status: SlotStatus }) => {
+  const inWindow = isInsideWindow(slot.day, slot.start_time);
+
+  if (slot.status === "live" && !inWindow) {
+    await timeslotQueue.add(GO_ENDED, { slotId: slot.id });
+  } else if (slot.status !== "live" && inWindow) {
+    await timeslotQueue.add(GO_LIVE, { slotId: slot.id });
   }
 };
 
-export const startScheduler = (io: Server) => {
+export const syncSlot = async (slotId: number) => {
+  const slot = await prisma.roomTimeslot.findUnique({
+    where: { id: slotId },
+    select: { id: true, day: true, start_time: true, status: true, enabled: true },
+  });
+
+  if (!slot?.enabled) {
+    await removeSlotJobs(slotId);
+    return;
+  }
+
+  await scheduleSlotJobs(slot);
+  await catchUp(slot);
+};
+
+export const startScheduler = async (io: Server) => {
   _io = io;
 
-  prisma.roomTimeslot
-    .findMany({
-      where: { enabled: true },
-      select: { id: true, roomId: true, day: true, start_time: true, status: true },
-    })
-    .then((slots) => {
-      for (const { status, ...slot } of slots) {
-        if (status === "live" && !isInsideWindow(slot.day, slot.start_time)) {
-          // Stuck live slot from a previous session — end it now and reschedule.
-          goEnded(slot);
-        } else {
-          scheduleSlot(slot);
-        }
-      }
-      console.log(`Scheduler: ${slots.length} slot(s) loaded`);
-    })
-    .catch((err) => console.error("Scheduler: startup query failed:", err));
+  const slots = await prisma.roomTimeslot.findMany({
+    where: { enabled: true },
+    select: { id: true, day: true, start_time: true, status: true },
+  });
+
+  for (const slot of slots) {
+    await scheduleSlotJobs(slot);
+    await catchUp(slot);
+  }
+
+  console.log(`Scheduler: ${slots.length} slot(s) loaded`);
 };

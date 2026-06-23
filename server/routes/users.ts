@@ -1,12 +1,12 @@
 import type { Application, RequestHandler } from "express";
 import prisma from "../prisma.js";
 import { asyncHandler } from "../utils/http.js";
-import type { AccountEntity } from "../../packages/shared/index.js";
+import type { Account } from "@prisma/client";
 
 const createUser: RequestHandler = asyncHandler(async (_req, res) => {
   const { email } = res.locals.user;
 
-  const account: AccountEntity = await prisma.account.upsert({
+  const account: Account = await prisma.account.upsert({
     where: {
       email,
     },
@@ -23,7 +23,7 @@ const createUser: RequestHandler = asyncHandler(async (_req, res) => {
 const getUser: RequestHandler = asyncHandler(async (_req, res) => {
   const { email } = res.locals.user;
 
-  const account: AccountEntity | null = await prisma.account.findUnique({
+  const account: Account | null = await prisma.account.findUnique({
     where: {
       email,
     },

@@ -28,12 +28,16 @@ services:
     environment:
       TZ: Europe/Sofia
       DATABASE_URL: postgresql://postgres.rubmddylbuklwvnysszw:${POSTGRES_PASSWORD}@aws-0-eu-west-1.pooler.supabase.com:5432/${POSTGRES_DB}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     command: sh -c "npm install && npx prisma generate --schema=server/prisma/schema.prisma && npx --yes tsx watch --clear-screen=false server/app.ts"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
 
   db:
     container_name: postgres_container
@@ -52,6 +56,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_container
+    ports:
+      - "6379:6379"
 
   pgadmin:
     image: dpage/pgadmin4

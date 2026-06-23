@@ -13,7 +13,7 @@
     <AppSidebar v-if="authStore.user" v-model:visible="menuVisible" />
 
     <!-- Main content -->
-    <div class="flex-1 height-[100dvh] overflow-y-auto">
+    <div class="flex-1 h-[100dvh] overflow-y-auto !p-4">
       <RouterView />
     </div>
   </div>

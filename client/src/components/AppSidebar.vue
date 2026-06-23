@@ -1,10 +1,10 @@
 <template>
   <div
-    class="shrink-0 overflow-hidden transition-all duration-300 ease-in-out"
+    class="shrink-0 !overflow-hidden transition-all duration-300 ease-in-out"
     :class="props.visible ? 'w-72 !ml-4 !mr-2' : 'w-0 !ml-0 !mr-0'"
   >
     <aside
-      class="sticky top-4 flex h-[calc(100vh-2rem)] w-72 flex-col !gap-5 rounded-lg border border-surface-200 bg-white !p-3 transition-opacity duration-200"
+      class="sticky rounded-xl top-4 flex h-[calc(100vh-2rem)] w-72 flex-col !gap-5 rounded-lg border border-surface-200 bg-white !p-3 transition-opacity duration-200"
       :class="props.visible ? 'opacity-100' : 'pointer-events-none opacity-0'"
     >
       <!-- Header -->
@@ -48,24 +48,26 @@
       <div class="flex-1" />
 
       <!-- Primary actions -->
-      <div class="flex flex-col !gap-2 rounded-xl bg-surface-50 !p-2">
-        <Button
-          v-if="showCreateButton"
-          icon="fa-solid fa-plus"
-          label="Create room"
-          class="w-full"
-          @click="createRoomVisible = true"
-        />
-        <SelectButton
-          :model-value="roomView"
-          :options="viewOptions"
-          :allow-empty="false"
-          option-label="label"
-          option-value="value"
-          fluid
-          @update:model-value="(val) => (roomView = val)"
-        />
-      </div>
+      <RoleGate :capability="$cap.rooms.create">
+        <div class="flex flex-col !gap-2 rounded-xl bg-surface-50 !p-2">
+          <Button
+            v-if="showCreateButton"
+            icon="fa-solid fa-plus"
+            label="Create room"
+            class="w-full"
+            @click="createRoomVisible = true"
+          />
+          <SelectButton
+            :model-value="roomView"
+            :options="viewOptions"
+            :allow-empty="false"
+            option-label="label"
+            option-value="value"
+            fluid
+            @update:model-value="(val) => (roomView = val)"
+          />
+        </div>
+      </RoleGate>
 
       <!-- User -->
       <div class="flex flex-col !gap-2 border-t border-surface-100 !pt-4">
@@ -93,7 +95,6 @@
       </div>
     </aside>
   </div>
-
   <Button
     v-if="!props.visible"
     icon="fa-solid fa-bars"
@@ -111,6 +112,7 @@ import { Button, SelectButton } from "primevue";
 import { useAuthStore } from "@/stores/auth";
 import { useRoomView } from "@/composables/useRoomView";
 import { useCreateRoom } from "@/composables/useCreateRoom";
+import { RoomView } from "@/constants";
 import { signOut, getAuth } from "firebase/auth";
 
 const props = defineProps<{ visible: boolean }>();
@@ -122,16 +124,16 @@ const router = useRouter();
 
 const roomView = useRoomView();
 const createRoomVisible = useCreateRoom();
-const showCreateButton = computed(() => roomView.value === "hosted");
+const showCreateButton = computed(() => roomView.value === RoomView.Host);
 
 const viewOptions = [
-  { label: "Host", value: "hosted" },
-  { label: "Play", value: "others" },
+  { label: "Host", value: RoomView.Host },
+  { label: "Play", value: RoomView.Play },
 ];
 
 const items = [
   { label: "Home", icon: "fa-solid fa-house", route: "/" },
-  { label: "About", icon: "fa-solid fa-circle-info", route: "/about" },
+  { label: "Settings", icon: "fa-solid fa-gear", route: "/settings" },
 ];
 
 const handleLogout = async () => {

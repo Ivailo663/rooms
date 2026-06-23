@@ -5,13 +5,14 @@ import BasicWrapper from "./components/BasicWrapper.vue";
 import { createPinia } from "pinia";
 import PrimeVue from "primevue/config";
 import Lara from "@primeuix/themes/lara";
-//@ts-ignore
 import App from "./App.vue";
 import router from "./router";
 import "./firebase";
 import { VueQueryPlugin, QueryClient } from "@tanstack/vue-query";
 import { useAuthStore } from "./stores/auth";
 import { definePreset } from "@primeuix/themes";
+import RoleGate from "./components/RoleGate.vue";
+import { Cap } from "./stores/role";
 
 const app = createApp(App);
 
@@ -54,10 +55,6 @@ app.use(PrimeVue, {
   },
 });
 
-app.component("BasicWrapper", BasicWrapper);
-app.use(router);
-app.use(createPinia());
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -65,8 +62,13 @@ const queryClient = new QueryClient({
     },
   },
 });
-
 app.use(VueQueryPlugin, { queryClient });
+
+app.use(createPinia());
+app.use(router);
+app.component("BasicWrapper", BasicWrapper);
+app.component("RoleGate", RoleGate);
+app.config.globalProperties.$cap = Cap;
 
 const { init } = useAuthStore();
 

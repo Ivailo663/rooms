@@ -54,9 +54,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import type { JoinableRoomResponse } from "@football/shared";
+import type { PlayableRoomResponse } from "@football/shared";
 
-type Slot = JoinableRoomResponse["timeslots"][number];
+type Slot = PlayableRoomResponse["timeslots"][number];
 
 const props = defineProps<{ timeslots: Slot[] }>();
 const emit = defineEmits<{ select: [index: number] }>();

@@ -2,7 +2,7 @@ import { api } from "@/axios";
 import {
   type GetTimeslotsParams,
   type GetEnabledTimeslotsParams,
-  type JoinableRoomResponse,
+  type PlayableRoomResponse,
   type CreateTimeslotRequest,
   type UpdateTimeslotRequest,
   type CreateTimeslotResponse,
@@ -16,8 +16,12 @@ export const getHostedRooms = async () => {
   return data;
 };
 
-export const getJoinableRooms = async (): Promise<JoinableRoomResponse[]> => {
-  const { data } = await api.get<JoinableRoomResponse[]>("/rooms/joinable");
+export const getPlayableRooms = async (
+  day?: string,
+): Promise<PlayableRoomResponse[]> => {
+  const { data } = await api.get<PlayableRoomResponse[]>("/rooms/playable", {
+    params: day ? { day } : undefined,
+  });
 
   return data;
 };

@@ -18,22 +18,27 @@
 import { ref, computed } from "vue";
 import { api } from "@/axios";
 import { useAuthStore } from "../stores/auth";
+import { useRoleStore, Cap } from "@/stores/role";
 import HostedRooms from "@/features/rooms/HostedRooms.vue";
 import PlayableRooms from "@/features/rooms/PlayableRooms.vue";
 import CreateRoomDialog from "@/features/rooms/components/CreateRoomDialog.vue";
 import RoomsHeader from "@/features/rooms/components/RoomsHeader.vue";
 import { useRoomView } from "@/composables/useRoomView";
 import { useCreateRoom } from "@/composables/useCreateRoom";
+import { RoomView } from "@/constants";
 import { storeToRefs } from "pinia";
 
 const authStore = useAuthStore();
 const { user } = storeToRefs(authStore);
+const roleStore = useRoleStore();
 
 const createRoomVisible = useCreateRoom();
 const search = ref("");
 
 const roomView = useRoomView();
-const isHostedRooms = computed(() => roomView.value === "hosted");
+const isHostedRooms = computed(
+  () => roleStore.can(Cap.rooms.create) && roomView.value === RoomView.Host,
+);
 
 const handleCreateRoom = async ({
   name,

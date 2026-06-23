@@ -11,6 +11,7 @@ model Account {
   name             String           @db.VarChar(50)
   playground_id    Int?
   email            String           @unique(map: "unique_email") @db.VarChar(50)
+  role             AccountRole      @default(player)
   rooms            Room?            @relation(fields: [playground_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   timeslot_players TimeslotPlayer[]
 
@@ -35,6 +36,13 @@ enum SlotStatus {
   scheduled
   live
   ended
+}
+
+enum AccountRole {
+  superAdmin
+  clientAdmin
+  player
+  host
 }
 
 model RoomTimeslot {

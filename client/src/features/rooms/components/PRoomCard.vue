@@ -143,12 +143,12 @@ import { ref, computed } from "vue";
 import { Button, Card } from "primevue";
 import { useJoinTimeslot, useLeaveTimeslot } from "../composables/queries";
 import { useAuthStore } from "@/stores/auth";
-import type { JoinableRoomResponse } from "@football/shared";
+import type { PlayableRoomResponse } from "@football/shared";
 import SlotCarousel from "./SlotCarousel.vue";
 
-type Slot = JoinableRoomResponse["timeslots"][number];
+type Slot = PlayableRoomResponse["timeslots"][number];
 
-const props = defineProps<{ room: JoinableRoomResponse }>();
+const props = defineProps<{ room: PlayableRoomResponse }>();
 
 const featureIconMap: Record<string, string> = {
   ball: "fa-futbol",

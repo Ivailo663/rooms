@@ -14,23 +14,25 @@ import { onMounted, onBeforeUnmount } from "vue";
 import { useQueryClient } from "@tanstack/vue-query";
 import { socket } from "@/socket";
 import type {
-  JoinableRoomResponse,
+  PlayableRoomResponse,
   TimeslotMembershipChangedPayload,
 } from "@football/shared";
-import { useGetJoinableRooms } from "../composables/queries";
+import { useGetPlayableRooms } from "../composables/queries";
+import { useActiveDay } from "@/composables/useActiveDay";
 import PRoomCard from "./PRoomCard.vue";
 
 const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
 
+const activeDay = useActiveDay();
 const queryClient = useQueryClient();
-const { data: roomList } = useGetJoinableRooms();
+const { data: roomList } = useGetPlayableRooms(activeDay);
 
 const handleMembershipChanged = ({
   timeslotId,
   players,
 }: TimeslotMembershipChangedPayload) => {
-  queryClient.setQueryData<JoinableRoomResponse[]>(
-    ["joinable-rooms"],
+  queryClient.setQueryData<PlayableRoomResponse[]>(
+    ["playable-rooms", activeDay.value],
     (rooms) =>
       rooms?.map((room) => ({
         ...room,
