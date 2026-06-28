@@ -10,6 +10,7 @@ import { registerMembershipRoutes } from "./routes/membership.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerTimeslotRoutes } from "./routes/timeslots.js";
 import { registerUserRoutes } from "./routes/users.js";
+import { registerTenantRoutes } from "./routes/tenants.js";
 import type { AppError } from "./utils/http.js";
 import { startScheduler } from "./scheduler.js";
 import "./workers/timeslotWorker.js";
@@ -38,7 +39,11 @@ registerUserRoutes(app);
 registerRoomRoutes(app);
 registerTimeslotRoutes(app);
 registerMembershipRoutes(app, io);
-startScheduler(io).catch((err) => console.error("Scheduler: startup failed:", err));
+registerTenantRoutes(app);
+
+startScheduler(io).catch((err) =>
+  console.error("Scheduler: startup failed:", err)
+);
 
 app.use(
   (error: AppError, _req: Request, res: Response, _next: NextFunction) => {

@@ -9,8 +9,8 @@
     </div>
   </div>
 
-  <div v-else class="flex min-h-screen">
-    <AppSidebar v-if="authStore.user" v-model:visible="menuVisible" />
+  <div v-else class="flex min-h-screen bg-gradient-to-b from-slate-50 via-sky-50/40 to-emerald-50/30">
+    <AppSidebar v-if="authStore.user" v-model:expanded="menuExpanded" />
 
     <!-- Main content -->
     <div class="flex-1 h-[100dvh] overflow-y-auto !p-4">
@@ -26,7 +26,7 @@ import { useAuthStore } from "./stores/auth";
 import AppSidebar from "./components/AppSidebar.vue";
 
 const authStore = useAuthStore();
-const menuVisible = ref(true);
+const menuExpanded = ref(true);
 </script>
 
 <style scoped></style>

@@ -1,8 +1,16 @@
 <template>
-  <main class="bg-surface-50">
-    <div class="w-full !py-8 sm:!px-6">
+  <main
+    class="flex flex-col h-full"
+    :class="isHostedRooms ? 'overflow-y-auto' : 'overflow-hidden'"
+  >
+    <div class="shrink-0 w-full !pt-6 sm:!px-6">
       <RoomsHeader v-model:search="search" />
+    </div>
 
+    <div
+      class="w-full sm:!px-6"
+      :class="isHostedRooms ? '' : 'flex-1 min-h-0'"
+    >
       <HostedRooms v-if="isHostedRooms" />
       <PlayableRooms v-else :search="search" />
     </div>

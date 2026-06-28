@@ -6,7 +6,6 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      name: "root",
       component: () => import("@/views/ProtectedLayout.vue"),
       children: [
         {
@@ -20,6 +19,11 @@ const router = createRouter({
           component: () => import("@/views/SettingsView.vue"),
         },
       ],
+    },
+    {
+      path: "/auth",
+      name: "auth",
+      component: () => import("@/views/AuthView.vue"),
     },
   ],
 });

@@ -127,6 +127,29 @@ export interface MutationMessageResponse {
   message: string;
 }
 
+export interface TenantSettings {
+  lateJoinCutoff: number;
+  allowJoinOnLive: boolean;
+  joinPolicy: number[];
+  defaultMaxPlayers: number;
+  minPlayers: number;
+  defaultPrice: number;
+  defaultFeatures: string[];
+  autoRedistribute: boolean;
+  redistributionWindow: number;
+}
+
+export interface TenantSettingsResponse {
+  id: number;
+  name: string | null;
+  settings: TenantSettings | null;
+}
+
+export interface UpdateTenantSettingsRequest {
+  tenantId: number;
+  settings: Prisma.InputJsonValue;
+}
+
 export interface TimeslotMembershipChangedPayload {
   timeslotId: number;
   players: TimeslotPlayerSummary[];

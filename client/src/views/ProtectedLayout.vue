@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
-import AuthView from './AuthView.vue'
+import { useRouter } from 'vue-router'
+import { watchEffect } from 'vue'
 
 const authStore = useAuthStore()
-console.log(authStore.user, 'auth store')
+const router = useRouter()
+
+watchEffect(() => {
+  if (authStore.initialized && !authStore.user) {
+    router.push({ name: 'auth' })
+  }
+})
 </script>
 
 <template>
-  <AuthView v-if="!authStore.user" />
-
-  <RouterView v-else />
+  <RouterView v-if="authStore.user" />
 </template>

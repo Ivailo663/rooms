@@ -1,150 +1,143 @@
 <template>
-  <Card
-    :pt="{
-      body: { class: 'flex flex-col h-full' },
-      content: { class: 'flex-1 flex flex-col' },
-    }"
-  >
-    <template #content>
-      <div class="flex flex-1 flex-col !gap-4">
-        <!-- Header: name + date + price -->
-        <div class="flex flex-col !gap-1">
-          <div class="flex items-start justify-between !gap-2 !mb-2">
-            <h3 class="text-base font-bold leading-tight text-surface-900">
-              {{ room.name }}
-            </h3>
-            <div class="flex shrink-0 items-center !gap-2">
-              <div class="flex items-center text-xs text-surface-400">
+  <div class="relative h-full w-full overflow-hidden rounded-3xl">
+    <!-- Full bleed image -->
+    <div
+      class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+      :style="{
+        backgroundImage: `url(https://picsum.photos/seed/${room.id}/800/1000)`,
+      }"
+    />
+    <div
+      class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10"
+    />
+
+    <!-- Content overlay -->
+    <div class="relative flex h-full flex-col !p-6">
+      <!-- Top: features -->
+      <div
+        v-if="(selectedSlot?.features as string[] | undefined)?.length"
+        class="flex flex-wrap !gap-2"
+      >
+        <span
+          v-for="feature in selectedSlot?.features as string[] | undefined"
+          :key="feature"
+          class="inline-flex items-center !gap-1.5 rounded-full bg-white/15 backdrop-blur-sm !px-3 !py-1.5 text-sm text-white/90"
+        >
+          <i
+            :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
+            style="font-size: 0.45rem"
+          />
+          {{ feature }}
+        </span>
+      </div>
+
+      <div class="flex-1" />
+
+      <!-- Bottom panel with blur -->
+      <Transition name="card-flip" mode="out-in">
+        <div
+          v-if="!showDetail"
+          key="home"
+          class="rounded-2xl bg-black/30 backdrop-blur-xl !px-5 !py-4"
+        >
+          <!-- Room info -->
+          <div class="flex items-end justify-between !gap-3 !mb-4">
+            <div class="min-w-0">
+              <h2 class="text-xl font-bold text-white leading-tight truncate">
+                {{ room.name }}
+              </h2>
+              <div class="flex items-center !gap-1.5 !mt-1">
                 <i
-                  class="fa-solid fa-calendar !mr-1"
-                  style="font-size: 0.6rem"
+                  class="fa-solid fa-location-dot text-white/50"
+                  style="font-size: 0.5rem"
                 />
-                <span>{{
-                  new Date().toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                  })
-                }}</span>
-              </div>
-              <div
-                v-if="selectedSlot?.price"
-                class="flex items-center rounded-full border border-emerald-200 bg-emerald-50 !px-2.5 !py-0.5"
-              >
-                <span class="text-xs font-bold text-emerald-700">
-                  {{ selectedSlot.price }} €
+                <span class="text-sm text-white/60 truncate">
+                  {{ room.address || "Location not set" }}
                 </span>
               </div>
             </div>
+            <span
+              v-if="selectedSlot?.price"
+              class="shrink-0 text-xl font-bold text-white"
+            >
+              {{ selectedSlot.price }}
+              <span class="text-sm font-normal text-white/50">€</span>
+            </span>
           </div>
-          <div class="flex items-center text-xs text-surface-400">
+
+          <p
+            v-if="selectedSlot?.message"
+            class="text-sm text-white/40 italic !mb-4 line-clamp-2"
+          >
+            "{{ selectedSlot.message }}"
+          </p>
+
+          <!-- Slot carousel -->
+          <SlotCarousel
+            :timeslots="room.timeslots"
+            variant="glass"
+            @select="handleSlotSelect"
+            @teams="showDetail = true"
+          />
+
+          <!-- Join / Leave -->
+          <button
+            v-if="isCurrentUserInSlot"
+            class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/15 !py-3 !mt-4 text-sm font-medium text-white/90 transition-all hover:bg-white/25 cursor-pointer border border-white/10 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="leaveMutation.isPending.value || !selectedSlot"
+            @click="handleLeave"
+          >
             <i
-              class="fa-solid fa-location-dot !mr-1"
+              :class="
+                leaveMutation.isPending.value
+                  ? 'fa-solid fa-spinner fa-spin'
+                  : 'fa-solid fa-right-from-bracket'
+              "
               style="font-size: 0.65rem"
             />
-            <span>{{ room.address || "Location not set" }}</span>
-          </div>
+            Leave game
+          </button>
+          <button
+            v-else
+            class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/15 !py-3 !mt-4 text-sm font-medium text-white/90 transition-all hover:bg-white/25 cursor-pointer border border-white/10 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="!canJoin || joinMutation.isPending.value"
+            @click="handleJoin"
+          >
+            <i
+              :class="
+                joinMutation.isPending.value
+                  ? 'fa-solid fa-spinner fa-spin'
+                  : 'fa-solid fa-right-to-bracket'
+              "
+              style="font-size: 0.65rem"
+            />
+            Join game
+          </button>
         </div>
 
-        <!-- Info panel -->
-        <div class="flex flex-col !gap-3 rounded-xl bg-surface-50 !p-3">
-          <div class="flex flex-col !gap-1.5">
-            <p
-              class="flex items-center text-xs font-semibold uppercase tracking-widest text-surface-400"
-            >
-              <i class="fa-solid fa-star !mr-1" style="font-size: 0.6rem" />
-              Features
-            </p>
-            <div
-              v-if="(selectedSlot?.features as string[] | undefined)?.length"
-              class="flex flex-wrap !gap-1.5"
-            >
-              <span
-                v-for="feature in selectedSlot?.features as
-                  | string[]
-                  | undefined"
-                :key="feature"
-                class="flex items-center rounded-full border border-surface-200 bg-white !px-2 !py-0.5 text-xs font-medium text-surface-700"
-              >
-                <i
-                  :class="[
-                    'fa-solid',
-                    featureIconMap[feature] ?? 'fa-circle',
-                    'text-primary-500',
-                    '!mr-1',
-                  ]"
-                  style="font-size: 0.6rem"
-                />
-                {{ feature }}
-              </span>
-            </div>
-            <span v-else class="text-xs italic text-surface-300"
-              >No features listed</span
-            >
-          </div>
-
-          <div class="flex flex-col !gap-1.5">
-            <p
-              class="flex items-center text-xs font-semibold uppercase tracking-widest text-surface-400"
-            >
-              <i class="fa-solid fa-comment !mr-1" style="font-size: 0.6rem" />
-              Host message
-            </p>
-            <p class="text-xs leading-relaxed text-surface-600">
-              {{ selectedSlot?.message || "No message from host." }}
-            </p>
-          </div>
-        </div>
-
-        <SlotCarousel :timeslots="room.timeslots" @select="handleSlotSelect" />
-      </div>
-
-      <!-- Footer actions -->
-      <div
-        class="flex items-center justify-center !gap-1 border-t border-surface-100 !mt-4 !pt-3"
-      >
-        <Button
-          v-tooltip.top="'View teams'"
-          icon="fa-solid fa-users"
-          severity="secondary"
-          size="small"
-          label="View teams"
-          text
-          :disabled="!selectedSlot"
-        />
-        <Button
-          v-if="isCurrentUserInSlot"
-          v-tooltip.top="'Leave'"
-          icon="fa-solid fa-right-from-bracket"
-          severity="danger"
-          label="Leave game"
-          size="small"
-          outlined
-          :loading="leaveMutation.isPending.value"
-          :disabled="!selectedSlot"
-          @click="handleLeave"
-        />
-        <Button
+        <!-- Detail view (teams) -->
+        <div
           v-else
-          v-tooltip.top="'Join'"
-          icon="fa-solid fa-right-to-bracket"
-          size="small"
-          label="Join game"
-          :loading="joinMutation.isPending.value"
-          :disabled="!canJoin"
-          @click="handleJoin"
-        />
-      </div>
-    </template>
-  </Card>
+          key="detail"
+          class="rounded-2xl bg-black/30 backdrop-blur-xl !p-5"
+        >
+          <PRoomCardDetails
+            :timeslot="selectedSlot"
+            @back="showDetail = false"
+          />
+        </div>
+      </Transition>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { Button, Card } from "primevue";
 import { useJoinTimeslot, useLeaveTimeslot } from "../composables/queries";
 import { useAuthStore } from "@/stores/auth";
 import type { PlayableRoomResponse } from "@football/shared";
 import SlotCarousel from "./SlotCarousel.vue";
+import PRoomCardDetails from "./PRoomCardDetails.vue";
 
 type Slot = PlayableRoomResponse["timeslots"][number];
 
@@ -163,6 +156,7 @@ const joinMutation = useJoinTimeslot();
 const leaveMutation = useLeaveTimeslot();
 
 const selectedIndex = ref(0);
+const showDetail = ref(false);
 
 const selectedSlot = computed<Slot | undefined>(
   () => props.room.timeslots[selectedIndex.value]
@@ -170,6 +164,7 @@ const selectedSlot = computed<Slot | undefined>(
 
 const handleSlotSelect = (index: number) => {
   selectedIndex.value = index;
+  showDetail.value = false;
 };
 
 const isCurrentUserInSlot = computed(() => {
@@ -194,3 +189,20 @@ const handleLeave = () => {
   if (selectedSlot.value) leaveMutation.mutate(selectedSlot.value.id);
 };
 </script>
+
+<style scoped>
+.card-flip-enter-active,
+.card-flip-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.card-flip-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.card-flip-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+</style>

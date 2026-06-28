@@ -32,10 +32,12 @@ export const useAuthStore = defineStore("auth", () => {
 
           await fetchUser();
 
-          router.push({ name: "home" });
+          if (router.currentRoute.value.name === "auth") {
+            router.push({ name: "home" });
+          }
         } else {
           userDBState.value = {};
-          router.push({ name: "root" });
+          router.push({ name: "auth" });
         }
 
         resolve();
