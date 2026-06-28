@@ -94,6 +94,7 @@
           <RoomFormSlot
             v-model:enabled="enabled"
             :form="form"
+            :available-features="tenantData?.settings?.defaultFeatures"
             :show-enabled-toggle="isCreating"
             :disabled="!isCreating && enabled"
           />
@@ -210,6 +211,7 @@ import {
   useUpdateTimeslot,
   useDeleteTimeslot,
 } from "../../composables/queries";
+import { useGetTenantSettings } from "@/features/settings/composables/queries";
 import RoomFormSlot from "./RoomSlotForm.vue";
 import ActiveSlotsPanel from "./ActiveSlotsPanel.vue";
 
@@ -237,14 +239,19 @@ const TIME_OPTIONS = Array.from({ length: 25 }, (_, h) => {
   return { name: t, code: t, order: h };
 });
 
-const EMPTY_FORM = {
-  price: null as string | null,
-  message: null as string | null,
-  max_players: null as number | null,
-  features: [] as string[],
-};
+const { data: tenantData } = useGetTenantSettings(1);
 
-const slotToForm = (slot: TimeslotResponse): typeof EMPTY_FORM => ({
+const defaultForm = computed(() => {
+  const s = tenantData.value?.settings;
+  return {
+    price: s?.defaultPrice !== null ? String(s?.defaultPrice) : null,
+    message: null as string | null,
+    max_players: s?.defaultMaxPlayers ?? null,
+    features: s?.defaultFeatures ?? [],
+  };
+});
+
+const slotToForm = (slot: TimeslotResponse) => ({
   price: slot.price !== null ? String(slot.price) : null,
   message: slot.message ?? null,
   max_players: slot.max_players ?? null,
@@ -278,7 +285,7 @@ const enabled = ref(false);
 const selectedSlot = computed(() => slots.value?.[selectedIndex.value]);
 
 const form = useForm({
-  defaultValues: { ...EMPTY_FORM },
+  defaultValues: { ...defaultForm.value },
   onSubmit: async ({ value }) => {
     if (isCreating.value && newTimeslot.value) {
       await createMutation.mutateAsync({
@@ -319,7 +326,7 @@ watch(
   [() => selectedSlot.value?.id, isCreating],
   ([, creating]) => {
     if (creating || !selectedSlot.value) {
-      form.reset({ ...EMPTY_FORM });
+      form.reset({ ...defaultForm.value });
       if (creating) enabled.value = false;
     } else {
       form.reset(slotToForm(selectedSlot.value));

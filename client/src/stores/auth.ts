@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, type User } from "firebase/auth";
 import { api } from "@/axios";
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
-import { type AccountEntity } from "@football/shared";
+import { type Account } from "@football/shared";
 
 export const useAuthStore = defineStore("auth", () => {
   const userAuthState = ref<User | null>(null);
@@ -32,10 +32,12 @@ export const useAuthStore = defineStore("auth", () => {
 
           await fetchUser();
 
-          router.push({ name: "home" });
+          if (router.currentRoute.value.name === "auth") {
+            router.push({ name: "home" });
+          }
         } else {
           userDBState.value = {};
-          router.push({ name: "root" });
+          router.push({ name: "auth" });
         }
 
         resolve();
@@ -46,7 +48,7 @@ export const useAuthStore = defineStore("auth", () => {
   const user = computed(() => {
     const result = {
       ...userAuthState.value,
-      ...(userDBState.value as AccountEntity),
+      ...(userDBState.value as Account),
     };
 
     return !Object.keys(result).length ? null : result;

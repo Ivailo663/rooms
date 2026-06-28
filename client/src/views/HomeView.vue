@@ -1,8 +1,16 @@
 <template>
-  <main class="bg-surface-50">
-    <div class="w-full !py-8 sm:!px-6">
+  <main
+    class="flex flex-col h-full"
+    :class="isHostedRooms ? 'overflow-y-auto' : 'overflow-hidden'"
+  >
+    <div class="shrink-0 w-full !pt-6 sm:!px-6">
       <RoomsHeader v-model:search="search" />
+    </div>
 
+    <div
+      class="w-full sm:!px-6"
+      :class="isHostedRooms ? '' : 'flex-1 min-h-0'"
+    >
       <HostedRooms v-if="isHostedRooms" />
       <PlayableRooms v-else :search="search" />
     </div>
@@ -18,22 +26,27 @@
 import { ref, computed } from "vue";
 import { api } from "@/axios";
 import { useAuthStore } from "../stores/auth";
+import { useRoleStore, Cap } from "@/stores/role";
 import HostedRooms from "@/features/rooms/HostedRooms.vue";
 import PlayableRooms from "@/features/rooms/PlayableRooms.vue";
 import CreateRoomDialog from "@/features/rooms/components/CreateRoomDialog.vue";
 import RoomsHeader from "@/features/rooms/components/RoomsHeader.vue";
 import { useRoomView } from "@/composables/useRoomView";
 import { useCreateRoom } from "@/composables/useCreateRoom";
+import { RoomView } from "@/constants";
 import { storeToRefs } from "pinia";
 
 const authStore = useAuthStore();
 const { user } = storeToRefs(authStore);
+const roleStore = useRoleStore();
 
 const createRoomVisible = useCreateRoom();
 const search = ref("");
 
 const roomView = useRoomView();
-const isHostedRooms = computed(() => roomView.value === "hosted");
+const isHostedRooms = computed(
+  () => roleStore.can(Cap.rooms.create) && roomView.value === RoomView.Host,
+);
 
 const handleCreateRoom = async ({
   name,

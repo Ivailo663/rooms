@@ -1,5 +1,12 @@
 import { Prisma } from "@prisma/client";
 
+export type {
+  Account,
+  Room,
+  RoomTimeslot,
+  AccountRole,
+} from "@prisma/client";
+
 export interface GetRoomsParams {
   hosted: boolean;
   user_id: number;
@@ -16,25 +23,9 @@ export interface GetEnabledTimeslotsParams {
   day: string;
 }
 
-export interface AccountEntity {
-  id: number;
-  email: string;
-  name: string;
-}
-
 export interface PlayerSummary {
   id: number;
   name: string;
-}
-
-export interface RoomEntity {
-  id: number;
-  name: string;
-  description: string | null;
-  price: string | number;
-  creatorId: number;
-  hostId: number;
-  address: string;
 }
 
 export interface RoomSummaryResponse {
@@ -67,20 +58,10 @@ export interface TimeslotResponse {
   start_time: number;
 }
 
-export interface TimeslotPlayer {
+export interface TimeslotPlayerSummary {
   id: number;
   email: string;
   name: string;
-}
-
-export interface TimeslotEntity {
-  id: number;
-  roomId: number;
-  name: string;
-  message: string | null;
-  price: string | number;
-  label: string;
-  features: unknown;
 }
 
 export interface CreateTimeslotRequest {
@@ -112,7 +93,7 @@ export interface CreateTimeslotResponse {
   message: string;
 }
 
-export interface JoinableRoomResponse extends RoomSummaryResponse {
+export interface PlayableRoomResponse extends RoomSummaryResponse {
   timeslots: Array<{
     id: number;
     name: string;
@@ -120,7 +101,7 @@ export interface JoinableRoomResponse extends RoomSummaryResponse {
     price: string | number | null;
     label: string;
     features: unknown;
-    players: TimeslotPlayer[];
+    players: TimeslotPlayerSummary[];
     max_players: number;
   }>;
 }
@@ -146,9 +127,32 @@ export interface MutationMessageResponse {
   message: string;
 }
 
+export interface TenantSettings {
+  lateJoinCutoff: number;
+  allowJoinOnLive: boolean;
+  joinPolicy: number[];
+  defaultMaxPlayers: number;
+  minPlayers: number;
+  defaultPrice: number;
+  defaultFeatures: string[];
+  autoRedistribute: boolean;
+  redistributionWindow: number;
+}
+
+export interface TenantSettingsResponse {
+  id: number;
+  name: string | null;
+  settings: TenantSettings | null;
+}
+
+export interface UpdateTenantSettingsRequest {
+  tenantId: number;
+  settings: Prisma.InputJsonValue;
+}
+
 export interface TimeslotMembershipChangedPayload {
   timeslotId: number;
-  players: TimeslotPlayer[];
+  players: TimeslotPlayerSummary[];
 }
 
 export interface TimeslotStatusChangedPayload {

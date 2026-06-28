@@ -1,11 +1,15 @@
 <template>
   <div
-    class="grid !gap-4"
-    style="
-      grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
-    "
+    ref="scrollContainer"
+    class="deck-scroll flex flex-col !gap-4 overflow-y-auto"
   >
-    <PRoomCard v-for="room in roomList" :key="room.id" :room="room" />
+    <div
+      v-for="room in roomList"
+      :key="room.id"
+      class="deck-item shrink-0 group"
+    >
+      <PRoomCard :room="room" />
+    </div>
   </div>
 </template>
 
@@ -14,23 +18,25 @@ import { onMounted, onBeforeUnmount } from "vue";
 import { useQueryClient } from "@tanstack/vue-query";
 import { socket } from "@/socket";
 import type {
-  JoinableRoomResponse,
+  PlayableRoomResponse,
   TimeslotMembershipChangedPayload,
 } from "@football/shared";
-import { useGetJoinableRooms } from "../composables/queries";
+import { useGetPlayableRooms } from "../composables/queries";
+import { useActiveDay } from "@/composables/useActiveDay";
 import PRoomCard from "./PRoomCard.vue";
 
 const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
 
+const activeDay = useActiveDay();
 const queryClient = useQueryClient();
-const { data: roomList } = useGetJoinableRooms();
+const { data: roomList } = useGetPlayableRooms(activeDay);
 
 const handleMembershipChanged = ({
   timeslotId,
   players,
 }: TimeslotMembershipChangedPayload) => {
-  queryClient.setQueryData<JoinableRoomResponse[]>(
-    ["joinable-rooms"],
+  queryClient.setQueryData<PlayableRoomResponse[]>(
+    ["playable-rooms", activeDay.value],
     (rooms) =>
       rooms?.map((room) => ({
         ...room,
@@ -48,3 +54,30 @@ onBeforeUnmount(() =>
   socket.off(TIMESLOT_MEMBERSHIP_CHANGED_EVENT, handleMembershipChanged)
 );
 </script>
+
+<style scoped>
+.deck-scroll {
+  scroll-snap-type: y mandatory;
+  scroll-padding-top: 0;
+  width: 100%;
+  max-width: 42rem;
+  margin: 0 auto;
+  height: 100%;
+  scrollbar-width: none;
+}
+
+@media (max-width: 640px) {
+  .deck-scroll {
+    max-width: 100%;
+  }
+}
+
+.deck-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.deck-item {
+  scroll-snap-align: start;
+  height: calc(100% - 3rem);
+}
+</style>

@@ -18,7 +18,7 @@
         class="flex flex-wrap !gap-2 rounded-xl border border-surface-200 bg-surface-50/50 !p-3"
       >
         <Button
-          v-for="feature in AVAILABLE_FEATURES"
+          v-for="feature in featureChips"
           :key="feature.label"
           :label="feature.label"
           :icon="`fa-solid ${feature.icon}`"
@@ -73,6 +73,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import {
   InputNumber,
   InputText,
@@ -82,19 +83,28 @@ import {
 } from "primevue";
 import FieldWrapper from "./FieldWrapper.vue";
 
-const AVAILABLE_FEATURES = [
-  { label: "ball", icon: "fa-futbol" },
-  { label: "showers", icon: "fa-shower" },
-  { label: "parking", icon: "fa-square-parking" },
-  { label: "lights", icon: "fa-sun" },
-];
+const BUILTIN_FEATURES: Record<string, string> = {
+  ball: "fa-futbol",
+  showers: "fa-shower",
+  parking: "fa-square-parking",
+  lights: "fa-sun",
+};
 
-defineProps<{
+const props = defineProps<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   form: any;
+  availableFeatures?: string[];
   showEnabledToggle?: boolean;
   disabled?: boolean;
 }>();
+
+const featureChips = computed(() => {
+  const labels = props.availableFeatures ?? Object.keys(BUILTIN_FEATURES);
+  return labels.map((label) => ({
+    label,
+    icon: BUILTIN_FEATURES[label] ?? "fa-tag",
+  }));
+});
 
 const enabledModel = defineModel<boolean>("enabled", { required: true });
 

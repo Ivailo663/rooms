@@ -1,7 +1,16 @@
 import { ref } from "vue";
+import { useRoleStore, Cap } from "@/stores/role";
+import { RoomView } from "@/constants";
 
-export type RoomView = "hosted" | "others";
+const view = ref<RoomView>(RoomView.Play);
+let initialized = false;
 
-const view = ref<RoomView>("hosted");
+export const useRoomView = () => {
+  if (!initialized) {
+    const roleStore = useRoleStore();
+    view.value = roleStore.can(Cap.rooms.create) ? RoomView.Host : RoomView.Play;
+    initialized = true;
+  }
 
-export const useRoomView = () => view;
+  return view;
+};

@@ -11,7 +11,7 @@ import {
   getTimeslots,
   getEnabledTimeslots,
   getEnabledTimeslotDays,
-  getJoinableRooms,
+  getPlayableRooms,
   createTimeslot,
   updateTimeslot,
   deleteTimeslot,
@@ -24,12 +24,11 @@ import type {
   GetEnabledTimeslotsParams,
   HostedRoomResponse,
   TimeslotResponse,
-  JoinableRoomResponse,
+  PlayableRoomResponse,
   CreateTimeslotRequest,
   UpdateTimeslotRequest,
   CreateTimeslotResponse,
   MutationMessageResponse,
-  RoomWithPlayersResponse,
 } from "@football/shared";
 
 import { useAuthStore } from "@/stores/auth";
@@ -47,17 +46,18 @@ export const useGetHostedRooms = (
   });
 };
 
-export const useGetJoinableRooms = (
+export const useGetPlayableRooms = (
+  day: MaybeRefOrGetter<string>,
   options?: Omit<
-    UseQueryOptions<RoomWithPlayersResponse[]>,
+    UseQueryOptions<PlayableRoomResponse[]>,
     "queryKey" | "queryFn"
-  >
+  >,
 ) => {
   const authStore = useAuthStore();
 
-  return useQuery<JoinableRoomResponse[]>({
-    queryKey: ["joinable-rooms"],
-    queryFn: () => getJoinableRooms(),
+  return useQuery<PlayableRoomResponse[]>({
+    queryKey: ["playable-rooms", day],
+    queryFn: () => getPlayableRooms(toValue(day)),
     enabled: !!authStore.user?.id,
     ...options,
   });
@@ -154,7 +154,7 @@ export const useJoinTimeslot = () => {
   return useMutation<MutationMessageResponse, Error, number>({
     mutationFn: joinTimeslot,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["joinable-rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
     },
   });
 };
@@ -165,7 +165,7 @@ export const useLeaveTimeslot = () => {
   return useMutation<MutationMessageResponse, Error, number>({
     mutationFn: leaveTimeslot,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["joinable-rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
     },
   });
 };

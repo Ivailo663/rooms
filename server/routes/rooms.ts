@@ -4,7 +4,7 @@ import type {
   CreateRoomRequest,
   CreateRoomResponse,
   HostedRoomResponse,
-  JoinableRoomResponse,
+  PlayableRoomResponse,
 } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger } from "../utils/validation.js";
@@ -106,8 +106,9 @@ const getHostedRooms: RequestHandler = asyncHandler(async (_req, res) => {
   res.send(response);
 });
 
-const getJoinableRooms: RequestHandler = asyncHandler(async (_req, res) => {
+const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
+  const day = typeof req.query.day === "string" ? req.query.day : undefined;
 
   const rooms = await prisma.room.findMany({
     where: {
@@ -122,6 +123,7 @@ const getJoinableRooms: RequestHandler = asyncHandler(async (_req, res) => {
       price: true,
       address: true,
       timeslots: {
+        where: day ? { day, enabled: true } : { enabled: true },
         select: {
           id: true,
           name: true,
@@ -152,7 +154,7 @@ const getJoinableRooms: RequestHandler = asyncHandler(async (_req, res) => {
     },
   });
 
-  const response: JoinableRoomResponse[] = rooms.map((room) => ({
+  const response: PlayableRoomResponse[] = rooms.map((room) => ({
     id: room.id,
     name: room.name,
     description: room.description,
@@ -185,5 +187,5 @@ const getJoinableRooms: RequestHandler = asyncHandler(async (_req, res) => {
 export const registerRoomRoutes = (app: Application) => {
   app.post("/rooms", createRoom);
   app.get("/rooms/hosted", getHostedRooms);
-  app.get("/rooms/joinable", getJoinableRooms);
+  app.get("/rooms/playable", getPlayableRooms);
 };
