@@ -14,9 +14,7 @@
 
   <form.Field v-slot="{ field }" name="features">
     <FieldWrapper block-label="Features" class="flex-1 flex flex-col">
-      <div
-        class="flex flex-wrap !gap-2 rounded-xl border border-surface-200 bg-surface-50/50 !p-3"
-      >
+      <div class="flex flex-wrap !gap-1.5">
         <Button
           v-for="feature in featureChips"
           :key="feature.label"
@@ -24,7 +22,10 @@
           :icon="`fa-solid ${feature.icon}`"
           size="small"
           rounded
-          class="!cursor-pointer"
+          class="!cursor-pointer feature-chip"
+          :class="{
+            'feature-chip--active': field.state.value.includes(feature.label),
+          }"
           :disabled="disabled"
           :variant="
             field.state.value.includes(feature.label) ? 'filled' : 'outlined'
@@ -37,21 +38,39 @@
     </FieldWrapper>
   </form.Field>
 
-  <form.Field v-slot="{ field }" name="max_players">
-    <FieldWrapper block-label="Max players">
-      <InputNumber
-        :model-value="field.state.value"
-        class="w-full"
-        :min="0"
-        :show-buttons="true"
-        button-layout="horizontal"
-        decrement-button-icon="fa-solid fa-minus"
-        increment-button-icon="fa-solid fa-plus"
-        :disabled="disabled"
-        @update:model-value="field.handleChange"
-      />
-    </FieldWrapper>
-  </form.Field>
+  <div class="flex !gap-4">
+    <form.Field v-slot="{ field }" name="min_players">
+      <FieldWrapper block-label="Min players" class="flex-1 min-w-0">
+        <InputNumber
+          :model-value="field.state.value"
+          class="w-full"
+          :min="0"
+          :show-buttons="true"
+          button-layout="horizontal"
+          decrement-button-icon="fa-solid fa-minus"
+          increment-button-icon="fa-solid fa-plus"
+          :disabled="disabled"
+          @update:model-value="field.handleChange"
+        />
+      </FieldWrapper>
+    </form.Field>
+
+    <form.Field v-slot="{ field }" name="max_players">
+      <FieldWrapper block-label="Max players" class="flex-1 min-w-0">
+        <InputNumber
+          :model-value="field.state.value"
+          class="w-full"
+          :min="0"
+          :show-buttons="true"
+          button-layout="horizontal"
+          decrement-button-icon="fa-solid fa-minus"
+          increment-button-icon="fa-solid fa-plus"
+          :disabled="disabled"
+          @update:model-value="field.handleChange"
+        />
+      </FieldWrapper>
+    </form.Field>
+  </div>
 
   <form.Field v-slot="{ field }" name="message">
     <FieldWrapper block-label="Message">
@@ -111,3 +130,36 @@ const enabledModel = defineModel<boolean>("enabled", { required: true });
 const toggleInArray = (arr: string[], item: string) =>
   arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item].sort();
 </script>
+
+<style scoped>
+.feature-chip {
+  font-size: 0.75rem !important;
+  transition: all 0.2s ease;
+}
+.feature-chip:not(.feature-chip--active) {
+  opacity: 0.55;
+}
+.feature-chip:not(.feature-chip--active):hover {
+  opacity: 0.85;
+}
+
+:deep(.p-inputtext:not(.p-inputnumber-input)),
+:deep(.p-textarea) {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  border-color: var(--p-surface-200);
+  border-radius: 0.625rem;
+}
+:deep(.p-inputtext:not(.p-inputnumber-input):not(:focus)),
+:deep(.p-textarea:not(:focus)) {
+  background: var(--p-surface-50);
+}
+
+:deep(.p-inputnumber) {
+  min-width: 0;
+}
+:deep(.p-inputnumber .p-inputnumber-input) {
+  min-width: 0;
+  width: 100%;
+}
+</style>

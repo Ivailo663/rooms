@@ -141,7 +141,7 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
   res.send(response);
 });
 
-const getEnabledTimeslotDays: RequestHandler = asyncHandler(
+const getEnabledTimeslotDaysAndFirstSlot: RequestHandler = asyncHandler(
   async (req, res) => {
     const account = await getCurrentAccount(res.locals.user.email);
     const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
@@ -154,11 +154,12 @@ const getEnabledTimeslotDays: RequestHandler = asyncHandler(
           creatorId: account.id,
         },
       },
-      select: { day: true },
+      select: { day: true, label: true },
+      orderBy: { order: "asc" },
       distinct: ["day"],
     });
 
-    res.send(rows.map((r) => r.day));
+    res.send(rows.map((r) => ({ day: r.day, label: r.label })));
   }
 );
 
@@ -282,7 +283,7 @@ const deleteTimeslot: RequestHandler = asyncHandler(async (req, res) => {
 export const registerTimeslotRoutes = (app: Application) => {
   app.get("/timeslots", getTimeslots);
   app.get("/timeslots/enabled", getEnabledTimeslots);
-  app.get("/timeslots/enabled/days", getEnabledTimeslotDays);
+  app.get("/timeslots/enabled/days", getEnabledTimeslotDaysAndFirstSlot);
   app.post("/timeslots", createTimeslot);
   app.put("/timeslots", updateTimeslot);
   app.delete("/timeslots/:id", deleteTimeslot);

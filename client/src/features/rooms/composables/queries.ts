@@ -10,7 +10,7 @@ import {
   getHostedRooms,
   getTimeslots,
   getEnabledTimeslots,
-  getEnabledTimeslotDays,
+  getEnabledTimeslotDaysAndFirstSlot,
   getPlayableRooms,
   createTimeslot,
   updateTimeslot,
@@ -22,6 +22,7 @@ import {
 import type {
   GetTimeslotsParams,
   GetEnabledTimeslotsParams,
+  EnabledDaySummary,
   HostedRoomResponse,
   TimeslotResponse,
   PlayableRoomResponse,
@@ -34,13 +35,17 @@ import type {
 import { useAuthStore } from "@/stores/auth";
 
 export const useGetHostedRooms = (
+  day?: MaybeRefOrGetter<string>,
   options?: Omit<UseQueryOptions<HostedRoomResponse[]>, "queryKey" | "queryFn">
 ) => {
   const authStore = useAuthStore();
 
   return useQuery<HostedRoomResponse[]>({
-    queryKey: ["hosted-rooms"],
-    queryFn: () => getHostedRooms(),
+    queryKey: ["hosted-rooms", day],
+    queryFn: () => {
+      const resolvedDay = day ? toValue(day) : undefined;
+      return getHostedRooms(resolvedDay ? { day: resolvedDay } : undefined);
+    },
     enabled: !!authStore.user?.id,
     ...options,
   });
@@ -77,7 +82,8 @@ export const useGetTimeslots = (
     queryKey: ["timeslots", params.room_id, params.day],
     queryFn: () =>
       getTimeslots({
-        ...params,
+        room_id: toValue(params.room_id),
+        day: toValue(params.day),
         user_id: authStore.user!.id,
       }),
     enabled: !!authStore.user?.id,
@@ -93,7 +99,11 @@ export const useGetEnabledTimeslots = (
 
   return useQuery<TimeslotResponse[]>({
     queryKey: ["timeslots", "enabled", params.room_id, params.day],
-    queryFn: () => getEnabledTimeslots(params),
+    queryFn: () =>
+      getEnabledTimeslots({
+        room_id: toValue(params.room_id),
+        day: toValue(params.day),
+      }),
     enabled: !!authStore.user?.id,
     ...options,
   });
@@ -101,13 +111,13 @@ export const useGetEnabledTimeslots = (
 
 export const useGetEnabledDays = (
   roomId: MaybeRefOrGetter<number>,
-  options?: Omit<UseQueryOptions<string[]>, "queryKey" | "queryFn">
+  options?: Omit<UseQueryOptions<EnabledDaySummary[]>, "queryKey" | "queryFn">
 ) => {
   const authStore = useAuthStore();
 
-  return useQuery<string[]>({
+  return useQuery<EnabledDaySummary[]>({
     queryKey: ["timeslots", "enabled-days", roomId],
-    queryFn: () => getEnabledTimeslotDays(toValue(roomId)),
+    queryFn: () => getEnabledTimeslotDaysAndFirstSlot(toValue(roomId)),
     enabled: !!authStore.user?.id,
     ...options,
   });

@@ -161,12 +161,22 @@ export interface TimeslotStatusChangedPayload {
   status: SlotStatus;
 }
 
+export interface EnabledDaySummary {
+  day: string;
+  label: string;
+}
+
+export interface GetHostedRoomsParams {
+  day: string;
+}
+
 export interface LiveSlotSummary {
   id: number;
   label: string;
   start_time: number;
   players_count: number;
   max_players: number;
+  day: string;
 }
 
 export interface HostedRoomResponse extends RoomSummaryResponse {
