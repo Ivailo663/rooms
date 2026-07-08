@@ -1,63 +1,139 @@
 <template>
-  <div class="flex !gap-6 items-start">
-    <div ref="formRef" class="flex-1">
-      <!-- Day selector -->
-      <div
-        class="w-full flex justify-between items-end text-primary uppercase rounded-[10px] !p-3 !mb-5 text-right border border-primary-100 day-banner"
-      >
-        <div>
-          <p
-            class="!mb-2 flex items-center !gap-1.5 text-xs font-semibold uppercase tracking-widest text-surface-400"
+  <div class="flex flex-col !gap-4">
+    <div>
+      <div>
+        <div class="day-banner rounded-2xl !p-4 border border-primary-50">
+          <!-- Day selector -->
+          <div
+            class="flex flex-wrap items-center justify-between !gap-x-2 !gap-y-3 !mb-4"
           >
-            <i class="fa-solid fa-calendar" style="font-size: 0.6rem" />
-            Day
-          </p>
-          <SelectButton
-            v-model="weekDay"
-            :options="DAYS"
-            option-label="label"
-            option-value="value"
-            :allow-empty="false"
-            @change="isCreating = false"
-          >
-            <template #option="{ option }">
-              <span>
-                {{ option.label }}
-                <span
-                  v-if="option.value === todayValue"
-                  class="h-2 w-2 rounded-full bg-primary absolute top-[5px] right-[5px]"
-                />
-              </span>
-            </template>
-          </SelectButton>
-        </div>
-        <p class="text-[25px] !font-thin tracking-[5px]">
-          {{ DAYS.find((d) => d.value === weekDay)?.full }}
-        </p>
-      </div>
-
-      <!-- Slot picker -->
-      <BasicWrapper class="!mb-5">
-        <div class="flex items-start justify-between !gap-4">
-          <div class="flex-1">
             <p
-              class="!mb-3 flex items-center !gap-1.5 text-xs font-semibold uppercase tracking-widest text-surface-400"
+              class="flex items-center !gap-1.5 text-[11px] font-medium tracking-wide text-surface-400/80"
             >
-              <i class="fa-solid fa-clock" style="font-size: 0.6rem" />
-              Time slots
+              <i class="fa-solid fa-calendar" style="font-size: 0.6rem" />
+              Day
             </p>
-            <div class="flex flex-wrap !gap-2">
+
+            <p
+              class="text-[20px] font-extralight tracking-[5px] text-primary-300 uppercase select-none"
+            >
+              {{ DAYS.find((d) => d.value === weekDay)?.full }}
+            </p>
+
+            <div class="flex items-center justify-between w-full">
+              <SelectButton
+                v-model="weekDay"
+                :options="DAYS"
+                option-value="value"
+                option-label="label"
+                :allow-empty="false"
+                size="small"
+                class="day-switch"
+                @change="isCreating = false"
+              >
+                <template #option="{ option }">
+                  <span class="relative">
+                    {{ option.label }}
+                    <span
+                      v-if="option.value === todayValue"
+                      class="absolute -bottom-[3px] left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-white"
+                    />
+                  </span>
+                </template>
+              </SelectButton>
+            </div>
+          </div>
+
+          <!-- Slot picker -->
+          <div class="!mb-4">
+            <div class="flex items-center justify-between !gap-4 !mb-3">
+              <p
+                class="flex items-center !gap-1.5 text-[11px] font-medium tracking-wide text-surface-400/80"
+              >
+                <i class="fa-solid fa-clock" style="font-size: 0.6rem" />
+                Time slots
+              </p>
+
+              <div class="shrink-0">
+                <Button
+                  :label="newTimeslot ? newTimeslot.name : 'Pick hour'"
+                  icon="fa-solid fa-plus"
+                  icon-pos="left"
+                  unstyled
+                  class="inline-flex items-center !gap-2 !px-3 !py-1.5 rounded-lg border border-dashed border-surface-200 bg-surface-50 text-[13px] font-medium text-surface-500 cursor-pointer transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600"
+                  @click="(e: Event) => hourPopover?.toggle(e)"
+                >
+                  <template #default>
+                    <i class="fa-solid fa-plus" style="font-size: 0.5rem" />
+                    <span>{{
+                      newTimeslot ? newTimeslot.name : "Pick hour"
+                    }}</span>
+                    <i
+                      class="fa-solid fa-chevron-down"
+                      style="font-size: 0.45rem"
+                    />
+                  </template>
+                </Button>
+                <Popover ref="hourPopover">
+                  <div class="grid grid-cols-4 !gap-1 !p-1 w-[220px]">
+                    <Button
+                      v-for="opt in availableTimeOptions"
+                      :key="opt.code"
+                      :label="opt.name"
+                      unstyled
+                      :class="[
+                        'rounded-md !py-1.5 text-center text-xs font-medium cursor-pointer transition-colors',
+                        newTimeslot?.code === opt.code
+                          ? 'bg-primary-600 text-white'
+                          : 'text-surface-500 hover:bg-primary-50 hover:text-primary-600',
+                      ]"
+                      @click="pickHour(opt, $event)"
+                    />
+                  </div>
+                </Popover>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap !gap-1.5">
               <Button
                 v-for="(slot, index) in slots"
                 :key="slot.id"
-                :label="slot.label"
-                size="small"
-                icon="fa-solid fa-clock"
-                class="!cursor-pointer"
-                :variant="
-                  index === selectedIndex && !isCreating ? 'filled' : 'outlined'
-                "
+                unstyled
+                :class="[
+                  'flex flex-col items-start !gap-0.5 !px-2 !py-1.5 rounded-lg border-1 cursor-pointer text-left transition-colors',
+                  index === selectedIndex && !isCreating
+                    ? 'border-dashed border-primary-300 bg-primary-50'
+                    : 'border-solid border-surface-200 bg-white hover:border-primary-300',
+                  !slot.enabled ? 'opacity-70' : '',
+                ]"
                 @click="selectSlot(index)"
+              >
+                <template #default>
+                  <div class="flex items-center !gap-1.5">
+                    <StatusDot
+                      :color="slotDotColor(slot)"
+                      :ping="slot.enabled && slot.status === 'live'"
+                    />
+                    <span
+                      class="text-[11px] font-semibold whitespace-nowrap text-surface-700"
+                    >
+                      <template v-if="slot.status === 'live'">
+                        {{ slot.label }}
+                      </template>
+                      <template v-else>{{ nextLabel(slot) }}</template>
+                    </span>
+                  </div>
+                  <span class="text-[10px] font-medium text-surface-400">
+                    {{ slot.players.length }}/{{ slot.max_players }}
+                  </span>
+                </template>
+              </Button>
+              <Tag
+                v-if="isCreating && newTimeslot"
+                :value="newTimeslot.name"
+                icon="fa-solid fa-clock"
+                rounded
+                class="!border-1 !border-dashed !border-primary-300 !bg-primary-50 !text-primary-400"
               />
             </div>
             <p
@@ -68,141 +144,138 @@
             </p>
           </div>
 
-          <div class="shrink-0">
-            <p
-              class="!mb-2 text-xs font-semibold uppercase tracking-widest text-surface-400"
-            >
-              Add slot
-            </p>
-            <Select
-              v-model="newTimeslot"
-              :options="TIME_OPTIONS"
-              option-label="name"
-              placeholder="Select time…"
-              show-clear
-              @change="isCreating = !!newTimeslot"
-            />
+          <!-- Form card (nested white inset) -->
+          <div
+            class="rounded-xl border-1 border-dashed border-primary-300 bg-white !p-5 flex flex-col !gap-4 overflow-hidden"
+          >
+            <template v-if="isCreating">
+              <RoomFormSlot
+                v-model:enabled="enabled"
+                :form="form"
+                :available-features="tenantData?.settings?.defaultFeatures"
+                :show-enabled-toggle="true"
+              />
+
+              <div
+                class="flex justify-end !gap-2 border-t border-surface-100 !pt-3"
+              >
+                <Button
+                  label="Discard"
+                  severity="secondary"
+                  outlined
+                  icon="fa-solid fa-xmark"
+                  size="small"
+                  @click="discardNewSlot"
+                />
+                <Button
+                  label="Save slot"
+                  severity="success"
+                  icon="fa-solid fa-check"
+                  size="small"
+                  :disabled="!newTimeslot"
+                  @click="form.handleSubmit()"
+                />
+              </div>
+            </template>
+
+            <template v-else-if="selectedSlot">
+              <div class="relative">
+                <SelectButton
+                  v-model="activeTab"
+                  :options="tabOptions"
+                  option-value="value"
+                  option-label="value"
+                  :allow-empty="false"
+                  class="!absolute top-0 right-0"
+                >
+                  <template #option="{ option }">
+                    <i :class="option.icon" style="font-size: 0.8rem" />
+                  </template>
+                </SelectButton>
+
+                <SlotMonitor
+                  v-if="activeTab === 'monitor'"
+                  :timeslot="selectedSlot"
+                  :enabled="enabled"
+                  @toggle-launch="toggleLaunch"
+                />
+
+                <div v-else class="flex flex-col !gap-4 !pt-10">
+                  <RoomFormSlot
+                    v-model:enabled="enabled"
+                    :form="form"
+                    :available-features="tenantData?.settings?.defaultFeatures"
+                    :show-enabled-toggle="false"
+                    :disabled="enabled"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="activeTab === 'settings'"
+                class="flex items-center justify-between border-t border-surface-100 !pt-3"
+              >
+                <Button
+                  :label="`Delete ${selectedSlot.label}`"
+                  severity="danger"
+                  size="small"
+                  variant="text"
+                  icon="fa-solid fa-trash"
+                  @click="deleteSlot"
+                />
+                <div v-if="isDirty" class="flex !gap-2">
+                  <Button
+                    label="Discard"
+                    severity="secondary"
+                    outlined
+                    icon="fa-solid fa-rotate"
+                    size="small"
+                    @click="form.reset()"
+                  />
+                  <Button
+                    label="Save"
+                    severity="success"
+                    icon="fa-solid fa-check"
+                    size="small"
+                    @click="form.handleSubmit()"
+                  />
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="flex flex-col items-center !py-10 text-center">
+                <div
+                  class="!mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-100"
+                >
+                  <i class="fa-solid fa-clock text-xl text-surface-300" />
+                </div>
+                <p class="!mb-1 text-sm font-medium text-surface-500">
+                  No time slots yet
+                </p>
+                <p class="!mb-4 text-xs text-surface-300">
+                  Add your first time slot for this day
+                </p>
+                <Button
+                  label="Create a slot"
+                  icon="fa-solid fa-plus"
+                  variant="text"
+                  size="small"
+                  @click="isCreating = true"
+                />
+              </div>
+            </template>
           </div>
         </div>
-      </BasicWrapper>
-
-      <!-- Form card -->
-      <BasicWrapper class="flex flex-col !gap-5">
-        <template v-if="slots?.length || isCreating">
-          <!-- Launch / Stop -->
-
-          <RoomFormSlot
-            v-model:enabled="enabled"
-            :form="form"
-            :available-features="tenantData?.settings?.defaultFeatures"
-            :show-enabled-toggle="isCreating"
-            :disabled="!isCreating && enabled"
-          />
-
-          <Button
-            v-if="!isCreating && selectedSlot"
-            :label="enabled ? 'Stop slot' : 'Launch slot'"
-            :icon="enabled ? 'fa-solid fa-stop' : 'fa-solid fa-play'"
-            :severity="enabled ? 'danger' : 'success'"
-            size="large"
-            class="w-full"
-            @click="toggleLaunch"
-          />
-
-          <!-- Creating actions -->
-          <div
-            v-if="isCreating"
-            class="flex justify-end !gap-2 border-t border-surface-100 !pt-3"
-          >
-            <Button
-              label="Discard"
-              severity="secondary"
-              outlined
-              icon="fa-solid fa-xmark"
-              size="small"
-              @click="discardNewSlot"
-            />
-            <Button
-              label="Save slot"
-              severity="success"
-              icon="fa-solid fa-check"
-              size="small"
-              :disabled="!newTimeslot"
-              @click="form.handleSubmit()"
-            />
-          </div>
-
-          <!-- Edit actions -->
-          <div
-            v-else-if="selectedSlot"
-            class="flex items-center justify-between border-t border-surface-100 !pt-3"
-          >
-            <Button
-              :label="`Delete ${selectedSlot.label}`"
-              severity="danger"
-              size="small"
-              variant="text"
-              icon="fa-solid fa-trash"
-              @click="deleteSlot"
-            />
-            <div v-if="isDirty" class="flex !gap-2">
-              <Button
-                label="Discard"
-                severity="secondary"
-                outlined
-                icon="fa-solid fa-rotate"
-                size="small"
-                @click="form.reset()"
-              />
-              <Button
-                label="Save"
-                severity="success"
-                icon="fa-solid fa-check"
-                size="small"
-                @click="form.handleSubmit()"
-              />
-            </div>
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="flex flex-col items-center !py-10 text-center">
-            <div
-              class="!mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-100"
-            >
-              <i class="fa-solid fa-clock text-xl text-surface-300" />
-            </div>
-            <p class="!mb-1 text-sm font-medium text-surface-500">
-              No time slots yet
-            </p>
-            <p class="!mb-4 text-xs text-surface-300">
-              Add your first time slot for this day
-            </p>
-            <Button
-              label="Create a slot"
-              icon="fa-solid fa-plus"
-              variant="text"
-              size="small"
-              @click="isCreating = true"
-            />
-          </div>
-        </template>
-      </BasicWrapper>
+      </div>
     </div>
-
-    <ActiveSlotsPanel
-      :room-id="id"
-      :selected-day="weekDay"
-      :max-height="formHeight"
-    />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
-import { Button, Select, SelectButton } from "primevue";
+import { Button, Popover, SelectButton, Tag } from "primevue";
 import { refDebounced } from "@vueuse/core";
-import { useAfterPaint } from "@/composables/useAfterPain";
 import { useForm } from "@tanstack/vue-form";
 import type { TimeslotResponse } from "@football/shared";
 import {
@@ -212,17 +285,18 @@ import {
   useDeleteTimeslot,
 } from "../../composables/queries";
 import { useGetTenantSettings } from "@/features/settings/composables/queries";
+import { useNow } from "../../composables/useNow";
 import RoomFormSlot from "./RoomSlotForm.vue";
-import ActiveSlotsPanel from "./ActiveSlotsPanel.vue";
+import SlotMonitor from "./SlotMonitor.vue";
+import StatusDot from "@/components/StatusDot.vue";
 
 const props = defineProps<{ id: number }>();
 
-const formRef = ref<HTMLElement | null>(null);
-const formHeight = ref<number | null>(null);
-
-useAfterPaint(() => {
-  formHeight.value = formRef.value?.offsetHeight ?? null;
-});
+const tabOptions = [
+  { value: "monitor", icon: "fa-solid fa-display" },
+  { value: "settings", icon: "fa-solid fa-sliders" },
+];
+const activeTab = ref<"monitor" | "settings">("monitor");
 
 const DAYS = [
   { label: "Mo", value: "mo", full: "Monday" },
@@ -234,9 +308,14 @@ const DAYS = [
   { label: "Su", value: "su", full: "Sunday" },
 ];
 
-const TIME_OPTIONS = Array.from({ length: 25 }, (_, h) => {
+const ALL_TIME_OPTIONS = Array.from({ length: 25 }, (_, h) => {
   const t = `${String(h).padStart(2, "0")}:00`;
   return { name: t, code: t, order: h };
+});
+
+const availableTimeOptions = computed(() => {
+  const used = new Set(slots.value?.map((s) => s.label) ?? []);
+  return ALL_TIME_OPTIONS.filter((o) => !used.has(o.code));
 });
 
 const { data: tenantData } = useGetTenantSettings(1);
@@ -246,6 +325,7 @@ const defaultForm = computed(() => {
   return {
     price: s?.defaultPrice !== null ? String(s?.defaultPrice) : null,
     message: null as string | null,
+    min_players: null as number | null,
     max_players: s?.defaultMaxPlayers ?? null,
     features: s?.defaultFeatures ?? [],
   };
@@ -254,6 +334,7 @@ const defaultForm = computed(() => {
 const slotToForm = (slot: TimeslotResponse) => ({
   price: slot.price !== null ? String(slot.price) : null,
   message: slot.message ?? null,
+  min_players: null as number | null,
   max_players: slot.max_players ?? null,
   features: Array.isArray(slot.features)
     ? [...(slot.features as string[])].sort()
@@ -275,12 +356,58 @@ const createMutation = useCreateTimeslot();
 const updateMutation = useUpdateTimeslot();
 const deleteMutation = useDeleteTimeslot();
 
+// ── Slot time labels ──
+const now = useNow();
+const DAY_MAP = ["su", "mo", "tu", "we", "th", "fr", "sa"];
+const DAY_LABELS: Record<string, string> = {
+  su: "Sunday",
+  mo: "Monday",
+  tu: "Tuesday",
+  we: "Wednesday",
+  th: "Thursday",
+  fr: "Friday",
+  sa: "Saturday",
+};
+
+const slotDotColor = (slot: TimeslotResponse): "green" | "amber" | "gray" => {
+  if (!slot.enabled) return "gray";
+  return slot.status === "live" ? "green" : "amber";
+};
+
+const minutesUntilStart = (slot: TimeslotResponse) => {
+  const n = now.value;
+  return slot.start_time - (n.getHours() * 60 + n.getMinutes());
+};
+
+const nextLabel = (slot: TimeslotResponse): string => {
+  const n = now.value;
+  const diff = minutesUntilStart(slot);
+  if (slot.day === DAY_MAP[n.getDay()] && diff > -60)
+    return `Today ${slot.label}`;
+
+  const daysUntil = (DAY_MAP.indexOf(slot.day) - n.getDay() + 7) % 7 || 7;
+
+  if (daysUntil === 1) return `Tomorrow ${slot.label}`;
+  return `Next ${DAY_LABELS[slot.day]} ${slot.label}`;
+};
+
 const selectedIndex = ref(0);
 const isCreating = ref(false);
 const newTimeslot = ref<{ name: string; code: string; order: number } | null>(
   null
 );
 const enabled = ref(false);
+const hourPopover = ref();
+
+// ── Hour picker ──
+const pickHour = (
+  opt: { name: string; code: string; order: number },
+  e: Event
+) => {
+  newTimeslot.value = opt;
+  isCreating.value = true;
+  hourPopover.value?.hide(e);
+};
 
 const selectedSlot = computed(() => slots.value?.[selectedIndex.value]);
 
@@ -325,6 +452,7 @@ watch(slots, (next) => {
 watch(
   [() => selectedSlot.value?.id, isCreating],
   ([, creating]) => {
+    activeTab.value = "monitor";
     if (creating || !selectedSlot.value) {
       form.reset({ ...defaultForm.value });
       if (creating) enabled.value = false;
@@ -367,6 +495,28 @@ const deleteSlot = async () => {
 
 <style>
 .day-banner {
-  background-image: linear-gradient(to right, #ccc9ff, #fefeff);
+  background-image: linear-gradient(
+    135deg,
+    #eeedff 0%,
+    #f8f7ff 40%,
+    #ffffff 100%
+  );
+}
+</style>
+
+<style scoped>
+.day-switch :deep(.p-togglebutton) {
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--p-surface-400);
+}
+.day-switch :deep(.p-togglebutton:not(.p-togglebutton-checked):hover) {
+  background: var(--p-primary-50);
+  color: var(--p-primary-500);
+}
+.day-switch :deep(.p-togglebutton-checked) {
+  background: var(--p-primary-600);
+  color: #fff;
 }
 </style>

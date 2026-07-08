@@ -2,16 +2,21 @@ import { api } from "@/axios";
 import {
   type GetTimeslotsParams,
   type GetEnabledTimeslotsParams,
+  type GetHostedRoomsParams,
+  type EnabledDaySummary,
+  type HostedRoomResponse,
   type PlayableRoomResponse,
   type CreateTimeslotRequest,
   type UpdateTimeslotRequest,
   type CreateTimeslotResponse,
   type MutationMessageResponse,
 } from "@football/shared";
-import { type MaybeRefOrGetter, toValue } from "vue";
-
-export const getHostedRooms = async () => {
-  const { data } = await api.get("/rooms/hosted", {});
+export const getHostedRooms = async (
+  params?: Partial<GetHostedRoomsParams>,
+): Promise<HostedRoomResponse[]> => {
+  const { data } = await api.get<HostedRoomResponse[]>("/rooms/hosted", {
+    params,
+  });
 
   return data;
 };
@@ -26,46 +31,25 @@ export const getPlayableRooms = async (
   return data;
 };
 
-type ReactiveParams<T> = {
-  [K in keyof T]: MaybeRefOrGetter<T[K]>;
-};
-
-export const getTimeslots = async (
-  params: ReactiveParams<GetTimeslotsParams>
-) => {
-  const { room_id, day } = params;
-
-  const { data } = await api.get("/timeslots", {
-    params: {
-      room_id: toValue(room_id),
-      day: toValue(day),
-    },
-  });
-
+export const getTimeslots = async (params: GetTimeslotsParams) => {
+  const { data } = await api.get("/timeslots", { params });
   return data;
 };
 
 export const getEnabledTimeslots = async (
-  params: ReactiveParams<GetEnabledTimeslotsParams>
+  params: GetEnabledTimeslotsParams,
 ) => {
-  const { room_id, day } = params;
-
-  const { data } = await api.get("/timeslots/enabled", {
-    params: {
-      room_id: toValue(room_id),
-      day: toValue(day),
-    },
-  });
-
+  const { data } = await api.get("/timeslots/enabled", { params });
   return data;
 };
 
-export const getEnabledTimeslotDays = async (
+export const getEnabledTimeslotDaysAndFirstSlot = async (
   room_id: number
-): Promise<string[]> => {
-  const { data } = await api.get<string[]>("/timeslots/enabled/days", {
-    params: { room_id },
-  });
+): Promise<EnabledDaySummary[]> => {
+  const { data } = await api.get<EnabledDaySummary[]>(
+    "/timeslots/enabled/days",
+    { params: { room_id } }
+  );
 
   return data;
 };

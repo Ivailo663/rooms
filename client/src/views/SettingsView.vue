@@ -17,9 +17,7 @@
           class="flex flex-col sm:flex-row sm:items-center sm:justify-between !gap-3 !py-4 first:!pt-0 last:!pb-0"
         >
           <div>
-            <p class="text-sm font-medium text-surface-700">
-              Late join cutoff
-            </p>
+            <p class="text-sm font-medium text-surface-700">Late join cutoff</p>
             <p class="!mt-0.5 text-xs text-surface-400">
               Minutes before start time after which players can no longer join
             </p>
@@ -390,8 +388,8 @@ type JoinPolicy = "free" | "required" | "required-list";
 const joinPolicy = ref<JoinPolicy>("free");
 const joinPolicyOptions = [
   { label: "Free", value: "free" as const },
-  { label: "Required", value: "required" as const },
-  { label: "Required List", value: "required-list" as const },
+  { label: "Approval", value: "required" as const },
+  { label: "Approval For Some", value: "required-list" as const },
 ];
 const playerSearch = ref("");
 const requiredPlayers = ref([
@@ -513,7 +511,7 @@ watch(
 
     hydrated.value = true;
   },
-  { immediate: true, once: true },
+  { immediate: true, once: true }
 );
 
 watchDebounced(
@@ -522,6 +520,6 @@ watchDebounced(
     if (!hydrated.value) return;
     saveSettings({ tenantId, settings });
   },
-  { debounce: 800, deep: true },
+  { debounce: 800, deep: true }
 );
 </script>

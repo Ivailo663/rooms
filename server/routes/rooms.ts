@@ -51,8 +51,9 @@ const createRoom: RequestHandler = asyncHandler(async (req, res) => {
   res.send(response);
 });
 
-const getHostedRooms: RequestHandler = asyncHandler(async (_req, res) => {
+const getHostedRooms: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
+  const day = typeof req.query.day === "string" ? req.query.day : undefined;
 
   const rooms = await prisma.room.findMany({
     where: {
@@ -65,7 +66,9 @@ const getHostedRooms: RequestHandler = asyncHandler(async (_req, res) => {
       price: true,
       address: true,
       timeslots: {
-        where: { enabled: true, status: "live" },
+        where: day
+          ? { enabled: true, status: "live", day }
+          : { enabled: true, status: "live" },
         select: {
           id: true,
           label: true,
