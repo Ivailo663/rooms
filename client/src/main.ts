@@ -4,11 +4,13 @@ import { createApp } from "vue";
 import BasicWrapper from "./components/BasicWrapper.vue";
 import { createPinia } from "pinia";
 import PrimeVue from "primevue/config";
+import ConfirmationService from "primevue/confirmationservice";
 import Lara from "@primeuix/themes/lara";
 import App from "./App.vue";
 import router from "./router";
 import "./firebase";
-import { VueQueryPlugin, QueryClient } from "@tanstack/vue-query";
+import { VueQueryPlugin } from "@tanstack/vue-query";
+import { queryClient } from "./queryClient";
 import { useAuthStore } from "./stores/auth";
 import { definePreset } from "@primeuix/themes";
 import RoleGate from "./components/RoleGate.vue";
@@ -54,14 +56,8 @@ app.use(PrimeVue, {
     },
   },
 });
+app.use(ConfirmationService);
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 60,
-    },
-  },
-});
 app.use(VueQueryPlugin, { queryClient });
 
 app.use(createPinia());

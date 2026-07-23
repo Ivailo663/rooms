@@ -10,6 +10,7 @@ import {
   type UpdateTimeslotRequest,
   type CreateTimeslotResponse,
   type MutationMessageResponse,
+  type JoinTimeslotResponse,
 } from "@football/shared";
 export const getHostedRooms = async (
   params?: Partial<GetHostedRoomsParams>,
@@ -86,10 +87,32 @@ export const deleteTimeslot = async (
 
 export const joinTimeslot = async (
   id: number
-): Promise<MutationMessageResponse> => {
-  const { data } = await api.post<MutationMessageResponse>(
+): Promise<JoinTimeslotResponse> => {
+  const { data } = await api.post<JoinTimeslotResponse>(
     `/timeslots/${id}/join`,
     { joined_at: new Date().toISOString() }
+  );
+
+  return data;
+};
+
+export const approveJoinRequest = async (params: {
+  timeslotId: number;
+  accountId: number;
+}): Promise<MutationMessageResponse> => {
+  const { data } = await api.post<MutationMessageResponse>(
+    `/timeslots/${params.timeslotId}/requests/${params.accountId}/approve`
+  );
+
+  return data;
+};
+
+export const denyJoinRequest = async (params: {
+  timeslotId: number;
+  accountId: number;
+}): Promise<MutationMessageResponse> => {
+  const { data } = await api.post<MutationMessageResponse>(
+    `/timeslots/${params.timeslotId}/requests/${params.accountId}/deny`
   );
 
   return data;
@@ -100,6 +123,16 @@ export const leaveTimeslot = async (
 ): Promise<MutationMessageResponse> => {
   const { data } = await api.post<MutationMessageResponse>(
     `/timeslots/${id}/leave`
+  );
+
+  return data;
+};
+
+export const redistributeTimeslot = async (
+  id: number
+): Promise<MutationMessageResponse> => {
+  const { data } = await api.post<MutationMessageResponse>(
+    `/timeslots/${id}/redistribute`
   );
 
   return data;

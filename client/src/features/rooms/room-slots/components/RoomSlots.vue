@@ -112,15 +112,25 @@
                   <div class="flex items-center !gap-1.5">
                     <StatusDot
                       :color="slotDotColor(slot)"
-                      :ping="slot.enabled && slot.status === 'live'"
+                      :ping="slot.enabled && liveNow(slot)"
                     />
                     <span
                       class="text-[11px] font-semibold whitespace-nowrap text-surface-700"
                     >
-                      <template v-if="slot.status === 'live'">
+                      <template v-if="liveNow(slot)">
                         {{ slot.label }}
                       </template>
                       <template v-else>{{ nextLabel(slot) }}</template>
+                    </span>
+                    <span
+                      v-if="slot.pendingRequests.length"
+                      class="flex items-center !gap-0.5 rounded-full bg-amber-100 !px-1.5 text-[9px] font-bold leading-4 text-amber-600"
+                    >
+                      <i
+                        class="fa-solid fa-user-clock"
+                        style="font-size: 0.5rem"
+                      />
+                      {{ slot.pendingRequests.length }}
                     </span>
                   </div>
                   <span class="text-[10px] font-medium text-surface-400">
@@ -197,7 +207,6 @@
                   v-if="activeTab === 'monitor'"
                   :timeslot="selectedSlot"
                   :enabled="enabled"
-                  @toggle-launch="toggleLaunch"
                 />
 
                 <div v-else class="flex flex-col !gap-4 !pt-10">
@@ -205,6 +214,7 @@
                     v-model:enabled="enabled"
                     :form="form"
                     :available-features="tenantData?.settings?.defaultFeatures"
+                    :available-hours="editableHourOptions"
                     :show-enabled-toggle="false"
                     :disabled="enabled"
                   />
@@ -241,6 +251,18 @@
                   />
                 </div>
               </div>
+
+              <button
+                class="launch-btn w-full"
+                :class="enabled ? 'launch-btn--stop' : 'launch-btn--go'"
+                @click="toggleLaunch"
+              >
+                <i
+                  :class="enabled ? 'fa-solid fa-stop' : 'fa-solid fa-play'"
+                  style="font-size: 0.75rem"
+                />
+                {{ enabled ? "Stop slot" : "Launch slot" }}
+              </button>
             </template>
 
             <template v-else>
@@ -286,6 +308,7 @@ import {
 } from "../../composables/queries";
 import { useGetTenantSettings } from "@/features/settings/composables/queries";
 import { useNow } from "../../composables/useNow";
+import { isSlotLiveNow } from "../../composables/isSlotLiveNow";
 import RoomFormSlot from "./RoomSlotForm.vue";
 import SlotMonitor from "./SlotMonitor.vue";
 import StatusDot from "@/components/StatusDot.vue";
@@ -318,23 +341,33 @@ const availableTimeOptions = computed(() => {
   return ALL_TIME_OPTIONS.filter((o) => !used.has(o.code));
 });
 
+const editableHourOptions = computed(() => {
+  const currentLabel = selectedSlot.value?.label;
+  const used = new Set(
+    slots.value?.filter((s) => s.label !== currentLabel).map((s) => s.label) ?? [],
+  );
+  return ALL_TIME_OPTIONS.filter((o) => !used.has(o.code));
+});
+
 const { data: tenantData } = useGetTenantSettings(1);
 
 const defaultForm = computed(() => {
   const s = tenantData.value?.settings;
   return {
+    label: "" as string,
     price: s?.defaultPrice !== null ? String(s?.defaultPrice) : null,
     message: null as string | null,
-    min_players: null as number | null,
+    min_players: s?.defaultMinPlayers ?? null,
     max_players: s?.defaultMaxPlayers ?? null,
     features: s?.defaultFeatures ?? [],
   };
 });
 
 const slotToForm = (slot: TimeslotResponse) => ({
+  label: slot.label,
   price: slot.price !== null ? String(slot.price) : null,
   message: slot.message ?? null,
-  min_players: null as number | null,
+  min_players: slot.min_players ?? null,
   max_players: slot.max_players ?? null,
   features: Array.isArray(slot.features)
     ? [...(slot.features as string[])].sort()
@@ -369,9 +402,11 @@ const DAY_LABELS: Record<string, string> = {
   sa: "Saturday",
 };
 
+const liveNow = (slot: TimeslotResponse) => isSlotLiveNow(slot, now.value);
+
 const slotDotColor = (slot: TimeslotResponse): "green" | "amber" | "gray" => {
   if (!slot.enabled) return "gray";
-  return slot.status === "live" ? "green" : "amber";
+  return liveNow(slot) ? "green" : "amber";
 };
 
 const minutesUntilStart = (slot: TimeslotResponse) => {
@@ -421,6 +456,7 @@ const form = useForm({
         day: weekDay.value,
         name: newTimeslot.value.name,
         label: newTimeslot.value.code,
+        min_players: value.min_players,
         max_players: value.max_players ?? 0,
         price: value.price,
         message: value.message,
@@ -431,6 +467,8 @@ const form = useForm({
     } else if (selectedSlot.value) {
       await updateMutation.mutateAsync({
         id: selectedSlot.value.id,
+        label: value.label,
+        min_players: value.min_players,
         max_players: value.max_players ?? 0,
         price: value.price,
         message: value.message,
@@ -443,11 +481,35 @@ const form = useForm({
 
 const isDirty = form.useStore((s) => s.isDirty);
 
-watch(slots, (next) => {
-  if (!next?.length) selectedIndex.value = 0;
-  else if (selectedIndex.value >= next.length)
-    selectedIndex.value = next.length - 1;
-});
+// On today's list, default to the slot that is live or starts next; otherwise the first one.
+const defaultSlotIndex = (list: TimeslotResponse[]) => {
+  if (debouncedWeekDay.value !== todayValue) return 0;
+  const nowMinutes = now.value.getHours() * 60 + now.value.getMinutes();
+  let best = -1;
+  list.forEach((slot, index) => {
+    if (!liveNow(slot) && slot.start_time < nowMinutes) return;
+    if (best === -1 || list[best]!.start_time > slot.start_time) best = index;
+  });
+  return best === -1 ? 0 : best;
+};
+
+const autoSelectedDay = ref<string | null>(null);
+
+watch(
+  slots,
+  (next) => {
+    if (!next?.length) {
+      selectedIndex.value = 0;
+      autoSelectedDay.value = null;
+    } else if (autoSelectedDay.value !== debouncedWeekDay.value) {
+      autoSelectedDay.value = debouncedWeekDay.value;
+      selectedIndex.value = defaultSlotIndex(next);
+    } else if (selectedIndex.value >= next.length) {
+      selectedIndex.value = next.length - 1;
+    }
+  },
+  { immediate: true }
+);
 
 watch(
   [() => selectedSlot.value?.id, isCreating],
@@ -505,6 +567,36 @@ const deleteSlot = async () => {
 </style>
 
 <style scoped>
+.launch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.75rem;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  transition: all 0.2s ease;
+}
+.launch-btn--go {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: #065f46;
+}
+.launch-btn--go:hover {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
+}
+.launch-btn--stop {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  color: #991b1b;
+}
+.launch-btn--stop:hover {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.12);
+}
 .day-switch :deep(.p-togglebutton) {
   border: none;
   border-radius: 10px;

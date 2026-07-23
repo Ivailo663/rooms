@@ -24,6 +24,17 @@
       </div>
 
       <div class="flex shrink-0 items-center !gap-2">
+        <!-- Pending join requests -->
+        <button
+          v-if="room.pendingRequestCount > 0"
+          class="flex items-center !gap-1.5 rounded-full border border-amber-200 bg-amber-50 !px-2.5 !py-1 text-xs font-semibold text-amber-600 transition-colors hover:bg-amber-100 cursor-pointer outline-none"
+          @click.stop="drawerVisible = true"
+        >
+          <i class="fa-solid fa-user-clock" style="font-size: 0.6rem" />
+          {{ room.pendingRequestCount }}
+          {{ room.pendingRequestCount === 1 ? "request" : "requests" }}
+        </button>
+
         <!-- Chat toggle button -->
         <button
           class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border transition-colors"
@@ -54,9 +65,11 @@
         :class="
           roomStatus === 'live'
             ? 'border-emerald-100 bg-emerald-50/50'
-            : roomStatus === 'scheduled'
-              ? 'border-amber-100 bg-amber-50/50'
-              : 'border-surface-100 bg-surface-50'
+            : roomStatus === 'redistributed'
+              ? 'border-violet-100 bg-violet-50/50'
+              : roomStatus === 'scheduled'
+                ? 'border-amber-100 bg-amber-50/50'
+                : 'border-surface-100 bg-surface-50'
         "
       >
         <StatusBadge :status="roomStatus" class="!mb-2">
@@ -65,45 +78,27 @@
           </template>
         </StatusBadge>
 
-        <template v-if="room.liveSlot">
-          <div class="flex items-baseline !gap-1.5">
-            <span class="text-lg font-bold text-surface-900">
-              {{ room.liveSlot.label }}
-            </span>
-          </div>
-          <p class="!mt-1.5 text-[10px] text-surface-400">
-            <template v-if="nextSlot">
-              Next: Today {{ nextSlot.label }}
-            </template>
-            <template v-else-if="nextEnabledDay">
-              Next: {{ DAY_LABELS[nextEnabledDay.day] }} {{ nextEnabledDay.label }}
-            </template>
-          </p>
-        </template>
+        <div v-if="primaryLabel" class="flex items-baseline !gap-1.5">
+          <span class="text-lg font-bold text-surface-900">
+            {{ primaryLabel }}
+          </span>
+          <span
+            v-if="!room.liveSlot && nextSlotInfo?.countdown"
+            class="text-xs text-surface-400"
+          >
+            {{ nextSlotInfo.countdown }}
+          </span>
+        </div>
 
-        <template v-else-if="nextSlot">
-          <div class="flex items-baseline !gap-1.5">
-            <span class="text-lg font-bold text-surface-900">
-              {{ nextSlot.label }}
-            </span>
-            <span class="text-xs text-surface-400">
-              {{ nextSlotTimeLabel }}
-            </span>
-          </div>
-          <p class="!mt-1.5 text-[10px] text-surface-400">
-            Next: Today {{ nextSlot.label }}
-          </p>
-        </template>
-
-        <template v-else-if="nextEnabledDay">
-          <p class="!mt-1.5 text-[10px] text-surface-400">
-            Next: {{ DAY_LABELS[nextEnabledDay.day] }} {{ nextEnabledDay.label }}
-          </p>
-        </template>
-
-        <template v-else>
-          <p class="text-sm font-medium text-surface-300">No slots</p>
-        </template>
+        <p v-if="nextHint" class="!mt-1.5 text-[10px] text-surface-400">
+          {{ nextHint }}
+        </p>
+        <p
+          v-else-if="!primaryLabel"
+          class="text-sm font-medium text-surface-300"
+        >
+          No slots
+        </p>
       </div>
 
       <!-- Players Widget -->
@@ -165,6 +160,19 @@
       </div>
     </div>
 
+    <!-- Redistribution notices -->
+    <div
+      v-if="redistributionNotices.length"
+      class="flex flex-col !gap-2 !px-4 !pb-3"
+    >
+      <RedistributionNotice
+        v-for="notice in redistributionNotices"
+        :key="notice.id"
+        :notice="notice"
+        @close="dismissNotice(notice.id)"
+      />
+    </div>
+
     <!-- Chat Panel (toggled) -->
     <div v-if="chatOpen" class="border-t border-surface-100 !px-4 !py-3">
       <SlotChat />
@@ -194,9 +202,11 @@ import { ref, computed } from "vue";
 import type { HostedRoomResponse } from "@football/shared";
 import ManageSlotsDrawer from "./ManageSlotsDrawer.vue";
 import SlotChat from "./SlotChat.vue";
+import RedistributionNotice from "./RedistributionNotice.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import { useNow } from "../composables/useNow";
 import { useGetTimeslots, useGetEnabledDays } from "../composables/queries";
+import { useRedistributionNotices } from "../composables/useRedistributionNotices";
 
 const DAY_ORDER = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 const DAY_LABELS: Record<string, string> = {
@@ -244,7 +254,7 @@ const nextEnabledDay = computed(() => {
   if (!enabledDays.value?.length) return null;
   const todayIndex = DAY_ORDER.indexOf(todayDay);
 
-  let best: { day: string; label: string } | null = null;
+  let best: { day: string; label: string; offset: number } | null = null;
   let bestOffset = Infinity;
   for (const entry of enabledDays.value) {
     const idx = DAY_ORDER.indexOf(entry.day);
@@ -253,14 +263,61 @@ const nextEnabledDay = computed(() => {
     if (offset === 0) offset = 7;
     if (offset < bestOffset) {
       bestOffset = offset;
-      best = entry;
+      best = { ...entry, offset };
     }
   }
   return best;
 });
 
+// The next upcoming slot, resolved once as { when, label, countdown }.
+// `when` is relative ("Today"/"Tomorrow"/"Next Monday"); `countdown` is
+// only set for same-day slots. offset === 1 covers tomorrow for any weekday,
+// so Sunday → Monday reads "Tomorrow" without a special case.
+const nextSlotInfo = computed(() => {
+  if (nextSlot.value) {
+    return {
+      when: "Today",
+      label: nextSlot.value.label,
+      countdown: nextSlotTimeLabel.value,
+    };
+  }
+  if (nextEnabledDay.value) {
+    const { day, label, offset } = nextEnabledDay.value;
+    return {
+      when: offset === 1 ? "Tomorrow" : `Next ${DAY_LABELS[day]}`,
+      label,
+      countdown: "",
+    };
+  }
+  return null;
+});
+
+const primaryLabel = computed(
+  () => props.room.liveSlot?.label ?? nextSlotInfo.value?.label ?? null
+);
+
+const nextHint = computed(() => {
+  const info = nextSlotInfo.value;
+  // While a slot is live, the label shows it and the hint previews what follows.
+  if (props.room.liveSlot) {
+    return info ? `Next: ${info.when} at ${info.label}` : "";
+  }
+  // Otherwise the label already is the next slot — the hint just says when.
+  return info?.when ?? "";
+});
+
+const { isRecentlyRedistributed, noticesForTimeslot, dismissNotice } =
+  useRedistributionNotices();
+
+const redistributionNotices = computed(() =>
+  nextSlot.value ? noticesForTimeslot(nextSlot.value.id) : []
+);
+
 const roomStatus = computed(() => {
   if (props.room.liveSlot) return "live";
+  if (nextSlot.value && isRecentlyRedistributed(nextSlot.value.id)) {
+    return "redistributed";
+  }
   return nextSlot.value || nextEnabledDay.value ? "scheduled" : "inactive";
 });
 
@@ -279,7 +336,9 @@ const nextSlotTimeLabel = computed(() => {
     nextSlot.value.start_time -
     (now.value.getHours() * 60 + now.value.getMinutes());
   if (mins < 60) return `in ${mins}m`;
-  return `in ${Math.floor(mins / 60)}h ${mins % 60}m`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem ? `in ${hrs}h${rem}m` : `in ${hrs}h`;
 });
 
 const activePlayerInfo = computed(() => {

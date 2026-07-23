@@ -65,6 +65,23 @@
             fluid
           />
 
+          <div v-if="joinPolicy !== 'free'" class="!mt-4">
+            <p class="text-xs font-medium text-surface-600 !mb-1">
+              Denial message
+            </p>
+            <p class="!mb-2 text-xs text-surface-400">
+              Shown to declined players
+            </p>
+            <Textarea
+              v-model="deniedMessage"
+              :rows="2"
+              auto-resize
+              fluid
+              placeholder="e.g. The squad is full this week — try again for the next game."
+              class="text-sm"
+            />
+          </div>
+
           <div
             v-if="joinPolicy === 'required-list'"
             class="!mt-4 rounded-xl border border-surface-200 bg-surface-50/50 !p-4"
@@ -76,17 +93,45 @@
               Only these players will need to request access before joining
             </p>
 
-            <div class="relative !mb-3">
-              <i
-                class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-surface-300"
-                style="font-size: 0.7rem"
-              />
-              <input
-                v-model="playerSearch"
-                placeholder="Search players…"
-                class="w-full rounded-lg border border-surface-200 bg-white !py-2 !pl-8 !pr-3 text-sm outline-none placeholder:text-surface-300 focus:border-primary-300"
-              />
-            </div>
+            <AutoComplete
+              v-model="playerSearch"
+              :suggestions="accountSuggestions"
+              option-label="name"
+              :delay="350"
+              placeholder="Search players by name or email…"
+              class="w-full !mb-3"
+              fluid
+              :virtual-scroller-options="{ itemSize: 50 }"
+              @complete="onSearchAccounts"
+              @option-select="onSelectAccount"
+            >
+              <template #option="{ option }">
+                <div class="flex items-center !gap-2 !py-1">
+                  <div
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600"
+                  >
+                    <i class="fa-solid fa-user" style="font-size: 0.6rem" />
+                  </div>
+                  <div class="flex flex-col leading-tight">
+                    <span class="text-sm text-surface-700">
+                      {{ option.name }}
+                    </span>
+                    <span class="text-xs text-surface-400">
+                      {{ option.email }}
+                    </span>
+                  </div>
+                </div>
+              </template>
+              <template #empty>
+                <div class="!px-3 !py-2 text-xs text-surface-400">
+                  {{
+                    searchTerm.length < 3
+                      ? "Type at least 3 characters to search"
+                      : "No players found"
+                  }}
+                </div>
+              </template>
+            </AutoComplete>
 
             <div v-if="requiredPlayers.length" class="flex flex-col !gap-2">
               <div
@@ -173,14 +218,14 @@
         >
           <div>
             <p class="text-sm font-medium text-surface-700">
-              Min players per slot
+              Default min Players
             </p>
             <p class="!mt-0.5 text-xs text-surface-400">
-              Minimum number of players required to run a slot
+              Pre-filled minimum players required to run a new slot
             </p>
           </div>
           <InputNumber
-            v-model="minPlayers"
+            v-model="defaultMinPlayers"
             :min="1"
             :max="50"
             :show-buttons="true"
@@ -364,22 +409,28 @@ import {
   Message,
   SelectButton,
   Checkbox,
+  AutoComplete,
+  Textarea,
 } from "primevue";
 import { watchDebounced } from "@vueuse/core";
+import type { AccountSearchResult } from "@football/shared";
 import BasicWrapper from "@/components/BasicWrapper.vue";
 import DisabledBlock from "@/components/DisabledBlock.vue";
 import {
   useGetTenantSettings,
   useUpdateTenantSettings,
+  useUpdateTenantAccount,
+  useSearchAccounts,
 } from "@/features/settings/composables/queries";
-
-const { mutate: saveSettings } = useUpdateTenantSettings();
-const { data: tenantData } = useGetTenantSettings(1);
-
-const hydrated = ref(false);
 
 // TODO: get from auth store once tenant is wired up
 const tenantId = 1;
+
+const { mutate: saveSettings } = useUpdateTenantSettings();
+const { mutate: saveAccountFlags } = useUpdateTenantAccount();
+const { data: tenantData } = useGetTenantSettings(tenantId);
+
+const hydrated = ref(false);
 
 const lateJoinCutoff = ref(15);
 const allowJoinOnLive = ref(false);
@@ -391,20 +442,48 @@ const joinPolicyOptions = [
   { label: "Approval", value: "required" as const },
   { label: "Approval For Some", value: "required-list" as const },
 ];
+// `playerSearch` holds the AutoComplete input value; `searchTerm` is the
+// debounced query the server search runs against (set from @complete).
 const playerSearch = ref("");
-const requiredPlayers = ref([
-  { id: 1, name: "John Doe" },
-  { id: 2, name: "Jane Smith" },
-]);
+const searchTerm = ref("");
+const { data: accountResults } = useSearchAccounts(searchTerm);
+
+// Derived from the query cache — the mutation invalidates ["tenant-settings"],
+// so there is no local copy to keep in sync.
+const requiredPlayers = computed(() =>
+  (tenantData.value?.flaggedAccounts ?? [])
+    .filter((a) => a.requiresApproval)
+    .map((a) => ({ id: a.accountId, name: a.name }))
+);
+
+// Drop anyone already on the list, and never show stale results for a
+// sub-threshold term (keepPreviousData retains the last 3+ char result set).
+const accountSuggestions = computed<AccountSearchResult[]>(() => {
+  if (searchTerm.value.length < 3) return [];
+  const added = new Set(requiredPlayers.value.map((p) => p.id));
+  return (accountResults.value ?? []).filter((a) => !added.has(a.id));
+});
+
+const onSearchAccounts = (e: { query: string }) => {
+  searchTerm.value = e.query.trim();
+};
+
+const onSelectAccount = (e: { value: AccountSearchResult }) => {
+  saveAccountFlags({ tenantId, accountId: e.value.id, requiresApproval: true });
+  playerSearch.value = "";
+  searchTerm.value = "";
+};
+
 const removeRequiredPlayer = (id: number) => {
-  requiredPlayers.value = requiredPlayers.value.filter((p) => p.id !== id);
+  saveAccountFlags({ tenantId, accountId: id, requiresApproval: false });
 };
 const includeBlacklisted = ref(false);
+const deniedMessage = ref("");
 
 const defaultMaxPlayers = ref(10);
 const defaultPrice = ref(5.0);
 
-const minPlayers = ref(4);
+const defaultMinPlayers = ref(4);
 const autoRedistribute = ref(false);
 const redistributionWindow = ref(15);
 
@@ -461,19 +540,14 @@ const removeFeature = (label: string) => {
   enabledFeatures.value = enabledFeatures.value.filter((f) => f !== label);
 };
 
-const joinPolicyValue = computed<number[]>(() => {
-  if (joinPolicy.value === "free") return [-2];
-  if (joinPolicy.value === "required") return [-1];
-  const ids = requiredPlayers.value.map((p) => p.id);
-  return includeBlacklisted.value ? [0, ...ids] : ids;
-});
-
 const settingsPayload = computed(() => ({
   lateJoinCutoff: lateJoinCutoff.value,
   allowJoinOnLive: allowJoinOnLive.value,
-  joinPolicy: joinPolicyValue.value,
+  joinMode: joinPolicy.value,
+  includeBlacklisted: includeBlacklisted.value,
+  deniedMessage: deniedMessage.value.trim(),
   defaultMaxPlayers: defaultMaxPlayers.value,
-  minPlayers: minPlayers.value,
+  defaultMinPlayers: defaultMinPlayers.value,
   defaultPrice: defaultPrice.value,
   defaultFeatures: enabledFeatures.value,
   autoRedistribute: autoRedistribute.value,
@@ -481,13 +555,14 @@ const settingsPayload = computed(() => ({
 }));
 
 watch(
-  () => tenantData.value?.settings,
-  (s) => {
+  () => tenantData.value,
+  (data) => {
+    const s = data?.settings;
     if (!s) return;
     lateJoinCutoff.value = s.lateJoinCutoff;
     allowJoinOnLive.value = s.allowJoinOnLive;
     defaultMaxPlayers.value = s.defaultMaxPlayers;
-    minPlayers.value = s.minPlayers;
+    defaultMinPlayers.value = s.defaultMinPlayers;
     defaultPrice.value = s.defaultPrice;
     enabledFeatures.value = s.defaultFeatures;
     const customFeatures = s.defaultFeatures
@@ -497,17 +572,9 @@ watch(
     autoRedistribute.value = s.autoRedistribute;
     redistributionWindow.value = s.redistributionWindow;
 
-    const jp = s.joinPolicy;
-    if (jp[0] === -2) {
-      joinPolicy.value = "free";
-    } else if (jp[0] === -1) {
-      joinPolicy.value = "required";
-    } else {
-      joinPolicy.value = "required-list";
-      includeBlacklisted.value = jp[0] === 0;
-      const ids = jp.filter((id) => id > 0);
-      requiredPlayers.value = ids.map((id) => ({ id, name: `Player ${id}` }));
-    }
+    joinPolicy.value = s.joinMode ?? "free";
+    includeBlacklisted.value = s.includeBlacklisted ?? false;
+    deniedMessage.value = s.deniedMessage ?? "";
 
     hydrated.value = true;
   },

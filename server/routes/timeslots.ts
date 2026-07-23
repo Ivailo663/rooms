@@ -64,6 +64,12 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
           },
         },
       },
+      join_requests: {
+        where: { status: "pending" },
+        include: {
+          account: { select: { name: true } },
+        },
+      },
     },
     orderBy: {
       order: "asc",
@@ -76,6 +82,7 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
     message: timeslot.message,
     price: timeslot.price?.toString() ?? null,
     label: timeslot.label,
+    min_players: timeslot.min_players,
     max_players: timeslot.max_players,
     features: timeslot.features as TimeslotResponse["features"],
     day: timeslot.day,
@@ -85,6 +92,11 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
     players: timeslot.timeslot_players.map(({ accounts }) => ({
       id: accounts.id,
       name: accounts.name,
+    })),
+    pendingRequests: timeslot.join_requests.map((request) => ({
+      accountId: request.accountId,
+      name: request.account.name,
+      created_at: request.created_at ? request.created_at.toISOString() : null,
     })),
   }));
 
@@ -116,6 +128,12 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
           },
         },
       },
+      join_requests: {
+        where: { status: "pending" },
+        include: {
+          account: { select: { name: true } },
+        },
+      },
     },
     orderBy: { start_time: "asc" },
   });
@@ -126,6 +144,7 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
     message: timeslot.message,
     price: timeslot.price?.toString() ?? null,
     label: timeslot.label,
+    min_players: timeslot.min_players,
     max_players: timeslot.max_players,
     features: timeslot.features as TimeslotResponse["features"],
     day: timeslot.day,
@@ -135,6 +154,11 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
     players: timeslot.timeslot_players.map(({ accounts }) => ({
       id: accounts.id,
       name: accounts.name,
+    })),
+    pendingRequests: timeslot.join_requests.map((request) => ({
+      accountId: request.accountId,
+      name: request.account.name,
+      created_at: request.created_at ? request.created_at.toISOString() : null,
     })),
   }));
 
@@ -184,6 +208,7 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
       name: body.name,
       label: body.label,
       start_time: labelToStartTime(body.label),
+      min_players: body.min_players ?? null,
       max_players: body.max_players,
       price: body.price
         ? typeof body.price === "string"
@@ -231,6 +256,7 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
     updateData.label = body.label;
     updateData.start_time = labelToStartTime(body.label);
   }
+  if (body.min_players !== undefined) updateData.min_players = body.min_players;
   if (body.max_players !== undefined) updateData.max_players = body.max_players;
   if (body.price !== undefined) {
     updateData.price = body.price

@@ -1,6 +1,6 @@
-import type { JsonValue } from "@prisma/client/runtime/library";
+import { Prisma } from "@prisma/client";
 
 export interface UpdateTenantSettings {
   tenantId: number;
-  settings: JsonValue;
+  settings: Prisma.JsonValue;
 }

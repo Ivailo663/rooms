@@ -5,6 +5,7 @@ import type {
   CreateRoomResponse,
   HostedRoomResponse,
   PlayableRoomResponse,
+  TenantSettings,
 } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger } from "../utils/validation.js";
@@ -85,6 +86,24 @@ const getHostedRooms: RequestHandler = asyncHandler(async (req, res) => {
     },
   });
 
+  // Pending join-request counts per room, in one aggregate query. Backed by
+  // the DB so the card badge survives reloads and missed socket events.
+  const roomIds = rooms.map((room) => room.id);
+  const pendingRequests = roomIds.length
+    ? await prisma.timeslotJoinRequest.findMany({
+        where: {
+          status: "pending",
+          room_timeslot: { roomId: { in: roomIds } },
+        },
+        select: { room_timeslot: { select: { roomId: true } } },
+      })
+    : [];
+  const pendingByRoom = new Map<number, number>();
+  for (const request of pendingRequests) {
+    const roomId = request.room_timeslot.roomId;
+    pendingByRoom.set(roomId, (pendingByRoom.get(roomId) ?? 0) + 1);
+  }
+
   const response: HostedRoomResponse[] = rooms.map((room) => {
     const live = room.timeslots[0] ?? null;
     return {
@@ -93,6 +112,7 @@ const getHostedRooms: RequestHandler = asyncHandler(async (req, res) => {
       description: room.description,
       address: room.address,
       price: room.price?.toString() ?? null,
+      pendingRequestCount: pendingByRoom.get(room.id) ?? 0,
       liveSlot: live
         ? {
             id: live.id,
@@ -125,6 +145,7 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
       description: true,
       price: true,
       address: true,
+      tenant: { select: { settings: true } },
       timeslots: {
         where: day ? { day, enabled: true } : { enabled: true },
         select: {
@@ -146,6 +167,10 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
               },
             },
           },
+          join_requests: {
+            where: { accountId: account.id },
+            select: { status: true },
+          },
         },
         orderBy: {
           order: "asc",
@@ -157,32 +182,38 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
     },
   });
 
-  const response: PlayableRoomResponse[] = rooms.map((room) => ({
-    id: room.id,
-    name: room.name,
-    description: room.description,
-    price: room.price?.toString() ?? null,
-    address: room.address,
-    timeslots: room.timeslots.map((timeslot) => {
-      const players = timeslot.timeslot_players.map(({ accounts }) => ({
-        id: accounts.id,
-        email: accounts.email,
-        name: accounts.name,
-      }));
+  const response: PlayableRoomResponse[] = rooms.map((room) => {
+    const settings = (room.tenant?.settings ?? {}) as Partial<TenantSettings>;
 
-      return {
-        id: timeslot.id,
-        name: timeslot.name,
-        message: timeslot.message,
-        price: timeslot.price?.toString() ?? null,
-        label: timeslot.label,
-        features: timeslot.features,
-        playersCount: players.length,
-        max_players: timeslot.max_players,
-        players,
-      };
-    }),
-  }));
+    return {
+      id: room.id,
+      name: room.name,
+      description: room.description,
+      price: room.price?.toString() ?? null,
+      address: room.address,
+      deniedMessage: settings.deniedMessage?.trim() || null,
+      timeslots: room.timeslots.map((timeslot) => {
+        const players = timeslot.timeslot_players.map(({ accounts }) => ({
+          id: accounts.id,
+          email: accounts.email,
+          name: accounts.name,
+        }));
+
+        return {
+          id: timeslot.id,
+          name: timeslot.name,
+          message: timeslot.message,
+          price: timeslot.price?.toString() ?? null,
+          label: timeslot.label,
+          features: timeslot.features,
+          playersCount: players.length,
+          max_players: timeslot.max_players,
+          players,
+          requestStatusForCurrentUser: timeslot.join_requests[0]?.status ?? null,
+        };
+      }),
+    };
+  });
 
   res.send(response);
 });

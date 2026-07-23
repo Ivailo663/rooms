@@ -17,6 +17,9 @@ import {
   deleteTimeslot,
   joinTimeslot,
   leaveTimeslot,
+  redistributeTimeslot,
+  approveJoinRequest,
+  denyJoinRequest,
 } from "../api";
 
 import type {
@@ -30,6 +33,7 @@ import type {
   UpdateTimeslotRequest,
   CreateTimeslotResponse,
   MutationMessageResponse,
+  JoinTimeslotResponse,
 } from "@football/shared";
 
 import { useAuthStore } from "@/stores/auth";
@@ -161,10 +165,42 @@ export const useDeleteTimeslot = () => {
 export const useJoinTimeslot = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<MutationMessageResponse, Error, number>({
+  return useMutation<JoinTimeslotResponse, Error, number>({
     mutationFn: joinTimeslot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
+    },
+  });
+};
+
+export const useApproveJoinRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    MutationMessageResponse,
+    Error,
+    { timeslotId: number; accountId: number }
+  >({
+    mutationFn: approveJoinRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timeslots"] });
+      queryClient.invalidateQueries({ queryKey: ["hosted-rooms"] });
+    },
+  });
+};
+
+export const useDenyJoinRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    MutationMessageResponse,
+    Error,
+    { timeslotId: number; accountId: number }
+  >({
+    mutationFn: denyJoinRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timeslots"] });
+      queryClient.invalidateQueries({ queryKey: ["hosted-rooms"] });
     },
   });
 };
@@ -176,6 +212,17 @@ export const useLeaveTimeslot = () => {
     mutationFn: leaveTimeslot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
+    },
+  });
+};
+
+export const useRedistributeTimeslot = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<MutationMessageResponse, Error, number>({
+    mutationFn: redistributeTimeslot,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timeslots"] });
     },
   });
 };

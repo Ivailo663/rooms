@@ -25,7 +25,11 @@
 <script setup lang="ts">
 import StatusDot from "./StatusDot.vue";
 
-export type SlotStatusKind = "live" | "scheduled" | "inactive";
+export type SlotStatusKind =
+  | "live"
+  | "scheduled"
+  | "inactive"
+  | "redistributed";
 
 withDefaults(
   defineProps<{
@@ -37,16 +41,18 @@ withDefaults(
 
 const STATUS_STYLES: Record<
   SlotStatusKind,
-  { dot: "green" | "amber" | "gray"; text: string; bg: string }
+  { dot: "green" | "amber" | "gray" | "purple"; text: string; bg: string }
 > = {
   live: { dot: "green", text: "text-emerald-600", bg: "bg-emerald-50" },
   scheduled: { dot: "amber", text: "text-amber-600", bg: "bg-amber-50" },
   inactive: { dot: "gray", text: "text-surface-400", bg: "bg-surface-50" },
+  redistributed: { dot: "purple", text: "text-violet-600", bg: "bg-violet-50" },
 };
 
 const DEFAULT_LABELS: Record<SlotStatusKind, string> = {
   live: "Live",
   scheduled: "Scheduled",
   inactive: "Offline",
+  redistributed: "Redistributed",
 };
 </script>

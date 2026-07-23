@@ -17,16 +17,38 @@
       <RouterView />
     </div>
   </div>
+
+  <ConfirmDialog
+    :closable="false"
+    :pt="{
+      root: {
+        class: '!rounded-2xl !border !border-surface-100 !shadow-lg !max-w-sm',
+      },
+      header: { class: '!px-5 !pt-5 !pb-0 !border-none' },
+      title: { class: '!text-base !font-semibold !text-surface-900' },
+      content: { class: '!px-5 !py-3' },
+      message: { class: '!text-sm !leading-relaxed !text-surface-500' },
+      footer: {
+        class:
+          '!px-5 !pb-5 !pt-3 !border-none !gap-2 flex !justify-end',
+      },
+    }"
+  />
 </template>
 
 <script setup lang="ts">
 import { RouterView } from "vue-router";
 import { ref } from "vue";
+import ConfirmDialog from "primevue/confirmdialog";
 import { useAuthStore } from "./stores/auth";
 import AppSidebar from "./components/AppSidebar.vue";
+import { useJoinRequestSync } from "./features/rooms/composables/useJoinRequestSync";
 
 const authStore = useAuthStore();
 const menuExpanded = ref(true);
+
+// App-wide realtime sync for join-request events.
+useJoinRequestSync();
 </script>
 
 <style scoped></style>

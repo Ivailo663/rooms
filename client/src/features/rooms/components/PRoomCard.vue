@@ -3,130 +3,151 @@
     <!-- Full bleed image -->
     <div
       class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-      :style="{
-        backgroundImage: `url(https://picsum.photos/seed/${room.id}/800/1000)`,
-      }"
-    />
-    <div
-      class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10"
-    />
-
-    <!-- Content overlay -->
-    <div class="relative flex h-full flex-col !p-6">
-      <!-- Top: features -->
+    >
       <div
-        v-if="(selectedSlot?.features as string[] | undefined)?.length"
-        class="flex flex-wrap !gap-2"
-      >
-        <span
-          v-for="feature in selectedSlot?.features as string[] | undefined"
-          :key="feature"
-          class="inline-flex items-center !gap-1.5 rounded-full bg-white/15 backdrop-blur-sm !px-3 !py-1.5 text-sm text-white/90"
-        >
-          <i
-            :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
-            style="font-size: 0.45rem"
-          />
-          {{ feature }}
-        </span>
-      </div>
+        class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10"
+      />
 
-      <div class="flex-1" />
-
-      <!-- Bottom panel with blur -->
-      <Transition name="card-flip" mode="out-in">
+      <!-- Content overlay -->
+      <div class="relative flex h-full flex-col !p-6">
+        <!-- Top: features -->
         <div
-          v-if="!showDetail"
-          key="home"
-          class="rounded-2xl bg-black/30 backdrop-blur-xl !px-5 !py-4"
+          v-if="(selectedSlot?.features as string[] | undefined)?.length"
+          class="flex flex-wrap !gap-2"
         >
-          <!-- Room info -->
-          <div class="flex items-end justify-between !gap-3 !mb-4">
-            <div class="min-w-0">
-              <h2 class="text-xl font-bold text-white leading-tight truncate">
-                {{ room.name }}
-              </h2>
-              <div class="flex items-center !gap-1.5 !mt-1">
-                <i
-                  class="fa-solid fa-location-dot text-white/50"
-                  style="font-size: 0.5rem"
-                />
-                <span class="text-sm text-white/60 truncate">
-                  {{ room.address || "Location not set" }}
-                </span>
+          <span
+            v-for="feature in selectedSlot?.features as string[] | undefined"
+            :key="feature"
+            class="inline-flex items-center !gap-1.5 rounded-full bg-white/15 backdrop-blur-sm !px-3 !py-1.5 text-sm text-white/90"
+          >
+            <i
+              :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
+              style="font-size: 0.45rem"
+            />
+            {{ feature }}
+          </span>
+        </div>
+
+        <div class="flex-1" />
+
+        <!-- Bottom panel with blur -->
+        <Transition name="card-flip" mode="out-in">
+          <div
+            v-if="!showDetail"
+            key="home"
+            class="rounded-2xl bg-black/30 backdrop-blur-xl !px-5 !py-4"
+          >
+            <!-- Room info -->
+            <div class="flex items-end justify-between !gap-3 !mb-4">
+              <div class="min-w-0">
+                <h2 class="text-xl font-bold text-white leading-tight truncate">
+                  {{ room.name }}
+                </h2>
+                <div class="flex items-center !gap-1.5 !mt-1">
+                  <i
+                    class="fa-solid fa-location-dot text-white/50"
+                    style="font-size: 0.5rem"
+                  />
+                  <span class="text-sm text-white/60 truncate">
+                    {{ room.address || "Location not set" }}
+                  </span>
+                </div>
               </div>
+              <span
+                v-if="selectedSlot?.price"
+                class="shrink-0 text-xl font-bold text-white"
+              >
+                {{ selectedSlot.price }}
+                <span class="text-sm font-normal text-white/50">€</span>
+              </span>
             </div>
-            <span
-              v-if="selectedSlot?.price"
-              class="shrink-0 text-xl font-bold text-white"
+
+            <p
+              v-if="selectedSlot?.message"
+              class="text-sm text-white/40 italic !mb-4 line-clamp-2"
             >
-              {{ selectedSlot.price }}
-              <span class="text-sm font-normal text-white/50">€</span>
-            </span>
+              "{{ selectedSlot.message }}"
+            </p>
+
+            <!-- Slot carousel -->
+            <SlotCarousel
+              :timeslots="room.timeslots"
+              variant="glass"
+              @select="handleSlotSelect"
+              @teams="showDetail = true"
+            />
+
+            <!-- Join / Leave -->
+            <button
+              v-if="isCurrentUserInSlot"
+              class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/15 !py-3 !mt-4 text-sm font-medium text-white/90 transition-all hover:bg-white/25 cursor-pointer border border-white/10 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="leaveMutation.isPending.value || !selectedSlot"
+              @click="handleLeave"
+            >
+              <i
+                :class="
+                  leaveMutation.isPending.value
+                    ? 'fa-solid fa-spinner fa-spin'
+                    : 'fa-solid fa-right-from-bracket'
+                "
+                style="font-size: 0.65rem"
+              />
+              Leave game
+            </button>
+            <button
+              v-else-if="isAwaitingApproval"
+              class="flex w-full items-center justify-center !gap-2 rounded-xl bg-amber-400/20 !py-3 !mt-4 text-sm font-medium text-amber-100 border border-amber-200/20 outline-none cursor-not-allowed"
+              disabled
+            >
+              <i class="fa-solid fa-user-clock" style="font-size: 0.65rem" />
+              Awaiting approval
+            </button>
+            <div v-else-if="isDeclined">
+              <button
+                class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/10 !py-3 !mt-4 text-sm font-medium text-white/50 border border-white/10 outline-none cursor-not-allowed"
+                disabled
+              >
+                <i class="fa-solid fa-circle-xmark" style="font-size: 0.65rem" />
+                Not accepted for this slot
+              </button>
+              <p
+                v-if="room.deniedMessage"
+                class="!mt-2 text-xs italic text-white/40 text-center"
+              >
+                "{{ room.deniedMessage }}"
+              </p>
+            </div>
+            <button
+              v-else
+              class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/15 !py-3 !mt-4 text-sm font-medium text-white/90 transition-all hover:bg-white/25 cursor-pointer border border-white/10 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="!canJoin || joinMutation.isPending.value"
+              @click="handleJoin"
+            >
+              <i
+                :class="
+                  joinMutation.isPending.value
+                    ? 'fa-solid fa-spinner fa-spin'
+                    : 'fa-solid fa-right-to-bracket'
+                "
+                style="font-size: 0.65rem"
+              />
+              Join game
+            </button>
           </div>
 
-          <p
-            v-if="selectedSlot?.message"
-            class="text-sm text-white/40 italic !mb-4 line-clamp-2"
-          >
-            "{{ selectedSlot.message }}"
-          </p>
-
-          <!-- Slot carousel -->
-          <SlotCarousel
-            :timeslots="room.timeslots"
-            variant="glass"
-            @select="handleSlotSelect"
-            @teams="showDetail = true"
-          />
-
-          <!-- Join / Leave -->
-          <button
-            v-if="isCurrentUserInSlot"
-            class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/15 !py-3 !mt-4 text-sm font-medium text-white/90 transition-all hover:bg-white/25 cursor-pointer border border-white/10 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="leaveMutation.isPending.value || !selectedSlot"
-            @click="handleLeave"
-          >
-            <i
-              :class="
-                leaveMutation.isPending.value
-                  ? 'fa-solid fa-spinner fa-spin'
-                  : 'fa-solid fa-right-from-bracket'
-              "
-              style="font-size: 0.65rem"
-            />
-            Leave game
-          </button>
-          <button
+          <!-- Detail view (teams) -->
+          <div
             v-else
-            class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/15 !py-3 !mt-4 text-sm font-medium text-white/90 transition-all hover:bg-white/25 cursor-pointer border border-white/10 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="!canJoin || joinMutation.isPending.value"
-            @click="handleJoin"
+            key="detail"
+            class="rounded-2xl bg-black/30 backdrop-blur-xl !p-5"
           >
-            <i
-              :class="
-                joinMutation.isPending.value
-                  ? 'fa-solid fa-spinner fa-spin'
-                  : 'fa-solid fa-right-to-bracket'
-              "
-              style="font-size: 0.65rem"
+            <PRoomCardDetails
+              :timeslot="selectedSlot"
+              @back="showDetail = false"
             />
-            Join game
-          </button>
-        </div>
-
-        <!-- Detail view (teams) -->
-        <div
-          v-else
-          key="detail"
-          class="rounded-2xl bg-black/30 backdrop-blur-xl !p-5"
-        >
-          <PRoomCardDetails
-            :timeslot="selectedSlot"
-            @back="showDetail = false"
-          />
-        </div>
-      </Transition>
+          </div>
+        </Transition>
+      </div>
     </div>
   </div>
 </template>
@@ -174,6 +195,16 @@ const isCurrentUserInSlot = computed(() => {
   if (userId === undefined) return false;
   return slot.players.some((p) => p.id === userId);
 });
+
+const isAwaitingApproval = computed(
+  () => selectedSlot.value?.requestStatusForCurrentUser === "pending"
+);
+
+// Denial lasts for the current occurrence only — the row (and this state)
+// resets when the slot ends and cycles back to scheduled.
+const isDeclined = computed(
+  () => selectedSlot.value?.requestStatusForCurrentUser === "denied"
+);
 
 const canJoin = computed(() => {
   const slot = selectedSlot.value;

@@ -43,6 +43,14 @@ export interface RoomWithPlayersResponse extends RoomSummaryResponse {
 
 export type SlotStatus = "scheduled" | "live" | "ended";
 
+export type JoinRequestStatus = "pending" | "denied";
+
+export interface JoinRequestSummary {
+  accountId: number;
+  name: string;
+  created_at: string | null;
+}
+
 export interface TimeslotResponse {
   id: number;
   name: string;
@@ -51,6 +59,8 @@ export interface TimeslotResponse {
   label: string;
   features: unknown;
   players: PlayerSummary[];
+  pendingRequests: JoinRequestSummary[];
+  min_players: number | null;
   max_players: number;
   day: string;
   enabled: boolean;
@@ -70,6 +80,7 @@ export interface CreateTimeslotRequest {
   room_id: number;
   name: string;
   label: string;
+  min_players?: number | null;
   max_players: number;
   price?: string | number | null;
   message?: string | null;
@@ -81,6 +92,7 @@ export interface UpdateTimeslotRequest {
   id: number;
   name?: string;
   label?: string;
+  min_players?: number | null;
   max_players?: number;
   price?: string | number | null;
   message?: string | null;
@@ -94,6 +106,8 @@ export interface CreateTimeslotResponse {
 }
 
 export interface PlayableRoomResponse extends RoomSummaryResponse {
+  // Tenant's custom message shown to players whose join request was declined.
+  deniedMessage: string | null;
   timeslots: Array<{
     id: number;
     name: string;
@@ -103,6 +117,8 @@ export interface PlayableRoomResponse extends RoomSummaryResponse {
     features: unknown;
     players: TimeslotPlayerSummary[];
     max_players: number;
+    // Current user's outstanding request for this slot, if any.
+    requestStatusForCurrentUser: JoinRequestStatus | null;
   }>;
 }
 
@@ -127,27 +143,73 @@ export interface MutationMessageResponse {
   message: string;
 }
 
+export type JoinOutcome = "joined" | "pending" | "already" | "denied";
+
+export interface JoinTimeslotResponse extends MutationMessageResponse {
+  status: JoinOutcome;
+}
+
+export interface JoinRequestCreatedPayload {
+  timeslotId: number;
+  roomId: number;
+  accountId: number;
+  name: string;
+}
+
+export interface JoinRequestResolvedPayload {
+  timeslotId: number;
+  roomId: number;
+  accountId: number;
+  approved: boolean;
+}
+
+export type JoinMode = "free" | "required" | "required-list";
+
 export interface TenantSettings {
   lateJoinCutoff: number;
   allowJoinOnLive: boolean;
-  joinPolicy: number[];
+  joinMode: JoinMode;
+  includeBlacklisted: boolean;
   defaultMaxPlayers: number;
-  minPlayers: number;
+  defaultMinPlayers: number;
   defaultPrice: number;
   defaultFeatures: string[];
   autoRedistribute: boolean;
   redistributionWindow: number;
+  // Shown to players whose join request the host declines. Empty = generic.
+  deniedMessage?: string;
+}
+
+export interface TenantAccountSummary {
+  accountId: number;
+  name: string;
+  requiresApproval: boolean;
+  blacklisted: boolean;
+}
+
+export interface AccountSearchResult {
+  id: number;
+  name: string;
+  email: string;
 }
 
 export interface TenantSettingsResponse {
   id: number;
   name: string | null;
   settings: TenantSettings | null;
+  flaggedAccounts: TenantAccountSummary[];
 }
 
 export interface UpdateTenantSettingsRequest {
   tenantId: number;
   settings: Prisma.InputJsonValue;
+}
+
+export interface UpdateTenantAccountRequest {
+  tenantId: number;
+  accountId: number;
+  requiresApproval?: boolean;
+  blacklisted?: boolean;
 }
 
 export interface TimeslotMembershipChangedPayload {
@@ -159,6 +221,20 @@ export interface TimeslotStatusChangedPayload {
   timeslotId: number;
   roomId: number;
   status: SlotStatus;
+}
+
+export interface RedistributionDestination {
+  timeslotId: number;
+  roomId: number;
+  roomName: string;
+  label: string;
+  playerCount: number;
+}
+
+export interface TimeslotRedistributedPayload {
+  timeslotId: number;
+  roomId: number;
+  destinations: RedistributionDestination[];
 }
 
 export interface EnabledDaySummary {
@@ -181,4 +257,5 @@ export interface LiveSlotSummary {
 
 export interface HostedRoomResponse extends RoomSummaryResponse {
   liveSlot: LiveSlotSummary | null;
+  pendingRequestCount: number;
 }

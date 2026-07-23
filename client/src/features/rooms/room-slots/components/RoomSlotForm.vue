@@ -1,4 +1,41 @@
 <template>
+  <div
+    v-if="disabled"
+    class="flex items-start !gap-2.5 rounded-lg border border-surface-200 bg-surface-50 !px-3 !py-2.5"
+  >
+    <i
+      class="fa-solid fa-lock !mt-0.5 text-surface-400"
+      style="font-size: 0.7rem"
+    />
+    <p class="text-[11px] leading-relaxed text-surface-500">
+      <span class="font-semibold text-surface-600">Slot is live.</span>
+      Stop it to edit settings.
+    </p>
+  </div>
+
+  <form.Field v-if="availableHours" v-slot="{ field }" name="label">
+    <FieldWrapper block-label="Hour">
+      <div class="flex overflow-x-auto !gap-1 pb-0.5" style="scrollbar-width: none">
+        <button
+          v-for="opt in availableHours"
+          :key="opt.code"
+          type="button"
+          :disabled="disabled"
+          :class="[
+            'shrink-0 rounded-md !px-2.5 !py-1.5 text-center text-xs font-medium transition-colors border',
+            field.state.value === opt.code
+              ? 'bg-primary-600 text-white border-primary-600'
+              : 'text-surface-500 border-surface-200 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-300',
+            disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+          ]"
+          @click="field.handleChange(opt.code)"
+        >
+          {{ opt.name }}
+        </button>
+      </div>
+    </FieldWrapper>
+  </form.Field>
+
   <form.Field v-slot="{ field }" name="price">
     <FieldWrapper block-label="Price">
       <InputText
@@ -113,6 +150,7 @@ const props = defineProps<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   form: any;
   availableFeatures?: string[];
+  availableHours?: { name: string; code: string; order: number }[];
   showEnabledToggle?: boolean;
   disabled?: boolean;
 }>();
