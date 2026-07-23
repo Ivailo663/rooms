@@ -4,6 +4,7 @@ import { api } from "@/axios";
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { type Account } from "@football/shared";
+import { queryClient } from "@/queryClient";
 
 export const useAuthStore = defineStore("auth", () => {
   const userAuthState = ref<User | null>(null);
@@ -22,14 +23,16 @@ export const useAuthStore = defineStore("auth", () => {
       const auth = getAuth();
 
       onAuthStateChanged(auth, async (userPayload) => {
-        console.log(userPayload, "user payload");
-
         userAuthState.value = userPayload;
         initializedState.value = true;
 
         if (userPayload) {
           await userPayload.getIdToken();
 
+          // Wipe any data cached under the previous session so a new login
+          // on the same tab (e.g. after logout) can't briefly show the
+          // prior user's queries before fresh ones load.
+          queryClient.clear();
           await fetchUser();
 
           if (router.currentRoute.value.name === "auth") {

@@ -11,9 +11,10 @@ import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerTimeslotRoutes } from "./routes/timeslots.js";
 import { registerUserRoutes } from "./routes/users.js";
 import { registerTenantRoutes } from "./routes/tenants.js";
+import { registerAccountRoutes } from "./routes/accounts.js";
 import type { AppError } from "./utils/http.js";
 import { startScheduler } from "./scheduler.js";
-import "./workers/timeslotWorker.js";
+import { createTimeslotWorker } from "./workers/timeslotWorker.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
@@ -33,13 +34,16 @@ const io = new Server(httpServer, {
 });
 
 // Apply auth only to API routes — socket.io transport requests must be excluded
-app.use(["/rooms", "/timeslots", "/user"], verifyFirebaseToken);
+app.use(["/rooms", "/timeslots", "/user", "/accounts"], verifyFirebaseToken);
 
 registerUserRoutes(app);
 registerRoomRoutes(app);
 registerTimeslotRoutes(app);
 registerMembershipRoutes(app, io);
 registerTenantRoutes(app);
+registerAccountRoutes(app);
+
+createTimeslotWorker(io);
 
 startScheduler(io).catch((err) =>
   console.error("Scheduler: startup failed:", err)

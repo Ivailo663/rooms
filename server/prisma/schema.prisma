@@ -13,9 +13,11 @@ model Account {
   email            String           @unique(map: "unique_email") @db.VarChar(50)
   role             AccountRole      @default(player)
   tenantid         Int?
-  rooms            Room?            @relation(fields: [playground_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  tenant           tenant?          @relation(fields: [tenantid], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_accounts_tenant")
+  rooms            Room?                 @relation(fields: [playground_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tenant           tenant?               @relation(fields: [tenantid], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_accounts_tenant")
   timeslot_players TimeslotPlayer[]
+  tenant_accounts  TenantAccount[]
+  join_requests    TimeslotJoinRequest[]
 
   @@map("accounts")
 }
@@ -46,17 +48,34 @@ model RoomTimeslot {
   price            Decimal?         @db.Money
   message          String?          @db.VarChar(250)
   name             String           @db.VarChar(50)
+  min_players      Int?
   max_players      Int
   day              String           @db.VarChar(2)
   enabled          Boolean          @default(false)
   order            Int              @default(0)
   start_time       Int
   status           SlotStatus       @default(scheduled)
-  room             Room             @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_room_timeslots_room")
+  room             Room                  @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_room_timeslots_room")
   timeslot_players TimeslotPlayer[]
+  join_requests    TimeslotJoinRequest[]
 
   @@unique([roomId, day, label], map: "unique_room_slot")
   @@map("room_timeslots")
+}
+
+model TimeslotJoinRequest {
+  timeslotId    Int               @map("timeslot_id")
+  accountId     Int               @map("account_id")
+  // denied rows persist until the slot's occurrence ends (worker wipes them on
+  // the ended→scheduled reset), blocking immediate re-requests after a denial.
+  status        JoinRequestStatus @default(pending)
+  resolved_at   DateTime?         @db.Timestamp(6)
+  created_at    DateTime?         @default(now()) @db.Timestamp(6)
+  room_timeslot RoomTimeslot @relation(fields: [timeslotId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_timeslot_join_requests_timeslot")
+  account       Account      @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_timeslot_join_requests_account")
+
+  @@id([timeslotId, accountId])
+  @@map("timeslot_join_requests")
 }
 
 model TimeslotPlayer {
@@ -71,12 +90,31 @@ model TimeslotPlayer {
 }
 
 model tenant {
-  id         Int       @id @default(autoincrement())
-  name       String?   @db.VarChar(100)
-  settings   Json?
-  created_at DateTime? @db.Timestamp(6)
-  accounts   Account[]
-  rooms      Room[]
+  id              Int             @id @default(autoincrement())
+  name            String?         @db.VarChar(100)
+  settings        Json?
+  created_at      DateTime?       @db.Timestamp(6)
+  accounts        Account[]
+  rooms           Room[]
+  tenant_accounts TenantAccount[]
+}
+
+model TenantAccount {
+  tenantId         Int       @map("tenant_id")
+  accountId        Int       @map("account_id")
+  requiresApproval Boolean   @default(false) @map("requires_approval")
+  blacklisted      Boolean   @default(false)
+  added_at         DateTime? @default(now()) @db.Timestamp(6)
+  tenant           tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_accounts_tenant")
+  account          Account   @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tenant_accounts_account")
+
+  @@id([tenantId, accountId])
+  @@map("tenant_accounts")
+}
+
+enum JoinRequestStatus {
+  pending
+  denied
 }
 
 enum SlotStatus {
