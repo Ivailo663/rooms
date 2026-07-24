@@ -25,6 +25,8 @@ export const useJoinRequestSync = () => {
     queryClient.invalidateQueries({ queryKey: ["hosted-rooms"] });
     queryClient.invalidateQueries({ queryKey: ["timeslots"] });
     queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
+    // An approval flips a "pending" entry to "joined" in the player's list.
+    queryClient.invalidateQueries({ queryKey: ["joined-slots"] });
   };
 
   onMounted(() => {

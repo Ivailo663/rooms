@@ -38,14 +38,25 @@
 
 <script setup lang="ts">
 import { RouterView } from "vue-router";
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import ConfirmDialog from "primevue/confirmdialog";
 import { useAuthStore } from "./stores/auth";
 import AppSidebar from "./components/AppSidebar.vue";
 import { useJoinRequestSync } from "./features/rooms/composables/useJoinRequestSync";
+import { useRoomView } from "./composables/useRoomView";
+import { RoomView } from "./constants";
 
 const authStore = useAuthStore();
-const menuExpanded = ref(true);
+
+// Play mode is a focused, "in the game" surface — start with the sidebar
+// collapsed there and expanded in Host. Manual toggles still stick until the
+// view changes again.
+const roomView = useRoomView();
+const menuExpanded = ref(roomView.value !== RoomView.Play);
+
+watch(roomView, (view) => {
+  menuExpanded.value = view !== RoomView.Play;
+});
 
 // App-wide realtime sync for join-request events.
 useJoinRequestSync();

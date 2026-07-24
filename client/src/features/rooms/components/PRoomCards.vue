@@ -45,6 +45,9 @@ const handleMembershipChanged = ({
         ),
       }))
   );
+  // Membership changes (including redistribution) can add/remove the current
+  // user's own slots — refresh the "your games" chip.
+  queryClient.invalidateQueries({ queryKey: ["joined-slots"] });
 };
 
 onMounted(() =>

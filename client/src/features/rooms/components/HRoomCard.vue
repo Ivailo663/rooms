@@ -243,6 +243,7 @@ const nextSlot = computed(() => {
         (s) =>
           s.status !== "ended" &&
           s.status !== "live" &&
+          s.enabled &&
           s.start_time > currentMinutes
       )
       .sort((a, b) => a.start_time - b.start_time)[0] ?? null

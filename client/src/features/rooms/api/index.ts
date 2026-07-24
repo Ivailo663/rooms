@@ -11,6 +11,7 @@ import {
   type CreateTimeslotResponse,
   type MutationMessageResponse,
   type JoinTimeslotResponse,
+  type JoinedSlotSummary,
 } from "@football/shared";
 export const getHostedRooms = async (
   params?: Partial<GetHostedRoomsParams>,
@@ -28,6 +29,12 @@ export const getPlayableRooms = async (
   const { data } = await api.get<PlayableRoomResponse[]>("/rooms/playable", {
     params: day ? { day } : undefined,
   });
+
+  return data;
+};
+
+export const getJoinedSlots = async (): Promise<JoinedSlotSummary[]> => {
+  const { data } = await api.get<JoinedSlotSummary[]>("/timeslots/joined");
 
   return data;
 };

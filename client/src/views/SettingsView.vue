@@ -363,8 +363,8 @@
               class="!w-full flex flex-col sm:flex-row sm:items-center !gap-3 sm:!justify-between"
             >
               <p class="text-sm !font-light">
-                Some players may be removed from the slot if it is under-filled
-                and redistributed to other slots.
+                Some players will be removed from the slot if it is under-filled
+                and redistributed to other slots. (some may be left behind)
               </p>
 
               <ToggleSwitch v-model="autoRedistribute" />

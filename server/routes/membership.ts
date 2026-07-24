@@ -3,6 +3,7 @@ import type { Server } from "socket.io";
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma.js";
 import type {
+  JoinedSlotSummary,
   JoinRequestCreatedPayload,
   JoinRequestResolvedPayload,
   JoinTimeslotRequest,
@@ -34,6 +35,79 @@ const getCurrentAccount = async (email: string) => {
 
   return account;
 };
+
+// Fixed week order for a stable API ordering; the client re-sorts relative to
+// "now" (next upcoming first) since that is a moving target.
+const DAY_ORDER = ["mo", "tu", "we", "th", "fr", "sa", "su"];
+
+// Every enabled slot the current user is confirmed in or has a pending
+// approval request for — cross-room and cross-day, unlike the day-scoped
+// playable-rooms feed. Powers the player's "my game" hub, so the full roster
+// rides along.
+const getJoinedSlots: RequestHandler = asyncHandler(async (_req, res) => {
+  const account = await getCurrentAccount(res.locals.user.email);
+
+  const slots = await prisma.roomTimeslot.findMany({
+    where: {
+      enabled: true,
+      OR: [
+        { timeslot_players: { some: { accountId: account.id } } },
+        {
+          join_requests: {
+            some: { accountId: account.id, status: "pending" },
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      label: true,
+      day: true,
+      start_time: true,
+      status: true,
+      price: true,
+      features: true,
+      max_players: true,
+      room: { select: { id: true, name: true, address: true } },
+      timeslot_players: {
+        select: { accounts: { select: { id: true, name: true } } },
+      },
+    },
+  });
+
+  const response: JoinedSlotSummary[] = slots
+    .map((slot) => {
+      const players = slot.timeslot_players.map(({ accounts }) => ({
+        id: accounts.id,
+        name: accounts.name,
+      }));
+
+      return {
+        timeslotId: slot.id,
+        roomId: slot.room.id,
+        roomName: slot.room.name,
+        address: slot.room.address,
+        label: slot.label,
+        day: slot.day,
+        start_time: slot.start_time,
+        status: slot.status,
+        price: slot.price?.toString() ?? null,
+        features: slot.features,
+        players,
+        max_players: slot.max_players,
+        membership: (players.some((player) => player.id === account.id)
+          ? "joined"
+          : "pending") as JoinedSlotSummary["membership"],
+      };
+    })
+    .sort(
+      (a, b) =>
+        DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day) ||
+        a.start_time - b.start_time
+    );
+
+  res.send(response);
+});
 
 type JoinResult =
   | { outcome: "joined" | "already" }
@@ -345,6 +419,7 @@ const createRedestributePlayersBetweenTimeslotHandler = (
   });
 
 export const registerMembershipRoutes = (app: Application, io: Server) => {
+  app.get("/timeslots/joined", getJoinedSlots);
   app.post("/timeslots/:id/join", createJoinTimeslotHandler(io));
   app.post("/timeslots/:id/leave", createLeaveTimeslotHandler(io));
   app.post(
