@@ -8,6 +8,7 @@ import { type MaybeRefOrGetter, toValue } from "vue";
 
 import {
   getHostedRooms,
+  getJoinedSlots,
   getTimeslots,
   getEnabledTimeslots,
   getEnabledTimeslotDaysAndFirstSlot,
@@ -34,6 +35,7 @@ import type {
   CreateTimeslotResponse,
   MutationMessageResponse,
   JoinTimeslotResponse,
+  JoinedSlotSummary,
 } from "@football/shared";
 
 import { useAuthStore } from "@/stores/auth";
@@ -67,6 +69,19 @@ export const useGetPlayableRooms = (
   return useQuery<PlayableRoomResponse[]>({
     queryKey: ["playable-rooms", day],
     queryFn: () => getPlayableRooms(toValue(day)),
+    enabled: !!authStore.user?.id,
+    ...options,
+  });
+};
+
+export const useGetJoinedSlots = (
+  options?: Omit<UseQueryOptions<JoinedSlotSummary[]>, "queryKey" | "queryFn">
+) => {
+  const authStore = useAuthStore();
+
+  return useQuery<JoinedSlotSummary[]>({
+    queryKey: ["joined-slots"],
+    queryFn: getJoinedSlots,
     enabled: !!authStore.user?.id,
     ...options,
   });
@@ -169,6 +184,7 @@ export const useJoinTimeslot = () => {
     mutationFn: joinTimeslot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["joined-slots"] });
     },
   });
 };
@@ -212,6 +228,7 @@ export const useLeaveTimeslot = () => {
     mutationFn: leaveTimeslot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["joined-slots"] });
     },
   });
 };

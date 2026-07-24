@@ -237,6 +237,25 @@ export interface TimeslotRedistributedPayload {
   destinations: RedistributionDestination[];
 }
 
+// A slot the current user is confirmed in, or awaiting approval for.
+export type JoinedMembership = "joined" | "pending";
+
+export interface JoinedSlotSummary {
+  timeslotId: number;
+  roomId: number;
+  roomName: string;
+  address: string;
+  label: string;
+  day: string;
+  start_time: number;
+  status: SlotStatus;
+  price: string | number | null;
+  features: unknown;
+  players: PlayerSummary[];
+  max_players: number;
+  membership: JoinedMembership;
+}
+
 export interface EnabledDaySummary {
   day: string;
   label: string;

@@ -1,5 +1,8 @@
 <template>
-  <div class="relative h-full w-full overflow-hidden rounded-3xl">
+  <div
+    class="relative h-full w-full overflow-hidden rounded-3xl"
+    :class="hasJoinedSlot ? 'ring-2 ring-emerald-400/60' : undefined"
+  >
     <!-- Full bleed image -->
     <div
       class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
@@ -10,21 +13,39 @@
 
       <!-- Content overlay -->
       <div class="relative flex h-full flex-col !p-6">
-        <!-- Top: features -->
-        <div
-          v-if="(selectedSlot?.features as string[] | undefined)?.length"
-          class="flex flex-wrap !gap-2"
-        >
-          <span
-            v-for="feature in selectedSlot?.features as string[] | undefined"
-            :key="feature"
-            class="inline-flex items-center !gap-1.5 rounded-full bg-white/15 backdrop-blur-sm !px-3 !py-1.5 text-sm text-white/90"
+        <!-- Top: features + membership pill -->
+        <div class="flex items-start justify-between !gap-2">
+          <div
+            v-if="(selectedSlot?.features as string[] | undefined)?.length"
+            class="flex flex-wrap !gap-2"
           >
-            <i
-              :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
-              style="font-size: 0.45rem"
-            />
-            {{ feature }}
+            <span
+              v-for="feature in selectedSlot?.features as string[] | undefined"
+              :key="feature"
+              class="inline-flex items-center !gap-1.5 rounded-full bg-white/15 backdrop-blur-sm !px-3 !py-1.5 text-sm text-white/90"
+            >
+              <i
+                :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
+                style="font-size: 0.45rem"
+              />
+              {{ feature }}
+            </span>
+          </div>
+          <div v-else class="flex-1" />
+
+          <span
+            v-if="hasJoinedSlot"
+            class="inline-flex shrink-0 items-center !gap-1.5 rounded-full bg-emerald-400/25 backdrop-blur-sm !px-3 !py-1.5 text-sm font-medium text-emerald-100"
+          >
+            <i class="fa-solid fa-circle-check" style="font-size: 0.6rem" />
+            Joined
+          </span>
+          <span
+            v-else-if="hasPendingSlot"
+            class="inline-flex shrink-0 items-center !gap-1.5 rounded-full bg-amber-400/25 backdrop-blur-sm !px-3 !py-1.5 text-sm font-medium text-amber-100"
+          >
+            <i class="fa-solid fa-user-clock" style="font-size: 0.6rem" />
+            Requested
           </span>
         </div>
 
@@ -73,6 +94,8 @@
             <SlotCarousel
               :timeslots="room.timeslots"
               variant="glass"
+              :markers="slotMarkers"
+              :initial-index="initialSlotIndex"
               @select="handleSlotSelect"
               @teams="showDetail = true"
             />
@@ -155,9 +178,10 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useJoinTimeslot, useLeaveTimeslot } from "../composables/queries";
+import { returnToGame } from "../composables/useGameMode";
 import { useAuthStore } from "@/stores/auth";
 import type { PlayableRoomResponse } from "@football/shared";
-import SlotCarousel from "./SlotCarousel.vue";
+import SlotCarousel, { type SlotMarker } from "./SlotCarousel.vue";
 import PRoomCardDetails from "./PRoomCardDetails.vue";
 
 type Slot = PlayableRoomResponse["timeslots"][number];
@@ -196,6 +220,39 @@ const isCurrentUserInSlot = computed(() => {
   return slot.players.some((p) => p.id === userId);
 });
 
+// Membership badges per slot id, driving the carousel markers and card pill.
+const slotMarkers = computed<Record<number, SlotMarker>>(() => {
+  const userId = authStore.user?.id;
+  const markers: Record<number, SlotMarker> = {};
+  if (userId === undefined) return markers;
+  for (const slot of props.room.timeslots) {
+    if (slot.players.some((p) => p.id === userId)) {
+      markers[slot.id] = "joined";
+    } else if (slot.requestStatusForCurrentUser === "pending") {
+      markers[slot.id] = "pending";
+    }
+  }
+  return markers;
+});
+
+const hasJoinedSlot = computed(() =>
+  Object.values(slotMarkers.value).includes("joined")
+);
+const hasPendingSlot = computed(() =>
+  Object.values(slotMarkers.value).includes("pending")
+);
+
+// Land the carousel on the slot the user cares about instead of index 0:
+// their joined slot first, a pending request second.
+const initialSlotIndex = computed(() => {
+  const byMarker = (marker: SlotMarker) =>
+    props.room.timeslots.findIndex((slot) => slotMarkers.value[slot.id] === marker);
+  const joined = byMarker("joined");
+  if (joined >= 0) return joined;
+  const pending = byMarker("pending");
+  return pending >= 0 ? pending : 0;
+});
+
 const isAwaitingApproval = computed(
   () => selectedSlot.value?.requestStatusForCurrentUser === "pending"
 );
@@ -213,7 +270,14 @@ const canJoin = computed(() => {
 });
 
 const handleJoin = () => {
-  if (selectedSlot.value) joinMutation.mutate(selectedSlot.value.id);
+  if (!selectedSlot.value) return;
+  joinMutation.mutate(selectedSlot.value.id, {
+    onSuccess: (data) => {
+      // A confirmed join flips the play view back to the match hub —
+      // the "you're in" moment. Pending approvals stay in browse mode.
+      if (data.status === "joined") returnToGame();
+    },
+  });
 };
 
 const handleLeave = () => {

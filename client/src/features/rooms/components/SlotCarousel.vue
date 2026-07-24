@@ -42,10 +42,22 @@
             "
           >
             <span
-              class="text-base font-semibold"
+              class="flex items-center !gap-2 text-base font-semibold"
               :class="isGlass ? 'text-white' : 'text-surface-800'"
             >
               {{ current.label }}
+              <i
+                v-if="currentMarker === 'joined'"
+                class="fa-solid fa-circle-check text-emerald-400"
+                style="font-size: 0.7rem"
+                title="You're in this slot"
+              />
+              <i
+                v-else-if="currentMarker === 'pending'"
+                class="fa-solid fa-user-clock text-amber-300"
+                style="font-size: 0.7rem"
+                title="Awaiting approval"
+              />
             </span>
             <button
               class="flex items-center !gap-2 rounded-lg !px-3 !py-1.5 transition-colors cursor-pointer border-none outline-none"
@@ -103,10 +115,18 @@ import { ref, computed, onMounted } from "vue";
 import type { PlayableRoomResponse } from "@football/shared";
 
 type Slot = PlayableRoomResponse["timeslots"][number];
+export type SlotMarker = "joined" | "pending";
 
 const props = withDefaults(
-  defineProps<{ timeslots: Slot[]; variant?: "default" | "glass" }>(),
-  { variant: "default" }
+  defineProps<{
+    timeslots: Slot[];
+    variant?: "default" | "glass";
+    // Per-slot membership badges for the current user, keyed by slot id.
+    markers?: Record<number, SlotMarker>;
+    // Slot to land on when the carousel mounts (e.g. the user's joined slot).
+    initialIndex?: number;
+  }>(),
+  { variant: "default", markers: () => ({}), initialIndex: 0 }
 );
 const emit = defineEmits<{ select: [index: number]; teams: [] }>();
 
@@ -115,8 +135,14 @@ const isGlass = computed(() => props.variant === "glass");
 const selectedIndex = ref(0);
 const slideDirection = ref<1 | -1>(1);
 
+const clampIndex = (index: number) =>
+  Math.min(Math.max(index, 0), props.timeslots.length - 1);
+
 onMounted(() => {
-  if (props.timeslots.length > 0) emit("select", 0);
+  if (props.timeslots.length > 0) {
+    selectedIndex.value = clampIndex(props.initialIndex);
+    emit("select", selectedIndex.value);
+  }
 });
 
 const transitionName = computed(() =>
@@ -125,6 +151,10 @@ const transitionName = computed(() =>
 
 const current = computed<Slot | undefined>(
   () => props.timeslots[selectedIndex.value]
+);
+
+const currentMarker = computed<SlotMarker | undefined>(() =>
+  current.value ? props.markers[current.value.id] : undefined
 );
 
 const currentTaken = computed(() => current.value?.players?.length ?? 0);
