@@ -4,19 +4,26 @@
     <div class="flex items-center justify-between">
       <StatusBadge :status="badgeStatus" pill>
         <template v-if="!enabled"> Draft </template>
+        <template v-else-if="badgeStatus === 'failed'"> GAME OFF </template>
         <template v-else-if="badgeStatus === 'redistributed'">
           REDISTRIBUTED
         </template>
         <template v-else-if="isLive"> LIVE </template>
         <template v-else> SCHEDULED </template>
         <template v-if="enabled && isLive" #adornment>
-          {{ elapsedMinutes }}'
+          {{ elapsed }}'
         </template>
       </StatusBadge>
       <span class="text-xs font-medium text-surface-500">
         {{ timeslot.players.length }}/{{ timeslot.max_players }} players
       </span>
     </div>
+
+    <SlotFailedNotice
+      v-if="badgeStatus === 'failed'"
+      :players-count="timeslot.players.length"
+      :min-players="timeslot.min_players"
+    />
 
     <RedistributionNotice
       v-for="notice in redistributionNotices"
@@ -35,23 +42,35 @@
     </div>
 
     <!-- Player list -->
-    <div v-if="timeslot.players.length" class="flex !gap-3">
-      <div
-        v-for="player in timeslot.players"
-        :key="player.id"
-        class="flex items-center !gap-2"
-      >
-        <div
-          class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600"
-        >
-          <i class="fa-solid fa-user" style="font-size: 0.6rem" />
-        </div>
-        <span class="text-xs text-surface-600">
-          {{ player.name || "Player #" + player.id }}
-        </span>
+    <div class="flex items-start justify-between !gap-3">
+      <div class="flex min-w-0 flex-wrap items-center !gap-3">
+        <template v-if="timeslot.players.length">
+          <div
+            v-for="player in timeslot.players"
+            :key="player.id"
+            class="flex items-center !gap-2"
+          >
+            <div
+              class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600"
+            >
+              <i class="fa-solid fa-user" style="font-size: 0.6rem" />
+            </div>
+            <span class="text-xs text-surface-600">
+              {{ player.name || "Player #" + player.id }}
+            </span>
+          </div>
+        </template>
+        <p v-else class="text-xs italic text-surface-300">No players yet</p>
       </div>
+
+      <span
+        class="flex shrink-0 items-center !gap-1.5 rounded-full !px-2.5 !py-1 text-xs font-semibold tabular-nums"
+        :class="counterColor"
+      >
+        <i class="fa-solid fa-users" style="font-size: 0.65rem" />
+        {{ timeslot.players.length }}/{{ timeslot.max_players }}
+      </span>
     </div>
-    <p v-else class="text-xs italic text-surface-300">No players yet</p>
 
     <!-- Pending join requests -->
     <div
@@ -68,35 +87,66 @@
         <div
           v-for="request in timeslot.pendingRequests"
           :key="request.accountId"
-          class="flex items-center justify-between !gap-2 rounded-lg bg-white !px-3 !py-2 border border-amber-100"
+          class="flex flex-col !gap-1.5 rounded-lg bg-white !px-3 !py-2 border"
+          :class="request.valid ? 'border-amber-100' : 'border-surface-200'"
         >
-          <span class="truncate text-xs text-surface-700">
-            {{ request.name }}
-          </span>
-          <div class="flex shrink-0 items-center !gap-1.5">
-            <button
-              class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 cursor-pointer border-none outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="isResolving(request.accountId)"
-              @click="approve(request.accountId)"
+          <div class="flex items-center justify-between !gap-2">
+            <span
+              class="truncate text-xs"
+              :class="request.valid ? 'text-surface-700' : 'text-surface-400'"
             >
-              <i class="fa-solid fa-check" style="font-size: 0.6rem" />
-            </button>
-            <button
-              class="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-50 text-surface-400 hover:bg-surface-100 hover:text-surface-600 cursor-pointer border-none outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="isResolving(request.accountId)"
-              @click="deny(request.accountId)"
+              {{ request.name }}
+            </span>
+
+            <!-- A void request has nothing to approve or decline — the only
+                 move left is to clear it away. -->
+            <div
+              v-if="request.valid"
+              class="flex shrink-0 items-center !gap-1.5"
             >
-              <i class="fa-solid fa-xmark" style="font-size: 0.6rem" />
+              <button
+                class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 cursor-pointer border-none outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                :disabled="isResolving(request.accountId)"
+                @click="approve(request.accountId)"
+              >
+                <i class="fa-solid fa-check" style="font-size: 0.6rem" />
+              </button>
+              <button
+                class="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-50 text-surface-400 hover:bg-surface-100 hover:text-surface-600 cursor-pointer border-none outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                :disabled="isResolving(request.accountId)"
+                @click="deny(request.accountId)"
+              >
+                <i class="fa-solid fa-xmark" style="font-size: 0.6rem" />
+              </button>
+            </div>
+            <button
+              v-else
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-50 text-surface-400 hover:bg-surface-100 hover:text-surface-600 cursor-pointer border-none outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="isResolving(request.accountId)"
+              title="Acknowledge"
+              aria-label="Acknowledge"
+              @click="acknowledge(request.accountId)"
+            >
+              <i class="fa-solid fa-check-double" style="font-size: 0.6rem" />
             </button>
           </div>
+
+          <p
+            v-if="!request.valid"
+            class="flex items-center !gap-1.5 text-[11px] leading-tight text-surface-400"
+          >
+            <i class="fa-solid fa-calendar-xmark" style="font-size: 0.55rem" />
+            This player is already in another game at this hour
+          </p>
         </div>
       </div>
     </div>
 
     <SlotChat />
 
+    <!-- Nothing to move out of an empty slot. -->
     <Button
-      v-if="enabled"
+      v-if="enabled && timeslot.players.length"
       label="Redistribute players"
       icon="fa-solid fa-shuffle"
       severity="secondary"
@@ -117,14 +167,20 @@ import type { TimeslotResponse } from "@football/shared";
 import StatusBadge from "@/components/StatusBadge.vue";
 import SlotChat from "../../components/SlotChat.vue";
 import RedistributionNotice from "../../components/RedistributionNotice.vue";
+import SlotFailedNotice from "../../components/SlotFailedNotice.vue";
 import { useNow } from "../../composables/useNow";
 import {
   useRedistributeTimeslot,
   useApproveJoinRequest,
   useDenyJoinRequest,
+  useAcknowledgeJoinRequest,
 } from "../../composables/queries";
 import { useRedistributionNotices } from "../../composables/useRedistributionNotices";
-import { isSlotLiveNow } from "../../composables/isSlotLiveNow";
+import {
+  isSlotLiveNow,
+  isSlotFailedNow,
+} from "../../composables/isSlotLiveNow";
+import { elapsedMinutes } from "../../composables/gameTime";
 
 const props = defineProps<{
   timeslot: TimeslotResponse;
@@ -134,6 +190,7 @@ const props = defineProps<{
 const redistributeMutation = useRedistributeTimeslot();
 const approveMutation = useApproveJoinRequest();
 const denyMutation = useDenyJoinRequest();
+const acknowledgeMutation = useAcknowledgeJoinRequest();
 
 // Track which accounts are mid-resolution so both buttons on a row disable
 // together while the request is being approved/denied.
@@ -142,7 +199,10 @@ const isResolving = (accountId: number) => resolving.value.has(accountId);
 
 const resolve = (
   accountId: number,
-  mutate: typeof approveMutation | typeof denyMutation
+  mutate:
+    | typeof approveMutation
+    | typeof denyMutation
+    | typeof acknowledgeMutation
 ) => {
   resolving.value.add(accountId);
   mutate.mutate(
@@ -157,6 +217,10 @@ const resolve = (
 
 const approve = (accountId: number) => resolve(accountId, approveMutation);
 const deny = (accountId: number) => resolve(accountId, denyMutation);
+// Clears a request voided by the player joining elsewhere in the hour. No
+// denial is recorded — see the server handler.
+const acknowledge = (accountId: number) =>
+  resolve(accountId, acknowledgeMutation);
 const { isRecentlyRedistributed, noticesForTimeslot, dismissNotice } =
   useRedistributionNotices();
 const confirm = useConfirm();
@@ -194,17 +258,16 @@ const handleRedistribute = () => {
 
 const now = useNow();
 const isLive = computed(() => isSlotLiveNow(props.timeslot, now.value));
-const elapsedMinutes = computed(() =>
-  Math.max(
-    1,
-    now.value.getHours() * 60 +
-      now.value.getMinutes() -
-      props.timeslot.start_time
-  )
+const elapsed = computed(() =>
+  elapsedMinutes(props.timeslot.start_time, now.value)
 );
 
 const badgeStatus = computed(() => {
   if (!props.enabled) return "inactive";
+  // "failed" only shows during the slot's own hour; past that it's a normal
+  // scheduled occurrence again.
+  if (isSlotFailedNow(props.timeslot, now.value)) return "failed";
+  if (props.timeslot.status === "redistributed") return "redistributed";
   if (!isLive.value && isRecentlyRedistributed(props.timeslot.id)) {
     return "redistributed";
   }
@@ -223,6 +286,14 @@ const capacityColor = computed(() => {
   if (ratio >= 1) return "bg-emerald-500";
   if (ratio >= 0.6) return "bg-amber-400";
   return "bg-primary-400";
+});
+
+// Mirrors the capacity bar so the counter reads as the same signal.
+const counterColor = computed(() => {
+  const ratio = props.timeslot.players.length / props.timeslot.max_players;
+  if (ratio >= 1) return "bg-emerald-50 text-emerald-700";
+  if (ratio >= 0.6) return "bg-amber-50 text-amber-700";
+  return "bg-primary-50 text-primary-700";
 });
 </script>
 

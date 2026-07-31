@@ -21,6 +21,7 @@ import {
   redistributeTimeslot,
   approveJoinRequest,
   denyJoinRequest,
+  acknowledgeJoinRequest,
 } from "../api";
 
 import type {
@@ -186,6 +187,12 @@ export const useJoinTimeslot = () => {
       queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
       queryClient.invalidateQueries({ queryKey: ["joined-slots"] });
     },
+    // A join lost to a race (slot filled or cutoff passed between refetch and
+    // click) 409s — refetch so the button flips to the correct closed state
+    // instead of the failure being swallowed.
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
+    },
   });
 };
 
@@ -214,6 +221,22 @@ export const useDenyJoinRequest = () => {
     { timeslotId: number; accountId: number }
   >({
     mutationFn: denyJoinRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timeslots"] });
+      queryClient.invalidateQueries({ queryKey: ["hosted-rooms"] });
+    },
+  });
+};
+
+export const useAcknowledgeJoinRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    MutationMessageResponse,
+    Error,
+    { timeslotId: number; accountId: number }
+  >({
+    mutationFn: acknowledgeJoinRequest,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["timeslots"] });
       queryClient.invalidateQueries({ queryKey: ["hosted-rooms"] });

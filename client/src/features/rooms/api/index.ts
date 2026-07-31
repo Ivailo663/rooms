@@ -125,6 +125,19 @@ export const denyJoinRequest = async (params: {
   return data;
 };
 
+// Clears a request the requester made un-approvable by joining another game in
+// the same hour. Not a denial — nothing is recorded against them.
+export const acknowledgeJoinRequest = async (params: {
+  timeslotId: number;
+  accountId: number;
+}): Promise<MutationMessageResponse> => {
+  const { data } = await api.delete<MutationMessageResponse>(
+    `/timeslots/${params.timeslotId}/requests/${params.accountId}`
+  );
+
+  return data;
+};
+
 export const leaveTimeslot = async (
   id: number
 ): Promise<MutationMessageResponse> => {

@@ -308,7 +308,7 @@ import {
 } from "../../composables/queries";
 import { useGetTenantSettings } from "@/features/settings/composables/queries";
 import { useNow } from "../../composables/useNow";
-import { isSlotLiveNow } from "../../composables/isSlotLiveNow";
+import { isSlotLiveNow, isSlotFailedNow } from "../../composables/isSlotLiveNow";
 import RoomFormSlot from "./RoomSlotForm.vue";
 import SlotMonitor from "./SlotMonitor.vue";
 import StatusDot from "@/components/StatusDot.vue";
@@ -404,8 +404,14 @@ const DAY_LABELS: Record<string, string> = {
 
 const liveNow = (slot: TimeslotResponse) => isSlotLiveNow(slot, now.value);
 
-const slotDotColor = (slot: TimeslotResponse): "green" | "amber" | "gray" => {
+const slotDotColor = (
+  slot: TimeslotResponse
+): "green" | "amber" | "gray" | "purple" | "red" => {
   if (!slot.enabled) return "gray";
+  // Only within its own hour — a stale "failed" from a past occurrence reads as
+  // a normal scheduled slot again (it runs next time).
+  if (isSlotFailedNow(slot, now.value)) return "red";
+  if (slot.status === "redistributed") return "purple";
   return liveNow(slot) ? "green" : "amber";
 };
 

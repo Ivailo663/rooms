@@ -39,6 +39,14 @@
         <!-- Top row -->
         <div class="flex items-center justify-between">
           <span
+            v-if="isFailed"
+            class="inline-flex items-center !gap-2 rounded-full bg-rose-50 !px-3 !py-1.5 text-xs font-bold uppercase tracking-widest text-rose-600"
+          >
+            <i class="fa-solid fa-circle-xmark" style="font-size: 0.6rem" />
+            Game off
+          </span>
+          <span
+            v-else
             class="inline-flex items-center !gap-2 rounded-full bg-emerald-50 !px-3 !py-1.5 text-xs font-bold uppercase tracking-widest text-emerald-600"
           >
             <i class="fa-solid fa-circle-check" style="font-size: 0.6rem" />
@@ -52,7 +60,21 @@
 
         <!-- Center: anticipation / live -->
         <div class="flex flex-col items-center !gap-1 !pt-8 !pb-2 text-center">
-          <template v-if="isLive">
+          <template v-if="isFailed">
+            <span
+              class="text-xs font-bold uppercase tracking-[0.3em] text-rose-500"
+            >
+              Not enough players
+            </span>
+            <span class="!mt-2 text-4xl font-bold text-surface-900 sm:text-5xl">
+              Game's off
+            </span>
+            <span class="!mt-1 text-sm text-surface-400">
+              This slot didn't reach the minimum this week, so it won't run
+            </span>
+          </template>
+
+          <template v-else-if="isLive">
             <span
               class="flex items-center !gap-3 text-xs font-bold uppercase tracking-[0.3em] text-emerald-600"
             >
@@ -69,7 +91,7 @@
             <span
               class="!mt-2 text-6xl font-bold tabular-nums text-emerald-600 sm:text-7xl"
             >
-              {{ elapsedMinutes }}'
+              {{ elapsed }}'
             </span>
             <span class="!mt-1 text-sm text-surface-400">
               Game on — kicked off at {{ primaryGame.label }}
@@ -186,7 +208,18 @@
 
         <!-- Actions -->
         <div class="!mt-5 flex flex-col items-center !gap-3">
+          <p
+            v-if="!leavability.canLeave"
+            class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400"
+          >
+            <i
+              :class="`fa-solid ${leavability.icon}`"
+              style="font-size: 0.65rem"
+            />
+            {{ leavability.label }}
+          </p>
           <button
+            v-else
             type="button"
             class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-200 bg-white !py-3 text-sm font-medium text-surface-500 transition-all hover:border-surface-300 hover:text-surface-700 cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed"
             :disabled="leaveMutation.isPending.value"
@@ -226,12 +259,17 @@ import { useAuthStore } from "@/stores/auth";
 import { useLeaveTimeslot } from "./composables/queries";
 import { useGameMode } from "./composables/useGameMode";
 import { useNow } from "./composables/useNow";
-import { isSlotLiveNow } from "./composables/isSlotLiveNow";
+import { isSlotLiveNow, isSlotFailedNow } from "./composables/isSlotLiveNow";
+import {
+  getSlotLeavability,
+  type Leavability,
+} from "./composables/slotJoinability";
 import {
   dayDisplay,
   shortDay,
   minutesUntil,
   formatCountdown,
+  elapsedMinutes,
 } from "./composables/gameTime";
 
 const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
@@ -280,14 +318,16 @@ const isLive = computed(
   () => !!primaryGame.value && isSlotLiveNow(primaryGame.value, now.value)
 );
 
-const elapsedMinutes = computed(() =>
+// The slot lost quorum at the cutoff and couldn't be redistributed — this
+// occurrence won't run. Gated on the clock so a stale "failed" from a past
+// occurrence doesn't bleed onto the next one that hasn't happened yet.
+const isFailed = computed(
+  () => !!primaryGame.value && isSlotFailedNow(primaryGame.value, now.value)
+);
+
+const elapsed = computed(() =>
   primaryGame.value
-    ? Math.max(
-        1,
-        now.value.getHours() * 60 +
-          now.value.getMinutes() -
-          primaryGame.value.start_time
-      )
+    ? elapsedMinutes(primaryGame.value.start_time, now.value)
     : 0
 );
 
@@ -313,6 +353,18 @@ const rosterPercent = computed(() =>
         (primaryGame.value.players.length / primaryGame.value.max_players) * 100
       )
     : 0
+);
+
+// From the cutoff onwards the seat is committed: the card stays up for the
+// rest of the hour — including a "game's off" one — but without an exit.
+const leavability = computed<Leavability>(() =>
+  primaryGame.value
+    ? getSlotLeavability(
+        primaryGame.value,
+        primaryGame.value.lateJoinCutoff,
+        now.value
+      )
+    : { canLeave: true }
 );
 
 const handleLeave = () => {

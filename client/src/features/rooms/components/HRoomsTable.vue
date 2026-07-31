@@ -54,7 +54,7 @@
 
           <div class="flex flex-col items-center !gap-0.5 leading-none">
             <span class="text-sm font-bold italic text-emerald-600">
-              {{ elapsedMinutes(slotProps.data.liveSlot.start_time) }}'
+              {{ elapsed(slotProps.data.liveSlot.start_time) }}'
             </span>
           </div>
 
@@ -139,6 +139,7 @@ import RoomSlots from "../room-slots/components/RoomSlots.vue";
 import StatusDot from "@/components/StatusDot.vue";
 import { useGetHostedRooms } from "../composables/queries";
 import { useNow } from "../composables/useNow";
+import { elapsedMinutes } from "../composables/gameTime";
 import { socket } from "@/socket";
 import type {
   HostedRoomResponse,
@@ -157,10 +158,7 @@ const now = useNow();
 
 const { data } = useGetHostedRooms();
 
-const elapsedMinutes = (startTime: number) => {
-  const n = now.value;
-  return Math.max(1, n.getHours() * 60 + n.getMinutes() - startTime);
-};
+const elapsed = (startTime: number) => elapsedMinutes(startTime, now.value);
 
 const handleStatusChanged = ({
   roomId,
