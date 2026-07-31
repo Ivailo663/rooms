@@ -102,7 +102,18 @@
 
             <!-- Join / Leave -->
             <button
-              v-if="isCurrentUserInSlot"
+              v-if="isCurrentUserInSlot && !leavability.canLeave"
+              class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/10 !py-3 !mt-4 text-sm font-medium text-white/50 border border-white/10 outline-none cursor-not-allowed"
+              disabled
+            >
+              <i
+                :class="`fa-solid ${leavability.icon}`"
+                style="font-size: 0.65rem"
+              />
+              {{ leavability.label }}
+            </button>
+            <button
+              v-else-if="isCurrentUserInSlot"
               class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/15 !py-3 !mt-4 text-sm font-medium text-white/90 transition-all hover:bg-white/25 cursor-pointer border border-white/10 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
               :disabled="leaveMutation.isPending.value || !selectedSlot"
               @click="handleLeave"
@@ -130,7 +141,10 @@
                 class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/10 !py-3 !mt-4 text-sm font-medium text-white/50 border border-white/10 outline-none cursor-not-allowed"
                 disabled
               >
-                <i class="fa-solid fa-circle-xmark" style="font-size: 0.65rem" />
+                <i
+                  class="fa-solid fa-circle-xmark"
+                  style="font-size: 0.65rem"
+                />
                 Not accepted for this slot
               </button>
               <p
@@ -141,9 +155,20 @@
               </p>
             </div>
             <button
+              v-else-if="!joinability.joinable"
+              class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/10 !py-3 !mt-4 text-sm font-medium text-white/50 border border-white/10 outline-none cursor-not-allowed"
+              disabled
+            >
+              <i
+                :class="`fa-solid ${joinability.icon}`"
+                style="font-size: 0.65rem"
+              />
+              {{ joinability.label }}
+            </button>
+            <button
               v-else
               class="flex w-full items-center justify-center !gap-2 rounded-xl bg-white/15 !py-3 !mt-4 text-sm font-medium text-white/90 transition-all hover:bg-white/25 cursor-pointer border border-white/10 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="!canJoin || joinMutation.isPending.value"
+              :disabled="joinMutation.isPending.value"
               @click="handleJoin"
             >
               <i
@@ -177,8 +202,19 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useJoinTimeslot, useLeaveTimeslot } from "../composables/queries";
+import {
+  useGetJoinedSlots,
+  useJoinTimeslot,
+  useLeaveTimeslot,
+} from "../composables/queries";
 import { returnToGame } from "../composables/useGameMode";
+import { useNow } from "../composables/useNow";
+import {
+  getSlotJoinability,
+  getSlotLeavability,
+  type Joinability,
+  type Leavability,
+} from "../composables/slotJoinability";
 import { useAuthStore } from "@/stores/auth";
 import type { PlayableRoomResponse } from "@football/shared";
 import SlotCarousel, { type SlotMarker } from "./SlotCarousel.vue";
@@ -199,6 +235,17 @@ const featureIconMap: Record<string, string> = {
 const authStore = useAuthStore();
 const joinMutation = useJoinTimeslot();
 const leaveMutation = useLeaveTimeslot();
+const now = useNow();
+
+// Cross-room, so the one-game-per-hour gate can see seats taken in rooms this
+// card knows nothing about. Shared query key — every card reads one fetch.
+const { data: joinedSlots } = useGetJoinedSlots();
+
+// Only confirmed seats clash; pending requests aren't commitments, matching the
+// server.
+const heldSlots = computed(() =>
+  (joinedSlots.value ?? []).filter((slot) => slot.membership === "joined")
+);
 
 const selectedIndex = ref(0);
 const showDetail = ref(false);
@@ -246,7 +293,9 @@ const hasPendingSlot = computed(() =>
 // their joined slot first, a pending request second.
 const initialSlotIndex = computed(() => {
   const byMarker = (marker: SlotMarker) =>
-    props.room.timeslots.findIndex((slot) => slotMarkers.value[slot.id] === marker);
+    props.room.timeslots.findIndex(
+      (slot) => slotMarkers.value[slot.id] === marker
+    );
   const joined = byMarker("joined");
   if (joined >= 0) return joined;
   const pending = byMarker("pending");
@@ -263,10 +312,20 @@ const isDeclined = computed(
   () => selectedSlot.value?.requestStatusForCurrentUser === "denied"
 );
 
-const canJoin = computed(() => {
+// Joinability mirrors the server's gates, so the button reflects whether a
+// click would actually be accepted — no click-then-error.
+const joinability = computed<Joinability>(() => {
   const slot = selectedSlot.value;
-  if (!slot) return false;
-  return slot.players.length < slot.max_players;
+  if (!slot) return { joinable: false };
+  return getSlotJoinability(slot, props.room, now.value, heldSlots.value);
+});
+
+// The mirror of joinability for a seat already taken: once the roster locks,
+// the slot stays visible for the rest of its hour but the exit is gone.
+const leavability = computed<Leavability>(() => {
+  const slot = selectedSlot.value;
+  if (!slot) return { canLeave: true };
+  return getSlotLeavability(slot, props.room.lateJoinCutoff, now.value);
 });
 
 const handleJoin = () => {

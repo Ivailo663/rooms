@@ -2,7 +2,21 @@ import type { Server } from "socket.io";
 import type { SlotStatus } from "@prisma/client";
 import prisma from "./prisma.js";
 import { timeslotQueue } from "./queues/timeslotQueue.js";
-import type { TimeslotStatusChangedPayload } from "../packages/shared/index.js";
+import type {
+  TenantSettings,
+  TimeslotStatusChangedPayload,
+} from "../packages/shared/index.js";
+
+// Fallback roster-lock / redistribution lead time when a tenant has no
+// setting (or an untenanted room). Kept in sync with the client default.
+const DEFAULT_LATE_JOIN_CUTOFF = 15;
+
+const resolveCutoff = (settings: unknown): number => {
+  const value = (settings as Partial<TenantSettings> | null)?.lateJoinCutoff;
+  return typeof value === "number" && value > 0
+    ? value
+    : DEFAULT_LATE_JOIN_CUTOFF;
+};
 
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
 const SLOT_DURATION_MS = 60 * 60 * 1000;
@@ -72,7 +86,7 @@ const endSchedulerId = (slotId: number) => `slot-${slotId}-end`;
 const redistributeSchedulerId = (slotId: number) =>
   `slot-${slotId}-redistribute`;
 
-const scheduleSlotJobs = async (slot: SlotInfo) => {
+const scheduleSlotJobs = async (slot: SlotInfo, cutoff: number) => {
   await timeslotQueue.upsertJobScheduler(
     liveSchedulerId(slot.id),
     { pattern: toCron(slot.day, slot.start_time) },
@@ -85,7 +99,7 @@ const scheduleSlotJobs = async (slot: SlotInfo) => {
   );
   await timeslotQueue.upsertJobScheduler(
     redistributeSchedulerId(slot.id),
-    { pattern: toCron(slot.day, slot.start_time - 15) },
+    { pattern: toCron(slot.day, slot.start_time - cutoff) },
     { name: GO_REDISTRIBUTE, data: { slotId: slot.id } }
   );
 };
@@ -118,6 +132,7 @@ export const syncSlot = async (slotId: number) => {
       start_time: true,
       status: true,
       enabled: true,
+      room: { select: { tenant: { select: { settings: true } } } },
     },
   });
 
@@ -126,7 +141,7 @@ export const syncSlot = async (slotId: number) => {
     return;
   }
 
-  await scheduleSlotJobs(slot);
+  await scheduleSlotJobs(slot, resolveCutoff(slot.room?.tenant?.settings));
   await catchUp(slot);
 };
 
@@ -150,11 +165,17 @@ export const startScheduler = async (io: Server) => {
 
   const slots = await prisma.roomTimeslot.findMany({
     where: { enabled: true },
-    select: { id: true, day: true, start_time: true, status: true },
+    select: {
+      id: true,
+      day: true,
+      start_time: true,
+      status: true,
+      room: { select: { tenant: { select: { settings: true } } } },
+    },
   });
 
   for (const slot of slots) {
-    await scheduleSlotJobs(slot);
+    await scheduleSlotJobs(slot, resolveCutoff(slot.room?.tenant?.settings));
     await catchUp(slot);
   }
 

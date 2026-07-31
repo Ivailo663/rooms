@@ -10,6 +10,9 @@ import type {
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger } from "../utils/validation.js";
 
+// Mirrors the join route's fallback so the client computes the same lock window.
+const DEFAULT_LATE_JOIN_CUTOFF = 15;
+
 const getCurrentAccount = async (email: string) => {
   const account = await prisma.account.findUnique({
     where: { email },
@@ -156,6 +159,9 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
           label: true,
           features: true,
           max_players: true,
+          status: true,
+          day: true,
+          start_time: true,
           timeslot_players: {
             select: {
               accounts: {
@@ -192,6 +198,12 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
       price: room.price?.toString() ?? null,
       address: room.address,
       deniedMessage: settings.deniedMessage?.trim() || null,
+      lateJoinCutoff:
+        typeof settings.lateJoinCutoff === "number" &&
+        settings.lateJoinCutoff > 0
+          ? settings.lateJoinCutoff
+          : DEFAULT_LATE_JOIN_CUTOFF,
+      allowJoinOnLive: settings.allowJoinOnLive ?? false,
       timeslots: room.timeslots.map((timeslot) => {
         const players = timeslot.timeslot_players.map(({ accounts }) => ({
           id: accounts.id,
@@ -208,6 +220,9 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
           features: timeslot.features,
           playersCount: players.length,
           max_players: timeslot.max_players,
+          status: timeslot.status,
+          day: timeslot.day,
+          start_time: timeslot.start_time,
           players,
           requestStatusForCurrentUser: timeslot.join_requests[0]?.status ?? null,
         };

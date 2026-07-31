@@ -12,27 +12,30 @@
       </div>
 
       <div class="divide-y divide-surface-100">
-        <DisabledBlock
-          disabled
+        <div
           class="flex flex-col sm:flex-row sm:items-center sm:justify-between !gap-3 !py-4 first:!pt-0 last:!pb-0"
         >
           <div>
-            <p class="text-sm font-medium text-surface-700">Late join cutoff</p>
+            <p class="text-sm font-medium text-surface-700">
+              Roster lock &amp; redistribution
+            </p>
             <p class="!mt-0.5 text-xs text-surface-400">
-              Minutes before start time after which players can no longer join
+              Minutes before start when the roster locks — no new joins, and
+              under-filled slots are redistributed or, if they can't be, marked
+              as not enough players
             </p>
           </div>
           <InputNumber
             v-model="lateJoinCutoff"
-            :min="0"
-            :max="120"
+            :min="5"
+            :max="60"
             suffix=" min"
             :show-buttons="true"
             button-layout="horizontal"
             decrement-button-icon="fa-solid fa-minus"
             increment-button-icon="fa-solid fa-plus"
           />
-        </DisabledBlock>
+        </div>
 
         <div
           class="flex flex-col sm:flex-row sm:items-center sm:justify-between !gap-3 !py-4 first:!pt-0 last:!pb-0"
@@ -64,23 +67,6 @@
             :allow-empty="false"
             fluid
           />
-
-          <div v-if="joinPolicy !== 'free'" class="!mt-4">
-            <p class="text-xs font-medium text-surface-600 !mb-1">
-              Denial message
-            </p>
-            <p class="!mb-2 text-xs text-surface-400">
-              Shown to declined players
-            </p>
-            <Textarea
-              v-model="deniedMessage"
-              :rows="2"
-              auto-resize
-              fluid
-              placeholder="e.g. The squad is full this week — try again for the next game."
-              class="text-sm"
-            />
-          </div>
 
           <div
             v-if="joinPolicy === 'required-list'"
@@ -176,6 +162,23 @@
                 Also require approval for blacklisted players
               </label>
             </div>
+          </div>
+
+          <div v-if="joinPolicy !== 'free'" class="!mt-4">
+            <p class="text-xs font-medium text-surface-600 !mb-1">
+              Denial message
+            </p>
+            <p class="!mb-2 text-xs text-surface-400">
+              Shown to declined players
+            </p>
+            <Textarea
+              v-model="deniedMessage"
+              :rows="2"
+              auto-resize
+              fluid
+              placeholder="e.g. The squad is full this week — try again for the next game."
+              class="text-sm"
+            />
           </div>
         </div>
       </div>
@@ -371,30 +374,6 @@
             </div>
           </Message>
         </div>
-
-        <DisabledBlock
-          :disabled="!autoRedistribute"
-          class="flex flex-col sm:flex-row sm:items-center sm:justify-between !gap-3 !py-4 first:!pt-0 last:!pb-0"
-        >
-          <div>
-            <p class="text-sm font-medium text-surface-700">
-              Redistribution window
-            </p>
-            <p class="!mt-0.5 text-xs text-surface-400">
-              How early before start time to check and redistribute
-            </p>
-          </div>
-          <InputNumber
-            v-model="redistributionWindow"
-            :min="5"
-            :max="60"
-            suffix=" min"
-            :show-buttons="true"
-            button-layout="horizontal"
-            decrement-button-icon="fa-solid fa-minus"
-            increment-button-icon="fa-solid fa-plus"
-          />
-        </DisabledBlock>
       </div>
     </BasicWrapper>
   </div>
@@ -415,7 +394,6 @@ import {
 import { watchDebounced } from "@vueuse/core";
 import type { AccountSearchResult } from "@football/shared";
 import BasicWrapper from "@/components/BasicWrapper.vue";
-import DisabledBlock from "@/components/DisabledBlock.vue";
 import {
   useGetTenantSettings,
   useUpdateTenantSettings,
@@ -485,7 +463,6 @@ const defaultPrice = ref(5.0);
 
 const defaultMinPlayers = ref(4);
 const autoRedistribute = ref(false);
-const redistributionWindow = ref(15);
 
 const builtInFeatures = [
   { label: "ball", icon: "fa-futbol" },
@@ -551,7 +528,6 @@ const settingsPayload = computed(() => ({
   defaultPrice: defaultPrice.value,
   defaultFeatures: enabledFeatures.value,
   autoRedistribute: autoRedistribute.value,
-  redistributionWindow: redistributionWindow.value,
 }));
 
 watch(
@@ -570,7 +546,6 @@ watch(
       .map((label) => ({ label, icon: "fa-tag" }));
     globalFeatures.value = [...builtInFeatures, ...customFeatures];
     autoRedistribute.value = s.autoRedistribute;
-    redistributionWindow.value = s.redistributionWindow;
 
     joinPolicy.value = s.joinMode ?? "free";
     includeBlacklisted.value = s.includeBlacklisted ?? false;

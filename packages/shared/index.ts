@@ -1,11 +1,6 @@
 import { Prisma } from "@prisma/client";
 
-export type {
-  Account,
-  Room,
-  RoomTimeslot,
-  AccountRole,
-} from "@prisma/client";
+export type { Account, Room, RoomTimeslot, AccountRole } from "@prisma/client";
 
 export interface GetRoomsParams {
   hosted: boolean;
@@ -41,7 +36,12 @@ export interface RoomWithPlayersResponse extends RoomSummaryResponse {
   players: PlayerSummary[];
 }
 
-export type SlotStatus = "scheduled" | "live" | "ended";
+export type SlotStatus =
+  | "scheduled"
+  | "live"
+  | "ended"
+  | "failed"
+  | "redistributed";
 
 export type JoinRequestStatus = "pending" | "denied";
 
@@ -49,6 +49,10 @@ export interface JoinRequestSummary {
   accountId: number;
   name: string;
   created_at: string | null;
+  // False once the requester has taken a confirmed seat in another game in the
+  // same hour: the request can no longer be approved (the server would 409), so
+  // all the host can do is acknowledge it away.
+  valid: boolean;
 }
 
 export interface TimeslotResponse {
@@ -108,6 +112,11 @@ export interface CreateTimeslotResponse {
 export interface PlayableRoomResponse extends RoomSummaryResponse {
   // Tenant's custom message shown to players whose join request was declined.
   deniedMessage: string | null;
+  // Tenant join-window policy, needed to compute joinability on the client so
+  // the Join button matches what the server would accept. Falls back to the
+  // server defaults when the tenant hasn't set them.
+  lateJoinCutoff: number;
+  allowJoinOnLive: boolean;
   timeslots: Array<{
     id: number;
     name: string;
@@ -117,6 +126,10 @@ export interface PlayableRoomResponse extends RoomSummaryResponse {
     features: unknown;
     players: TimeslotPlayerSummary[];
     max_players: number;
+    // Fields the client needs to tell whether joining is still open.
+    status: SlotStatus;
+    day: string;
+    start_time: number;
     // Current user's outstanding request for this slot, if any.
     requestStatusForCurrentUser: JoinRequestStatus | null;
   }>;
@@ -156,6 +169,17 @@ export interface JoinRequestCreatedPayload {
   name: string;
 }
 
+// A pending request became un-approvable (the requester took a seat elsewhere
+// in the same hour) or approvable again (they gave that seat up). The change
+// originates in a different room than the one holding the request, so it can't
+// ride on that room's own membership event.
+export interface JoinRequestValidityChangedPayload {
+  timeslotId: number;
+  roomId: number;
+  accountId: number;
+  valid: boolean;
+}
+
 export interface JoinRequestResolvedPayload {
   timeslotId: number;
   roomId: number;
@@ -166,6 +190,8 @@ export interface JoinRequestResolvedPayload {
 export type JoinMode = "free" | "required" | "required-list";
 
 export interface TenantSettings {
+  // Minutes before start when the roster locks: no new joins are accepted, and
+  // the scheduler runs the redistribute-or-fail verdict on under-filled slots.
   lateJoinCutoff: number;
   allowJoinOnLive: boolean;
   joinMode: JoinMode;
@@ -175,7 +201,6 @@ export interface TenantSettings {
   defaultPrice: number;
   defaultFeatures: string[];
   autoRedistribute: boolean;
-  redistributionWindow: number;
   // Shown to players whose join request the host declines. Empty = generic.
   deniedMessage?: string;
 }
@@ -254,6 +279,9 @@ export interface JoinedSlotSummary {
   players: PlayerSummary[];
   max_players: number;
   membership: JoinedMembership;
+  // Minutes before start at which the roster freezes — no more joining, and
+  // no more leaving. Resolved per slot since it comes from the owning tenant.
+  lateJoinCutoff: number;
 }
 
 export interface EnabledDaySummary {

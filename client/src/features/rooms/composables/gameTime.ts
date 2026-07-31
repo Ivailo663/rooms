@@ -31,6 +31,11 @@ export const effectiveDayOffset = (slot: JoinedSlotSummary, now: Date) => {
   return Math.floor((minutesNow + minutesUntil(slot, now)) / MINUTES_PER_DAY);
 };
 
+// Minutes a live slot has been running, as shown on the "12'" match clock.
+// Floors at 1 so a slot that just kicked off never reads "0'".
+export const elapsedMinutes = (startTime: number, now: Date) =>
+  Math.max(1, now.getHours() * 60 + now.getMinutes() - startTime);
+
 const FULL_DAY_NAMES: Record<string, string> = {
   mo: "Monday",
   tu: "Tuesday",

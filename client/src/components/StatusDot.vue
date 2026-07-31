@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-type Color = "green" | "amber" | "gray" | "purple";
+type Color = "green" | "amber" | "gray" | "purple" | "red";
 
 const props = withDefaults(
   defineProps<{
@@ -32,6 +32,7 @@ const colorMap: Record<Color, { bg: string; ping: string }> = {
   amber: { bg: "bg-amber-400", ping: "bg-amber-300" },
   gray: { bg: "bg-surface-300", ping: "bg-surface-200" },
   purple: { bg: "bg-violet-500", ping: "bg-violet-400" },
+  red: { bg: "bg-rose-500", ping: "bg-rose-400" },
 };
 
 const bgClass = computed(() => colorMap[props.color].bg);

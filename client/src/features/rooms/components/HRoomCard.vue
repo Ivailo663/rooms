@@ -67,14 +67,16 @@
             ? 'border-emerald-100 bg-emerald-50/50'
             : roomStatus === 'redistributed'
               ? 'border-violet-100 bg-violet-50/50'
-              : roomStatus === 'scheduled'
-                ? 'border-amber-100 bg-amber-50/50'
-                : 'border-surface-100 bg-surface-50'
+              : roomStatus === 'failed'
+                ? 'border-rose-100 bg-rose-50/50'
+                : roomStatus === 'scheduled'
+                  ? 'border-amber-100 bg-amber-50/50'
+                  : 'border-surface-100 bg-surface-50'
         "
       >
         <StatusBadge :status="roomStatus" class="!mb-2">
           <template v-if="roomStatus === 'live'" #adornment>
-            {{ elapsedMinutes }}'
+            {{ elapsed }}'
           </template>
         </StatusBadge>
 
@@ -102,30 +104,48 @@
       </div>
 
       <!-- Players Widget -->
-      <div class="rounded-lg border border-surface-100 bg-surface-50 !p-3">
+      <div
+        class="rounded-lg border !p-3 transition-colors"
+        :class="
+          hasQuorum
+            ? 'border-emerald-300 bg-emerald-50/60'
+            : 'border-surface-100 bg-surface-50'
+        "
+      >
         <div class="flex items-center justify-between !mb-2">
           <div class="flex items-center !gap-1.5">
             <i
-              class="fa-solid fa-users text-surface-400"
+              class="fa-solid fa-users"
+              :class="hasQuorum ? 'text-emerald-500' : 'text-surface-400'"
               style="font-size: 0.55rem"
             />
             <span
-              class="text-[10px] font-semibold uppercase tracking-widest text-surface-400"
+              class="text-[10px] font-semibold uppercase tracking-widest"
+              :class="hasQuorum ? 'text-emerald-600' : 'text-surface-400'"
             >
               Players
             </span>
           </div>
-          <span
-            v-if="activePlayerInfo"
-            class="text-xs font-bold text-surface-600"
-          >
-            {{ activePlayerInfo.count }}/{{ activePlayerInfo.max }}
-          </span>
+          <div v-if="activePlayerInfo" class="flex items-center !gap-1.5">
+            <span
+              class="text-xs font-bold"
+              :class="hasQuorum ? 'text-emerald-600' : 'text-surface-600'"
+            >
+              {{ activePlayerInfo.count }}/{{ activePlayerInfo.max }}
+            </span>
+            <i
+              v-if="hasQuorum"
+              class="fa-solid fa-circle-check text-emerald-500"
+              style="font-size: 0.7rem"
+              :title="quorumTitle"
+            />
+          </div>
         </div>
 
         <template v-if="activePlayerInfo">
           <div
-            class="!mb-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-200"
+            class="!mb-2 h-1.5 w-full overflow-hidden rounded-full transition-colors"
+            :class="hasQuorum ? 'bg-emerald-100' : 'bg-surface-200'"
           >
             <div
               class="h-full rounded-full transition-all"
@@ -149,7 +169,16 @@
                 +{{ activePlayerInfo.count - 3 }}
               </div>
             </div>
-            <span class="text-[10px] text-surface-400">joined</span>
+            <span
+              class="text-[10px]"
+              :class="
+                hasQuorum
+                  ? 'font-semibold text-emerald-600'
+                  : 'text-surface-400'
+              "
+            >
+              {{ hasQuorum ? "gathered" : "joined" }}
+            </span>
           </div>
           <p v-else class="text-xs text-surface-300">No players yet</p>
         </template>
@@ -158,6 +187,15 @@
           <p class="text-sm font-medium text-surface-300">&mdash;</p>
         </template>
       </div>
+    </div>
+
+    <!-- Failed / under-filled notice -->
+    <div v-if="failedSlot" class="!px-4 !pb-3">
+      <SlotFailedNotice
+        :players-count="failedSlot.players.length"
+        :min-players="failedSlot.min_players"
+        :slot-label="failedSlot.label"
+      />
     </div>
 
     <!-- Redistribution notices -->
@@ -203,8 +241,11 @@ import type { HostedRoomResponse } from "@football/shared";
 import ManageSlotsDrawer from "./ManageSlotsDrawer.vue";
 import SlotChat from "./SlotChat.vue";
 import RedistributionNotice from "./RedistributionNotice.vue";
+import SlotFailedNotice from "./SlotFailedNotice.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import { useNow } from "../composables/useNow";
+import { isSlotFailedNow } from "../composables/isSlotLiveNow";
+import { elapsedMinutes } from "../composables/gameTime";
 import { useGetTimeslots, useGetEnabledDays } from "../composables/queries";
 import { useRedistributionNotices } from "../composables/useRedistributionNotices";
 
@@ -237,16 +278,25 @@ const { data: enabledDays } = useGetEnabledDays(props.room.id);
 const nextSlot = computed(() => {
   if (!todaySlots.value) return null;
   const currentMinutes = now.value.getHours() * 60 + now.value.getMinutes();
+  // A slot that hasn't started yet is upcoming by definition — any
+  // live/failed/ended on it is a stale status from a past occurrence the
+  // scheduler didn't reset, so we gate on the clock, not the stored status.
   return (
     todaySlots.value
-      .filter(
-        (s) =>
-          s.status !== "ended" &&
-          s.status !== "live" &&
-          s.enabled &&
-          s.start_time > currentMinutes
-      )
+      .filter((s) => s.enabled && s.start_time > currentMinutes)
       .sort((a, b) => a.start_time - b.start_time)[0] ?? null
+  );
+});
+
+// A slot that didn't reach its minimum by go-live. Surfaced at room level so
+// the host sees the outcome without opening the drawer; the most recent one
+// wins. Cleared automatically when the occurrence resets to scheduled.
+const failedSlot = computed(() => {
+  if (!todaySlots.value) return null;
+  return (
+    todaySlots.value
+      .filter((s) => s.enabled && isSlotFailedNow(s, now.value))
+      .sort((a, b) => b.start_time - a.start_time)[0] ?? null
   );
 });
 
@@ -294,7 +344,11 @@ const nextSlotInfo = computed(() => {
 });
 
 const primaryLabel = computed(
-  () => props.room.liveSlot?.label ?? nextSlotInfo.value?.label ?? null
+  () =>
+    props.room.liveSlot?.label ??
+    nextSlotInfo.value?.label ??
+    failedSlot.value?.label ??
+    null
 );
 
 const nextHint = computed(() => {
@@ -303,6 +357,8 @@ const nextHint = computed(() => {
   if (props.room.liveSlot) {
     return info ? `Next: ${info.when} at ${info.label}` : "";
   }
+  // A failed slot with nothing upcoming: name the outcome rather than a time.
+  if (!info && failedSlot.value) return "Didn't run";
   // Otherwise the label already is the next slot — the hint just says when.
   return info?.when ?? "";
 });
@@ -319,17 +375,19 @@ const roomStatus = computed(() => {
   if (nextSlot.value && isRecentlyRedistributed(nextSlot.value.id)) {
     return "redistributed";
   }
-  return nextSlot.value || nextEnabledDay.value ? "scheduled" : "inactive";
+  // Anything still upcoming owns the widget — it describes what's next, not
+  // what already happened. A failed slot only takes it over when the day has
+  // nothing left; otherwise the failure lives solely in the banner below.
+  if (nextSlot.value || nextEnabledDay.value) return "scheduled";
+  if (failedSlot.value) return "failed";
+  return "inactive";
 });
 
-const elapsedMinutes = computed(() => {
-  if (!props.room.liveSlot) return 0;
-  const n = now.value;
-  return Math.max(
-    1,
-    n.getHours() * 60 + n.getMinutes() - props.room.liveSlot.start_time
-  );
-});
+const elapsed = computed(() =>
+  props.room.liveSlot
+    ? elapsedMinutes(props.room.liveSlot.start_time, now.value)
+    : 0
+);
 
 const nextSlotTimeLabel = computed(() => {
   if (!nextSlot.value) return "";
@@ -347,16 +405,35 @@ const activePlayerInfo = computed(() => {
     return {
       count: props.room.liveSlot.players_count,
       max: props.room.liveSlot.max_players,
+      // A slot only goes live once the server checked quorum and it held, so a
+      // live roster has gathered by definition (LiveSlotSummary carries no
+      // minimum of its own to re-check against).
+      gathered: true,
     };
   }
   if (nextSlot.value) {
+    const count = nextSlot.value.players.length;
+    const min = nextSlot.value.min_players;
     return {
-      count: nextSlot.value.players.length,
+      count,
       max: nextSlot.value.max_players,
+      // Same rule the worker applies at go-live: enough players to run, which
+      // with no configured minimum means simply "somebody joined". Anything
+      // stricter would promise green for a game that then fails, or withhold
+      // it from one that runs.
+      gathered: count > 0 && (min === null || count >= min),
     };
   }
   return null;
 });
+
+const hasQuorum = computed(() => activePlayerInfo.value?.gathered ?? false);
+
+const quorumTitle = computed(() =>
+  props.room.liveSlot
+    ? "Players gathered — game is running"
+    : "Enough players to run"
+);
 
 const playerPercent = computed(() => {
   if (!activePlayerInfo.value) return 0;

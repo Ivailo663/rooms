@@ -4,10 +4,17 @@ import prisma from "./prisma.js";
 import type {
   TimeslotMembershipChangedPayload,
   TimeslotRedistributedPayload,
+  TimeslotStatusChangedPayload,
 } from "../packages/shared/index.js";
 
 export const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
 export const TIMESLOT_REDISTRIBUTED_EVENT = "timeslot-redistributed";
+export const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
+
+// Whether the under-filled slot's players were all relocated. The worker uses
+// this to decide the source slot's fate: a clean evacuation leaves it
+// "redistributed", a failed one (no room, or redistribution off) is "failed".
+export type RedistributionOutcome = "redistributed" | "not-redistributed";
 
 export const getUpdatedPlayers = async (
   timeslotId: number
@@ -20,7 +27,7 @@ export const getUpdatedPlayers = async (
   return rows.map(({ accounts }) => accounts);
 };
 
-const emitMembershipChanged = async (io: Server, timeslotId: number) => {
+export const emitMembershipChanged = async (io: Server, timeslotId: number) => {
   const players = await getUpdatedPlayers(timeslotId);
   const payload: TimeslotMembershipChangedPayload = { timeslotId, players };
   io.emit(TIMESLOT_MEMBERSHIP_CHANGED_EVENT, payload);
@@ -39,7 +46,7 @@ type RedistributionResult = {
 export const redistributeSlot = async (
   slotId: number,
   io: Server
-): Promise<void> => {
+): Promise<RedistributionOutcome> => {
   const result = await prisma.$transaction<RedistributionResult>(
     async (tx) => {
       const noop: RedistributionResult = {
@@ -142,6 +149,14 @@ export const redistributeSlot = async (
 
       await tx.timeslotPlayer.deleteMany({ where: { timeslotId: slot.id } });
 
+      // The source occurrence is now evacuated — mark it so its host sees the
+      // slot was redistributed (not silently emptied). The worker's end-of-slot
+      // reset returns it to "scheduled" for next week.
+      await tx.roomTimeslot.update({
+        where: { id: slot.id },
+        data: { status: "redistributed" },
+      });
+
       for (const [timeslotId, accountIds] of Array.from(assignments)) {
         await tx.timeslotPlayer.createMany({
           data: accountIds.map((accountId) => ({ timeslotId, accountId })),
@@ -179,5 +194,13 @@ export const redistributeSlot = async (
 
   if (result.redistribution) {
     io.emit(TIMESLOT_REDISTRIBUTED_EVENT, result.redistribution);
+    io.emit(TIMESLOT_STATUS_CHANGED_EVENT, {
+      timeslotId: result.redistribution.timeslotId,
+      roomId: result.redistribution.roomId,
+      status: "redistributed",
+    } satisfies TimeslotStatusChangedPayload);
+    return "redistributed";
   }
+
+  return "not-redistributed";
 };

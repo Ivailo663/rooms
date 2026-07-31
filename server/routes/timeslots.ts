@@ -16,6 +16,72 @@ const labelToStartTime = (label: string): number => {
   return (h ?? 0) * 60 + (m ?? 0);
 };
 
+const SLOT_DURATION_MINUTES = 60;
+
+type SlotWithRequests = {
+  id: number;
+  day: string;
+  start_time: number;
+  join_requests: Array<{ accountId: number }>;
+};
+
+// Requests the host can no longer approve, keyed "timeslotId:accountId": the
+// requester has since taken a confirmed seat in another game whose hour
+// overlaps, so approving would 409 on the server's one-game-per-hour rule.
+//
+// Resolved in a single query for the whole view rather than per request — the
+// seats can live in any room or tenant, so there is nothing narrower to scope
+// it to than the requesting accounts themselves.
+const findInvalidRequests = async (
+  timeslots: SlotWithRequests[]
+): Promise<Set<string>> => {
+  const accountIds = Array.from(
+    new Set(
+      timeslots.flatMap((slot) => slot.join_requests.map((r) => r.accountId))
+    )
+  );
+
+  if (!accountIds.length) {
+    return new Set();
+  }
+
+  const seats = await prisma.timeslotPlayer.findMany({
+    where: {
+      accountId: { in: accountIds },
+      room_timeslots: {
+        enabled: true,
+        day: { in: Array.from(new Set(timeslots.map((slot) => slot.day))) },
+      },
+    },
+    select: {
+      accountId: true,
+      timeslotId: true,
+      room_timeslots: { select: { day: true, start_time: true } },
+    },
+  });
+
+  const invalid = new Set<string>();
+
+  for (const slot of timeslots) {
+    for (const request of slot.join_requests) {
+      const clashes = seats.some(
+        (seat) =>
+          seat.accountId === request.accountId &&
+          seat.timeslotId !== slot.id &&
+          seat.room_timeslots.day === slot.day &&
+          Math.abs(seat.room_timeslots.start_time - slot.start_time) <
+            SLOT_DURATION_MINUTES
+      );
+
+      if (clashes) {
+        invalid.add(`${slot.id}:${request.accountId}`);
+      }
+    }
+  }
+
+  return invalid;
+};
+
 const getQueryValue = (value: unknown) => {
   if (Array.isArray(value)) {
     return value[0];
@@ -71,10 +137,10 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
         },
       },
     },
-    orderBy: {
-      order: "asc",
-    },
+    orderBy: { start_time: "asc" },
   });
+
+  const invalidRequests = await findInvalidRequests(timeslots);
 
   const response: TimeslotResponse[] = timeslots.map((timeslot) => ({
     id: timeslot.id,
@@ -97,6 +163,7 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
       accountId: request.accountId,
       name: request.account.name,
       created_at: request.created_at ? request.created_at.toISOString() : null,
+      valid: !invalidRequests.has(`${timeslot.id}:${request.accountId}`),
     })),
   }));
 
@@ -138,6 +205,8 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
     orderBy: { start_time: "asc" },
   });
 
+  const invalidRequests = await findInvalidRequests(timeslots);
+
   const response: TimeslotResponse[] = timeslots.map((timeslot) => ({
     id: timeslot.id,
     name: timeslot.name,
@@ -159,6 +228,7 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
       accountId: request.accountId,
       name: request.account.name,
       created_at: request.created_at ? request.created_at.toISOString() : null,
+      valid: !invalidRequests.has(`${timeslot.id}:${request.accountId}`),
     })),
   }));
 
@@ -179,7 +249,7 @@ const getEnabledTimeslotDaysAndFirstSlot: RequestHandler = asyncHandler(
         },
       },
       select: { day: true, label: true },
-      orderBy: { order: "asc" },
+      orderBy: { start_time: "asc" },
       distinct: ["day"],
     });
 
@@ -255,6 +325,8 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   if (body.label !== undefined) {
     updateData.label = body.label;
     updateData.start_time = labelToStartTime(body.label);
+    // keep `order` aligned with the hour so it never drifts from the label
+    updateData.order = Math.floor(labelToStartTime(body.label) / 60);
   }
   if (body.min_players !== undefined) updateData.min_players = body.min_players;
   if (body.max_players !== undefined) updateData.max_players = body.max_players;

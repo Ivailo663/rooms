@@ -121,6 +121,8 @@ enum SlotStatus {
   scheduled
   live
   ended
+  failed
+  redistributed
 }
 
 enum AccountRole {
