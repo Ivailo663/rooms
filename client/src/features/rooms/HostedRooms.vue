@@ -28,8 +28,11 @@
     />
   </div>
 
-  <div v-else class="grid grid-cols-1 !gap-4 lg:grid-cols-2 items-start">
-    <HRoomCard v-for="room in rooms" :key="room.id" :room="room" />
+  <div v-else class="flex flex-col !gap-4">
+    <RoomSettingsBar />
+    <div class="grid grid-cols-1 !gap-4 lg:grid-cols-2 items-start">
+      <HRoomCard v-for="room in rooms" :key="room.id" :room="room" />
+    </div>
   </div>
 </template>
 
@@ -38,14 +41,12 @@ import { onMounted, onBeforeUnmount } from "vue";
 import { Button } from "primevue";
 import { useQueryClient } from "@tanstack/vue-query";
 import HRoomCard from "./components/HRoomCard.vue";
+import RoomSettingsBar from "./components/RoomSettingsBar.vue";
 import { useGetHostedRooms } from "./composables/queries";
 import { useCreateRoom } from "@/composables/useCreateRoom";
 import { useActiveDay } from "@/composables/useActiveDay";
 import { socket } from "@/socket";
-import type {
-  HostedRoomResponse,
-  TimeslotStatusChangedPayload,
-} from "@football/shared";
+import type { TimeslotStatusChangedPayload } from "@football/shared";
 
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
 
@@ -54,23 +55,14 @@ const queryClient = useQueryClient();
 const activeDay = useActiveDay();
 const { data: rooms, isPending } = useGetHostedRooms(activeDay);
 
-const handleStatusChanged = ({
-  roomId,
-  status,
-}: TimeslotStatusChangedPayload) => {
-  if (status === "live") {
-    queryClient.invalidateQueries({ queryKey: ["hosted-rooms"] });
-    return;
-  }
-  queryClient.setQueryData<HostedRoomResponse[]>(
-    ["hosted-rooms", activeDay.value],
-    (current) =>
-      current?.map((room) => {
-        if (room.id !== roomId) return room;
-        if (status === "ended") return { ...room, liveSlot: null };
-        return room;
-      }),
-  );
+const handleStatusChanged = ({ roomId }: TimeslotStatusChangedPayload) => {
+  // Any slot transition (live / ended / failed / redistributed) can change a
+  // card: its live slot, failed banner and player widget come from today's
+  // slots, while its pending-request count comes from the room summary — and a
+  // slot failing deletes those pending requests. Refresh both feeds so the card
+  // never shows a stale status or an already-cleared request.
+  queryClient.invalidateQueries({ queryKey: ["timeslots", roomId] });
+  queryClient.invalidateQueries({ queryKey: ["hosted-rooms"] });
 };
 
 onMounted(() => socket.on(TIMESLOT_STATUS_CHANGED_EVENT, handleStatusChanged));

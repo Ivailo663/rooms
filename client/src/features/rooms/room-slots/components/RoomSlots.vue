@@ -38,6 +38,17 @@
                       v-if="option.value === todayValue"
                       class="absolute -bottom-[3px] left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-white"
                     />
+                    <!-- Reminder only: a request on this day is awaiting action. -->
+                    <span
+                      v-if="pendingDays?.includes(option.value)"
+                      title="Requests awaiting action"
+                      class="absolute -top-[7px] -right-[9px] flex h-3 w-3 items-center justify-center rounded-full bg-amber-100 text-amber-600"
+                    >
+                      <i
+                        class="fa-solid fa-user-clock"
+                        style="font-size: 0.4rem"
+                      />
+                    </span>
                   </span>
                 </template>
               </SelectButton>
@@ -103,7 +114,9 @@
                   'flex flex-col items-start !gap-0.5 !px-2 !py-1.5 rounded-lg border-1 cursor-pointer text-left transition-colors',
                   index === selectedIndex && !isCreating
                     ? 'border-dashed border-primary-300 bg-primary-50'
-                    : 'border-solid border-surface-200 bg-white hover:border-primary-300',
+                    : playerInfo(slot).gathered
+                      ? 'border-solid border-emerald-200 bg-emerald-50/60 hover:border-emerald-300'
+                      : 'border-solid border-surface-200 bg-white hover:border-primary-300',
                   !slot.enabled ? 'opacity-70' : '',
                 ]"
                 @click="selectSlot(index)"
@@ -133,9 +146,13 @@
                       {{ slot.pendingRequests.length }}
                     </span>
                   </div>
-                  <span class="text-[10px] font-medium text-surface-400">
-                    {{ slot.players.length }}/{{ slot.max_players }}
-                  </span>
+                  <SlotPlayerCount
+                    size="xs"
+                    :count="playerInfo(slot).count"
+                    :max="playerInfo(slot).max"
+                    :gathered="playerInfo(slot).gathered"
+                    :title="gatheredTitle(liveNow(slot))"
+                  />
                 </template>
               </Button>
               <Tag
@@ -209,16 +226,15 @@
                   :enabled="enabled"
                 />
 
-                <div v-else class="flex flex-col !gap-4 !pt-10">
-                  <RoomFormSlot
-                    v-model:enabled="enabled"
-                    :form="form"
-                    :available-features="tenantData?.settings?.defaultFeatures"
-                    :available-hours="editableHourOptions"
-                    :show-enabled-toggle="false"
-                    :disabled="enabled"
-                  />
-                </div>
+                <RoomFormSlot
+                  v-else
+                  v-model:enabled="enabled"
+                  :form="form"
+                  :available-features="tenantData?.settings?.defaultFeatures"
+                  :available-hours="editableHourOptions"
+                  :show-enabled-toggle="false"
+                  :disabled="enabled"
+                />
               </div>
 
               <div
@@ -305,13 +321,19 @@ import {
   useCreateTimeslot,
   useUpdateTimeslot,
   useDeleteTimeslot,
+  useGetPendingRequestDays,
 } from "../../composables/queries";
 import { useGetTenantSettings } from "@/features/settings/composables/queries";
 import { useNow } from "../../composables/useNow";
-import { isSlotLiveNow, isSlotFailedNow } from "../../composables/isSlotLiveNow";
+import {
+  isSlotLiveNow,
+  isSlotFailedNow,
+} from "../../composables/isSlotLiveNow";
 import RoomFormSlot from "./RoomSlotForm.vue";
 import SlotMonitor from "./SlotMonitor.vue";
 import StatusDot from "@/components/StatusDot.vue";
+import SlotPlayerCount from "../../components/SlotPlayerCount.vue";
+import { slotPlayerInfo, gatheredTitle } from "../../composables/slotQuorum";
 
 const props = defineProps<{ id: number }>();
 
@@ -344,7 +366,8 @@ const availableTimeOptions = computed(() => {
 const editableHourOptions = computed(() => {
   const currentLabel = selectedSlot.value?.label;
   const used = new Set(
-    slots.value?.filter((s) => s.label !== currentLabel).map((s) => s.label) ?? [],
+    slots.value?.filter((s) => s.label !== currentLabel).map((s) => s.label) ??
+      []
   );
   return ALL_TIME_OPTIONS.filter((o) => !used.has(o.code));
 });
@@ -385,6 +408,10 @@ const { data: slots } = useGetTimeslots({
   day: debouncedWeekDay,
 });
 
+// Days of this room with at least one pending request — the slot list only
+// covers the selected day, so this is what the day switcher badges off.
+const { data: pendingDays } = useGetPendingRequestDays(() => props.id);
+
 const createMutation = useCreateTimeslot();
 const updateMutation = useUpdateTimeslot();
 const deleteMutation = useDeleteTimeslot();
@@ -403,6 +430,11 @@ const DAY_LABELS: Record<string, string> = {
 };
 
 const liveNow = (slot: TimeslotResponse) => isSlotLiveNow(slot, now.value);
+
+// Counts + quorum for a chip, on the same rule the room card uses: a slot the
+// clock says is running has gathered by definition.
+const playerInfo = (slot: TimeslotResponse) =>
+  slotPlayerInfo(slot, liveNow(slot));
 
 const slotDotColor = (
   slot: TimeslotResponse
@@ -602,6 +634,12 @@ const deleteSlot = async () => {
 .launch-btn--stop:hover {
   background: linear-gradient(135deg, #fee2e2, #fecaca);
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.12);
+}
+.day-switch,
+.day-switch :deep(.p-togglebutton),
+.day-switch :deep(.p-togglebutton-content) {
+  /* The pending-request badge sits outside the button box. */
+  overflow: visible;
 }
 .day-switch :deep(.p-togglebutton) {
   border: none;

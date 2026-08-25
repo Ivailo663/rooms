@@ -4,11 +4,28 @@
     <BasicWrapper>
       <div class="!mb-5">
         <h2 class="text-base font-semibold text-surface-900">
-          Joining & Availability
+          Player Management
         </h2>
         <p class="!mt-0.5 text-sm text-surface-400">
           Control when and how players can join timeslots
         </p>
+      </div>
+
+      <div
+        class="flex flex-col sm:flex-row sm:items-center sm:justify-between !gap-3 !py-4 first:!pt-0 last:!pb-0"
+      >
+        <div>
+          <p class="text-sm font-medium text-surface-700">
+            Allow join on live slot
+          </p>
+          <p class="!mt-0.5 text-xs text-surface-400">
+            Let players join a slot that has already started
+          </p>
+        </div>
+        <ToggleSwitch
+          v-model="allowJoinOnLive"
+          class="self-start sm:self-auto shrink-0"
+        />
       </div>
 
       <div class="divide-y divide-surface-100">
@@ -37,18 +54,40 @@
           />
         </div>
 
-        <div
-          class="flex flex-col sm:flex-row sm:items-center sm:justify-between !gap-3 !py-4 first:!pt-0 last:!pb-0"
-        >
-          <div>
+        <div class="divide-y divide-surface-100 !py-4">
+          <div class="!py-4 first:!pt-0">
             <p class="text-sm font-medium text-surface-700">
-              Allow join on live slot
+              Auto-redistribute players
             </p>
-            <p class="!mt-0.5 text-xs text-surface-400">
-              Let players join a slot that has already started
+            <p class="!mt-0.5 !mb-2 text-xs text-surface-400">
+              Randomly redistribute players to other slots when minimum isn't
+              reached
             </p>
+
+            <Message
+              severity="warn"
+              :pt="{
+                text: {
+                  class: '!w-full',
+                },
+              }"
+            >
+              <div
+                class="!w-full flex flex-col sm:flex-row sm:items-center !gap-3 sm:!justify-between"
+              >
+                <p class="text-sm !font-light">
+                  Some players will be removed from the slot if it is
+                  under-filled and redistributed to other slots. (some may be
+                  left behind)
+                </p>
+
+                <ToggleSwitch
+                  v-model="autoRedistribute"
+                  class="self-start sm:self-auto shrink-0"
+                />
+              </div>
+            </Message>
           </div>
-          <ToggleSwitch v-model="allowJoinOnLive" />
         </div>
 
         <div class="!py-4 first:!pt-0 last:!pb-0">
@@ -332,50 +371,6 @@
         </div>
       </div>
     </BasicWrapper>
-
-    <!-- Player Redistribution -->
-    <BasicWrapper>
-      <div class="!mb-5">
-        <h2 class="text-base font-semibold text-surface-900">
-          Player Management
-        </h2>
-        <p class="!mt-0.5 text-sm text-surface-400">
-          Automatically shuffle players when a slot is under-filled
-        </p>
-      </div>
-
-      <div class="divide-y divide-surface-100">
-        <div class="!py-4 first:!pt-0">
-          <p class="text-sm font-medium text-surface-700">
-            Auto-redistribute players
-          </p>
-          <p class="!mt-0.5 !mb-2 text-xs text-surface-400">
-            Randomly redistribute players to other slots when minimum isn't
-            reached
-          </p>
-
-          <Message
-            severity="warn"
-            :pt="{
-              text: {
-                class: '!w-full',
-              },
-            }"
-          >
-            <div
-              class="!w-full flex flex-col sm:flex-row sm:items-center !gap-3 sm:!justify-between"
-            >
-              <p class="text-sm !font-light">
-                Some players will be removed from the slot if it is under-filled
-                and redistributed to other slots. (some may be left behind)
-              </p>
-
-              <ToggleSwitch v-model="autoRedistribute" />
-            </div>
-          </Message>
-        </div>
-      </div>
-    </BasicWrapper>
   </div>
 </template>
 
@@ -565,3 +560,9 @@ watchDebounced(
   { debounce: 800, deep: true }
 );
 </script>
+
+<style scoped>
+:deep(.p-toggleswitch) {
+  min-width: 3rem;
+}
+</style>

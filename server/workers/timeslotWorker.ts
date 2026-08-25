@@ -14,6 +14,23 @@ import type { TenantSettings } from "../../packages/shared/index.js";
 const meetsQuorum = (playerCount: number, min: number | null): boolean =>
   playerCount > 0 && (min === null || playerCount >= min);
 
+// Mark a slot as failed for this occurrence. Pending join requests are dropped
+// with it — the host can't act on them once the game is off. Denied rows stay:
+// they're the "can't rejoin" block, and expire only at the end-of-occurrence
+// reset (GO_ENDED) along with everything else.
+const markFailed = async (slotId: number, roomId: number) => {
+  await prisma.$transaction([
+    prisma.timeslotJoinRequest.deleteMany({
+      where: { timeslotId: slotId, status: "pending" },
+    }),
+    prisma.roomTimeslot.update({
+      where: { id: slotId },
+      data: { status: "failed" },
+    }),
+  ]);
+  emit(slotId, roomId, "failed");
+};
+
 export const createTimeslotWorker = (io: Server) => {
   const worker = new Worker<{ slotId: number }>(
     TIMESLOT_QUEUE_NAME,
@@ -42,11 +59,7 @@ export const createTimeslotWorker = (io: Server) => {
         const playerCount = detail?._count.timeslot_players ?? 0;
 
         if (!meetsQuorum(playerCount, detail?.min_players ?? null)) {
-          await prisma.roomTimeslot.update({
-            where: { id: slot.id },
-            data: { status: "failed" },
-          });
-          emit(slot.id, slot.roomId, "failed");
+          await markFailed(slot.id, slot.roomId);
           return;
         }
 
@@ -120,11 +133,7 @@ export const createTimeslotWorker = (io: Server) => {
           }
         }
 
-        await prisma.roomTimeslot.update({
-          where: { id: slot.id },
-          data: { status: "failed" },
-        });
-        emit(slot.id, slot.roomId, "failed");
+        await markFailed(slot.id, slot.roomId);
         return;
       }
     },

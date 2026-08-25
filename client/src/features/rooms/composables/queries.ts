@@ -12,6 +12,7 @@ import {
   getTimeslots,
   getEnabledTimeslots,
   getEnabledTimeslotDaysAndFirstSlot,
+  getPendingRequestDays,
   getPlayableRooms,
   createTimeslot,
   updateTimeslot,
@@ -138,6 +139,22 @@ export const useGetEnabledDays = (
   return useQuery<EnabledDaySummary[]>({
     queryKey: ["timeslots", "enabled-days", roomId],
     queryFn: () => getEnabledTimeslotDaysAndFirstSlot(toValue(roomId)),
+    enabled: !!authStore.user?.id,
+    ...options,
+  });
+};
+
+export const useGetPendingRequestDays = (
+  roomId: MaybeRefOrGetter<number>,
+  options?: Omit<UseQueryOptions<string[]>, "queryKey" | "queryFn">
+) => {
+  const authStore = useAuthStore();
+
+  return useQuery<string[]>({
+    // Kept under the "timeslots" prefix so the join-request socket sync and the
+    // slot mutations already invalidate it.
+    queryKey: ["timeslots", "pending-days", roomId],
+    queryFn: () => getPendingRequestDays(toValue(roomId)),
     enabled: !!authStore.user?.id,
     ...options,
   });
