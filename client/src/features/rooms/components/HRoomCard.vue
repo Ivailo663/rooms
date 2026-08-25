@@ -126,20 +126,13 @@
               Players
             </span>
           </div>
-          <div v-if="activePlayerInfo" class="flex items-center !gap-1.5">
-            <span
-              class="text-xs font-bold"
-              :class="hasQuorum ? 'text-emerald-600' : 'text-surface-600'"
-            >
-              {{ activePlayerInfo.count }}/{{ activePlayerInfo.max }}
-            </span>
-            <i
-              v-if="hasQuorum"
-              class="fa-solid fa-circle-check text-emerald-500"
-              style="font-size: 0.7rem"
-              :title="quorumTitle"
-            />
-          </div>
+          <SlotPlayerCount
+            v-if="activePlayerInfo"
+            :count="activePlayerInfo.count"
+            :max="activePlayerInfo.max"
+            :gathered="hasQuorum"
+            :title="quorumTitle"
+          />
         </div>
 
         <template v-if="activePlayerInfo">
@@ -169,16 +162,6 @@
                 +{{ activePlayerInfo.count - 3 }}
               </div>
             </div>
-            <span
-              class="text-[10px]"
-              :class="
-                hasQuorum
-                  ? 'font-semibold text-emerald-600'
-                  : 'text-surface-400'
-              "
-            >
-              {{ hasQuorum ? "gathered" : "joined" }}
-            </span>
           </div>
           <p v-else class="text-xs text-surface-300">No players yet</p>
         </template>
@@ -242,12 +225,18 @@ import ManageSlotsDrawer from "./ManageSlotsDrawer.vue";
 import SlotChat from "./SlotChat.vue";
 import RedistributionNotice from "./RedistributionNotice.vue";
 import SlotFailedNotice from "./SlotFailedNotice.vue";
+import SlotPlayerCount from "./SlotPlayerCount.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import { useNow } from "../composables/useNow";
 import { isSlotFailedNow } from "../composables/isSlotLiveNow";
 import { elapsedMinutes } from "../composables/gameTime";
 import { useGetTimeslots, useGetEnabledDays } from "../composables/queries";
 import { useRedistributionNotices } from "../composables/useRedistributionNotices";
+import {
+  slotPlayerInfo,
+  liveSlotPlayerInfo,
+  gatheredTitle,
+} from "../composables/slotQuorum";
 
 const DAY_ORDER = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 const DAY_LABELS: Record<string, string> = {
@@ -401,39 +390,14 @@ const nextSlotTimeLabel = computed(() => {
 });
 
 const activePlayerInfo = computed(() => {
-  if (props.room.liveSlot) {
-    return {
-      count: props.room.liveSlot.players_count,
-      max: props.room.liveSlot.max_players,
-      // A slot only goes live once the server checked quorum and it held, so a
-      // live roster has gathered by definition (LiveSlotSummary carries no
-      // minimum of its own to re-check against).
-      gathered: true,
-    };
-  }
-  if (nextSlot.value) {
-    const count = nextSlot.value.players.length;
-    const min = nextSlot.value.min_players;
-    return {
-      count,
-      max: nextSlot.value.max_players,
-      // Same rule the worker applies at go-live: enough players to run, which
-      // with no configured minimum means simply "somebody joined". Anything
-      // stricter would promise green for a game that then fails, or withhold
-      // it from one that runs.
-      gathered: count > 0 && (min === null || count >= min),
-    };
-  }
+  if (props.room.liveSlot) return liveSlotPlayerInfo(props.room.liveSlot);
+  if (nextSlot.value) return slotPlayerInfo(nextSlot.value);
   return null;
 });
 
 const hasQuorum = computed(() => activePlayerInfo.value?.gathered ?? false);
 
-const quorumTitle = computed(() =>
-  props.room.liveSlot
-    ? "Players gathered — game is running"
-    : "Enough players to run"
-);
+const quorumTitle = computed(() => gatheredTitle(!!props.room.liveSlot));
 
 const playerPercent = computed(() => {
   if (!activePlayerInfo.value) return 0;

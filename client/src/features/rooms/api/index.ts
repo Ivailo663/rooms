@@ -62,6 +62,16 @@ export const getEnabledTimeslotDaysAndFirstSlot = async (
   return data;
 };
 
+export const getPendingRequestDays = async (
+  room_id: number
+): Promise<string[]> => {
+  const { data } = await api.get<string[]>("/timeslots/pending-days", {
+    params: { room_id },
+  });
+
+  return data;
+};
+
 export const createTimeslot = async (
   data: CreateTimeslotRequest
 ): Promise<CreateTimeslotResponse> => {

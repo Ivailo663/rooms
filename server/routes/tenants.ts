@@ -5,6 +5,7 @@ import type {
   UpdateTenantAccountRequest,
   UpdateTenantSettingsRequest,
 } from "@football/shared";
+import { syncSlot } from "../scheduler.js";
 
 const getTenantSettings: RequestHandler = async (req, res) => {
   const tenantId = Number(req.params.tenantId);
@@ -73,6 +74,14 @@ const updateTenantSettings: RequestHandler = async (req, res) => {
       where: { id: tenantId },
       data: { settings },
     });
+
+    const slots = await prisma.roomTimeslot.findMany({
+      where: { enabled: true, room: { tenantid: tenantId } },
+      select: { id: true },
+    });
+    await Promise.all(slots.map((s) => syncSlot(s.id)));
+
+    console.log(`Settings updated: resynced ${slots.length} slot(s) for tenant ${tenantId}`);
 
     return res
       .status(200)

@@ -257,6 +257,30 @@ const getEnabledTimeslotDaysAndFirstSlot: RequestHandler = asyncHandler(
   }
 );
 
+// Which days of the room hold at least one pending join request. The slot list
+// only ever loads the selected day, so this is what lets the day switcher hint
+// that another day is waiting on the host.
+const getPendingRequestDays: RequestHandler = asyncHandler(async (req, res) => {
+  const account = await getCurrentAccount(res.locals.user.email);
+  const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
+
+  const rows = await prisma.roomTimeslot.findMany({
+    where: {
+      roomId,
+      room: {
+        creatorId: account.id,
+      },
+      join_requests: {
+        some: { status: "pending" },
+      },
+    },
+    select: { day: true },
+    distinct: ["day"],
+  });
+
+  res.send(rows.map((row) => row.day));
+});
+
 const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
   const body: CreateTimeslotRequest = req.body;
@@ -382,6 +406,7 @@ export const registerTimeslotRoutes = (app: Application) => {
   app.get("/timeslots", getTimeslots);
   app.get("/timeslots/enabled", getEnabledTimeslots);
   app.get("/timeslots/enabled/days", getEnabledTimeslotDaysAndFirstSlot);
+  app.get("/timeslots/pending-days", getPendingRequestDays);
   app.post("/timeslots", createTimeslot);
   app.put("/timeslots", updateTimeslot);
   app.delete("/timeslots/:id", deleteTimeslot);
