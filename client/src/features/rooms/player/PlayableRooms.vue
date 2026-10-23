@@ -1,14 +1,11 @@
 <template>
-  <div
-    ref="scrollContainer"
-    class="deck-scroll flex flex-col !gap-4 overflow-y-auto"
-  >
+  <div class="deck-scroll flex flex-col !gap-4 overflow-y-auto">
     <div
       v-for="room in roomList"
       :key="room.id"
       class="deck-item shrink-0 group"
     >
-      <PRoomCard :room="room" />
+      <PlayableRoomCard :room="room" />
     </div>
   </div>
 </template>
@@ -23,9 +20,13 @@ import type {
 } from "@football/shared";
 import { useGetPlayableRooms } from "../composables/queries";
 import { useActiveDay } from "@/composables/useActiveDay";
-import PRoomCard from "./PRoomCard.vue";
+import PlayableRoomCard from "./PlayableRoomCard.vue";
 
 const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
+
+// Comes from the header's search box, which nothing filters on yet — the prop
+// is the already-wired half of that feature, not a value this deck reads.
+defineProps<{ search: string }>();
 
 const activeDay = useActiveDay();
 const queryClient = useQueryClient();

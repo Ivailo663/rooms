@@ -10,7 +10,7 @@
   </div>
 
   <div v-else class="flex min-h-screen bg-gradient-to-b from-slate-50 via-sky-50/40 to-emerald-50/30">
-    <AppSidebar v-if="authStore.user" v-model:expanded="menuExpanded" />
+    <AppSidebar v-if="authStore.user" />
 
     <!-- Main content -->
     <div class="flex-1 h-[100dvh] overflow-y-auto !p-4">
@@ -38,12 +38,13 @@
 
 <script setup lang="ts">
 import { RouterView } from "vue-router";
-import { ref, watch } from "vue";
+import { watch } from "vue";
 import ConfirmDialog from "primevue/confirmdialog";
 import { useAuthStore } from "./stores/auth";
 import AppSidebar from "./components/AppSidebar.vue";
 import { useJoinRequestSync } from "./features/rooms/composables/useJoinRequestSync";
 import { useRoomView } from "./composables/useRoomView";
+import { useMenuExpanded } from "./composables/useMenuExpanded";
 import { RoomView } from "./constants";
 
 const authStore = useAuthStore();
@@ -52,7 +53,8 @@ const authStore = useAuthStore();
 // collapsed there and expanded in Host. Manual toggles still stick until the
 // view changes again.
 const roomView = useRoomView();
-const menuExpanded = ref(roomView.value !== RoomView.Play);
+const menuExpanded = useMenuExpanded();
+menuExpanded.value = roomView.value !== RoomView.Play;
 
 watch(roomView, (view) => {
   menuExpanded.value = view !== RoomView.Play;

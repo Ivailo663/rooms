@@ -1,3 +1,7 @@
 @import "./base.css";
 @import "tailwindcss";
 @import "tailwindcss-primeui";
+
+@theme {
+  --breakpoint-xs: 30rem; /* 480px */
+}

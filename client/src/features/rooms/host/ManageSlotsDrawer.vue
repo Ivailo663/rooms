@@ -38,7 +38,7 @@ import { Drawer } from "primevue";
 import { useQueryClient } from "@tanstack/vue-query";
 import { socket } from "@/socket";
 import type { TimeslotStatusChangedPayload } from "@football/shared";
-import RoomSlots from "../room-slots/components/RoomSlots.vue";
+import RoomSlots from "../room-slots/RoomSlots.vue";
 
 const props = defineProps<{
   visible: boolean;

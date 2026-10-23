@@ -165,22 +165,22 @@ import { Button } from "primevue";
 import { useConfirm } from "primevue/useconfirm";
 import type { TimeslotResponse } from "@football/shared";
 import StatusBadge from "@/components/StatusBadge.vue";
-import SlotChat from "../../components/SlotChat.vue";
-import RedistributionNotice from "../../components/RedistributionNotice.vue";
-import SlotFailedNotice from "../../components/SlotFailedNotice.vue";
-import { useNow } from "../../composables/useNow";
+import SlotChat from "../components/SlotChat.vue";
+import RedistributionNotice from "../components/RedistributionNotice.vue";
+import SlotFailedNotice from "../components/SlotFailedNotice.vue";
+import { useNow } from "../composables/useNow";
 import {
   useRedistributeTimeslot,
   useApproveJoinRequest,
   useDenyJoinRequest,
   useAcknowledgeJoinRequest,
-} from "../../composables/queries";
-import { useRedistributionNotices } from "../../composables/useRedistributionNotices";
+} from "../composables/queries";
+import { useRedistributionNotices } from "../composables/useRedistributionNotices";
 import {
   isSlotLiveNow,
   isSlotFailedNow,
-} from "../../composables/isSlotLiveNow";
-import { elapsedMinutes } from "../../composables/gameTime";
+} from "../composables/isSlotLiveNow";
+import { elapsedMinutes } from "../composables/gameTime";
 
 const props = defineProps<{
   timeslot: TimeslotResponse;

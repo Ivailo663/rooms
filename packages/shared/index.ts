@@ -287,6 +287,13 @@ export interface JoinedSlotSummary {
 export interface EnabledDaySummary {
   day: string;
   label: string;
+  // Roster of that day's first slot. A room card only ever loads today's
+  // slots, so when its next game falls on a later day this summary is the
+  // only place its counts and quorum can come from.
+  timeslotId: number;
+  players_count: number;
+  min_players: number | null;
+  max_players: number;
 }
 
 export interface GetHostedRoomsParams {

@@ -135,7 +135,7 @@ import type {
   DataTableRowExpandEvent,
 } from "primevue/datatable";
 import { useQueryClient } from "@tanstack/vue-query";
-import RoomSlots from "../room-slots/components/RoomSlots.vue";
+import RoomSlots from "../room-slots/RoomSlots.vue";
 import StatusDot from "@/components/StatusDot.vue";
 import { useGetHostedRooms } from "../composables/queries";
 import { useNow } from "../composables/useNow";

@@ -3,7 +3,7 @@
   <div
     v-if="isMobile && expanded"
     class="fixed inset-0 z-40 bg-black/30"
-    @click="emit('update:expanded', false)"
+    @click="expanded = false"
   />
 
   <!-- Sidebar -->
@@ -12,6 +12,7 @@
     :class="sidebarContainerClass"
   >
     <aside
+      id="app-sidebar"
       class="flex flex-col !gap-5 border-surface-200 bg-white transition-all duration-300 overflow-hidden"
       :class="sidebarClass"
     >
@@ -35,11 +36,13 @@
         </div>
         <Button
           v-if="!collapsed"
+          ref="closeButton"
           :icon="isMobile ? 'fa-solid fa-xmark' : 'fa-solid fa-chevron-left'"
+          :aria-label="isMobile ? 'Close menu' : 'Collapse sidebar'"
           severity="secondary"
           text
           size="small"
-          @click="emit('update:expanded', false)"
+          @click="expanded = false"
         />
       </div>
 
@@ -52,7 +55,7 @@
           class="flex items-center rounded-lg text-sm font-medium text-surface-500 transition-colors hover:bg-surface-50 hover:text-surface-900"
           :class="collapsed ? 'justify-center !p-2.5' : '!gap-3 !px-3 !py-2.5'"
           exact-active-class="!bg-primary-50 !text-primary-600"
-          @click="isMobile && emit('update:expanded', false)"
+          @click="isMobile && (expanded = false)"
         >
           <i
             :class="['w-4 text-center', item.icon]"
@@ -90,12 +93,21 @@
           />
           <Button
             v-else
-            v-tooltip.right="roomView === RoomView.Host ? 'Switch to Play' : 'Switch to Host'"
-            :icon="roomView === RoomView.Host ? 'fa-solid fa-eye' : 'fa-solid fa-gamepad'"
+            v-tooltip.right="
+              roomView === RoomView.Host ? 'Switch to Play' : 'Switch to Host'
+            "
+            :icon="
+              roomView === RoomView.Host
+                ? 'fa-solid fa-eye'
+                : 'fa-solid fa-gamepad'
+            "
             size="small"
             variant="outlined"
             class="w-full"
-            @click="roomView = roomView === RoomView.Host ? RoomView.Play : RoomView.Host"
+            @click="
+              roomView =
+                roomView === RoomView.Host ? RoomView.Play : RoomView.Host
+            "
           />
         </div>
       </RoleGate>
@@ -140,37 +152,54 @@
       <button
         v-if="!isMobile && !expanded"
         class="flex w-full items-center justify-center rounded-lg !py-1.5 text-surface-400 hover:bg-surface-50 hover:text-surface-600 cursor-pointer border-none outline-none bg-transparent transition-colors"
-        @click="emit('update:expanded', true)"
+        @click="expanded = true"
       >
         <i class="fa-solid fa-chevron-right" style="font-size: 0.65rem" />
       </button>
     </aside>
   </div>
 
-  <!-- Mobile hamburger -->
-  <Button
+  <!-- Mobile pull-out tab: the sliver of the collapsed sidebar that stays on
+       screen. Flush to the viewport's left edge and rounded only on its right so
+       it reads as cut out of the sidebar's edge, and owned by the sidebar rather
+       than by a view, so every route keeps a way back to the drawer without
+       making room for a trigger of its own. Mid-edge rather than at the top
+       corner: a zero-width sidebar has no corner to notch, and the top-left of
+       every screen is the busiest — here it overlays only the content gutter and
+       the cards' own padding. -->
+  <button
     v-if="isMobile && !expanded"
-    icon="fa-solid fa-bars"
-    severity="secondary"
-    text
-    class="!fixed !left-4 !top-4 !z-50"
-    @click="emit('update:expanded', true)"
-  />
+    type="button"
+    aria-label="Open menu"
+    aria-controls="app-sidebar"
+    :aria-expanded="expanded"
+    class="fixed left-0 top-1/2 z-40 flex h-12 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-l-none rounded-r-2xl border border-l-0 border-surface-200/40 bg-white/70 text-surface-500 shadow-sm backdrop-blur-xl transition-colors hover:text-surface-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300"
+    @click="openMenu"
+  >
+    <i class="fa-solid fa-bars" style="font-size: 0.8rem" />
+  </button>
 </template>
 
 <script setup lang="ts">
 import { RouterLink, useRouter } from "vue-router";
-import { computed, onMounted, onBeforeUnmount, ref } from "vue";
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  ref,
+  useTemplateRef,
+} from "vue";
 import { Button, SelectButton } from "primevue";
 import { useAuthStore } from "@/stores/auth";
 import { useRoomView } from "@/composables/useRoomView";
 import { useCreateRoom } from "@/composables/useCreateRoom";
+import { useMenuExpanded } from "@/composables/useMenuExpanded";
 import { RoomView } from "@/constants";
 import { signOut, getAuth } from "firebase/auth";
 import RoleGate from "./RoleGate.vue";
 
-const props = defineProps<{ expanded: boolean }>();
-const emit = defineEmits<{ "update:expanded": [value: boolean] }>();
+const expanded = useMenuExpanded();
 
 const authStore = useAuthStore();
 const auth = getAuth();
@@ -196,24 +225,34 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", checkMobile);
 });
 
-const collapsed = computed(() => !isMobile.value && !props.expanded);
+const collapsed = computed(() => !isMobile.value && !expanded.value);
+
+// Opening the drawer unmounts the tab that was just pressed, which would drop
+// focus back to <body>. Hand it to the drawer's close button instead.
+const closeButton = useTemplateRef<{ $el: HTMLButtonElement }>("closeButton");
+
+const openMenu = async () => {
+  expanded.value = true;
+  await nextTick();
+  closeButton.value?.$el.focus();
+};
 
 const sidebarContainerClass = computed(() => {
   if (isMobile.value) {
-    return props.expanded ? "fixed inset-y-0 left-0 z-50 w-72" : "w-0";
+    return expanded.value ? "fixed inset-y-0 left-0 z-50 w-72" : "w-0";
   }
-  return props.expanded ? "w-72 !ml-4 !mr-2" : "w-16 !ml-4 !mr-2";
+  return expanded.value ? "w-72 !ml-4 !mr-2" : "w-16 !ml-4 !mr-2";
 });
 
 const sidebarClass = computed(() => {
   if (isMobile.value) {
-    return props.expanded
+    return expanded.value
       ? "h-full w-72 !p-3 opacity-100"
       : "h-full w-0 !p-0 opacity-0 pointer-events-none";
   }
   return [
     "sticky top-4 rounded-xl h-[calc(100vh-2rem)] border",
-    props.expanded
+    expanded.value
       ? "w-72 !p-3 opacity-100"
       : "w-16 !p-2 opacity-100 items-center",
   ];
@@ -223,7 +262,6 @@ const viewOptions = [
   { label: "Host", value: RoomView.Host },
   { label: "Play", value: RoomView.Play },
 ];
-
 
 const items = [
   { label: "Home", icon: "fa-solid fa-house", route: { name: "home" } },
