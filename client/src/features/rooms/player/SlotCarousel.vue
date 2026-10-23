@@ -1,28 +1,17 @@
 <template>
   <div class="flex flex-col !gap-3">
     <div class="flex items-center justify-between">
-      <span
-        class="text-sm font-medium"
-        :class="isGlass ? 'text-white/60' : 'text-surface-400'"
-      >
-        Available slots
-      </span>
-      <span
-        class="text-sm tabular-nums"
-        :class="isGlass ? 'text-white/40' : 'text-surface-300'"
-      >
-        {{ timeslots.length ? `${selectedIndex + 1} / ${timeslots.length}` : '' }}
+      <span class="text-sm font-medium text-surface-500">Available slots</span>
+      <span class="text-xs tabular-nums text-surface-400">
+        {{
+          timeslots.length ? `${selectedIndex + 1} / ${timeslots.length}` : ""
+        }}
       </span>
     </div>
 
     <div class="flex items-center !gap-2">
       <button
-        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer border-none outline-none"
-        :class="
-          isGlass
-            ? 'bg-white/10 text-white/60 hover:bg-white/20'
-            : 'border border-surface-100 bg-white text-surface-400 hover:border-surface-200 hover:text-surface-600'
-        "
+        class="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-surface-200 bg-white text-surface-400 outline-none transition-all hover:border-surface-300 hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-30"
         :disabled="selectedIndex === 0"
         @click="go(-1)"
       >
@@ -34,38 +23,40 @@
           <div
             v-if="current"
             :key="selectedIndex"
-            class="flex w-full items-center justify-between rounded-xl !px-5 !py-3"
+            class="flex w-full items-center justify-between rounded-xl border !px-4 !py-2.5"
             :class="
-              isGlass
-                ? 'bg-white/10'
-                : 'border border-surface-100 bg-surface-50/50'
+              currentMarker === 'joined'
+                ? 'border-emerald-200 bg-emerald-50/70'
+                : currentMarker === 'pending'
+                  ? 'border-amber-200 bg-amber-50/70'
+                  : 'border-surface-200 bg-white'
             "
           >
             <span
-              class="flex items-center !gap-2 text-base font-semibold"
-              :class="isGlass ? 'text-white' : 'text-surface-800'"
+              class="flex items-center !gap-2 text-lg font-bold tabular-nums tracking-tight"
+              :class="
+                currentMarker === 'joined'
+                  ? 'text-emerald-700'
+                  : 'text-surface-900'
+              "
             >
               {{ current.label }}
               <i
                 v-if="currentMarker === 'joined'"
-                class="fa-solid fa-circle-check text-emerald-400"
+                class="fa-solid fa-circle-check text-emerald-500"
                 style="font-size: 0.7rem"
                 title="You're in this slot"
               />
               <i
                 v-else-if="currentMarker === 'pending'"
-                class="fa-solid fa-user-clock text-amber-300"
+                class="fa-solid fa-user-clock text-amber-500"
                 style="font-size: 0.7rem"
                 title="Awaiting approval"
               />
             </span>
             <button
-              class="flex items-center !gap-2 rounded-lg !px-3 !py-1.5 transition-colors cursor-pointer border-none outline-none"
-              :class="
-                isGlass
-                  ? 'bg-white/15 text-white/80 hover:bg-white/25'
-                  : 'bg-surface-100 text-surface-500 hover:bg-surface-200'
-              "
+              class="flex cursor-pointer items-center !gap-2 rounded-lg border-none bg-surface-100 !px-3 !py-1.5 text-surface-500 outline-none transition-colors hover:bg-surface-200 hover:text-surface-700"
+              title="See who's in"
               @click.stop="emit('teams')"
             >
               <i class="fa-solid fa-users" style="font-size: 0.55rem" />
@@ -76,36 +67,34 @@
           </div>
           <div
             v-else
-            :key="`empty`"
-            class="flex w-full items-center justify-center rounded-xl !py-4"
-            :class="
-              isGlass
-                ? 'border border-white/10'
-                : 'border border-dashed border-surface-200'
-            "
+            key="empty"
+            class="flex w-full items-center justify-center rounded-xl border border-dashed border-surface-200 !py-4"
           >
-            <span
-              class="text-sm"
-              :class="isGlass ? 'text-white/30' : 'text-surface-300'"
-            >
-              No time slots
-            </span>
+            <span class="text-sm text-surface-300">No time slots</span>
           </div>
         </Transition>
       </div>
 
       <button
-        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer border-none outline-none"
-        :class="
-          isGlass
-            ? 'bg-white/10 text-white/60 hover:bg-white/20'
-            : 'border border-surface-100 bg-white text-surface-400 hover:border-surface-200 hover:text-surface-600'
-        "
+        class="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-surface-200 bg-white text-surface-400 outline-none transition-all hover:border-surface-300 hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-30"
         :disabled="selectedIndex >= timeslots.length - 1"
         @click="go(1)"
       >
         <i class="fa-solid fa-chevron-right" style="font-size: 0.6rem" />
       </button>
+    </div>
+
+    <!-- Position rail: how many slots this room runs, and which one is up -->
+    <div v-if="timeslots.length > 1" class="flex items-center !gap-1.5">
+      <button
+        v-for="(slot, index) in timeslots"
+        :key="slot.id"
+        type="button"
+        class="h-1 flex-1 cursor-pointer rounded-full border-none !p-0 outline-none transition-colors"
+        :class="railClass(slot, index)"
+        :title="slot.label"
+        @click="jumpTo(index)"
+      />
     </div>
   </div>
 </template>
@@ -120,17 +109,14 @@ export type SlotMarker = "joined" | "pending";
 const props = withDefaults(
   defineProps<{
     timeslots: Slot[];
-    variant?: "default" | "glass";
     // Per-slot membership badges for the current user, keyed by slot id.
     markers?: Record<number, SlotMarker>;
     // Slot to land on when the carousel mounts (e.g. the user's joined slot).
     initialIndex?: number;
   }>(),
-  { variant: "default", markers: () => ({}), initialIndex: 0 }
+  { markers: () => ({}), initialIndex: 0 }
 );
 const emit = defineEmits<{ select: [index: number]; teams: [] }>();
-
-const isGlass = computed(() => props.variant === "glass");
 
 const selectedIndex = ref(0);
 const slideDirection = ref<1 | -1>(1);
@@ -160,12 +146,29 @@ const currentMarker = computed<SlotMarker | undefined>(() =>
 const currentTaken = computed(() => current.value?.players?.length ?? 0);
 const currentMax = computed(() => current.value?.max_players ?? 0);
 
+// The rail doubles as a legend: membership colours the segment even when that
+// slot isn't the one on screen.
+const railClass = (slot: Slot, index: number) => {
+  const marker = props.markers[slot.id];
+  if (marker === "joined") return "bg-emerald-400";
+  if (marker === "pending") return "bg-amber-300";
+  return index === selectedIndex.value ? "bg-surface-400" : "bg-surface-200";
+};
+
+const select = (next: number, direction: 1 | -1) => {
+  slideDirection.value = direction;
+  selectedIndex.value = next;
+  emit("select", next);
+};
+
 const go = (direction: -1 | 1) => {
   const next = selectedIndex.value + direction;
-  if (next >= 0 && next < props.timeslots.length) {
-    slideDirection.value = direction;
-    selectedIndex.value = next;
-    emit("select", next);
+  if (next >= 0 && next < props.timeslots.length) select(next, direction);
+};
+
+const jumpTo = (index: number) => {
+  if (index !== selectedIndex.value) {
+    select(index, index > selectedIndex.value ? 1 : -1);
   }
 };
 </script>

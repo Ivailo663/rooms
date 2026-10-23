@@ -1,4 +1,5 @@
 import type { PlayableRoomResponse, SlotStatus } from "@football/shared";
+import { dayValueOf } from "@/constants";
 import { isSlotFailedNow, isSlotLiveNow } from "./isSlotLiveNow";
 
 type Slot = PlayableRoomResponse["timeslots"][number];
@@ -7,15 +8,6 @@ type RoomPolicy = Pick<
   "lateJoinCutoff" | "allowJoinOnLive"
 >;
 
-const DAY_INDEX: Record<string, number> = {
-  su: 0,
-  mo: 1,
-  tu: 2,
-  we: 3,
-  th: 4,
-  fr: 5,
-  sa: 6,
-};
 const SLOT_DURATION_MINUTES = 60;
 
 export type JoinBlockReason = "no-game" | "live" | "closed" | "full" | "clash";
@@ -55,7 +47,7 @@ const isRosterLocked = (
   cutoff: number,
   now: Date
 ): boolean => {
-  if (now.getDay() !== DAY_INDEX[day]) return false;
+  if (dayValueOf(now) !== day) return false;
   const minutesNow = now.getHours() * 60 + now.getMinutes();
   return (
     minutesNow >= startTime - cutoff &&

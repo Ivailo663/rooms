@@ -2,6 +2,7 @@ import type { Application, RequestHandler } from "express";
 import prisma from "../prisma.js";
 import type {
   TimeslotResponse,
+  EnabledDaySummary,
   CreateTimeslotRequest,
   UpdateTimeslotRequest,
   CreateTimeslotResponse,
@@ -90,6 +91,19 @@ const getQueryValue = (value: unknown) => {
   return value;
 };
 
+// Prisma reads `undefined` in a `where` clause as "no filter", so a missing
+// day would silently widen a single-day query into every day's slots — which
+// the client then renders as today. Fail the request instead.
+const getRequiredDay = (value: unknown): string => {
+  const day = getQueryValue(value);
+
+  if (typeof day !== "string" || !day) {
+    throw createHttpError(400, "day is required");
+  }
+
+  return day;
+};
+
 const getCurrentAccount = async (email: string) => {
   const account = await prisma.account.findUnique({
     where: {
@@ -110,11 +124,12 @@ const getCurrentAccount = async (email: string) => {
 const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
   const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
+  const day = getRequiredDay(req.query.day);
 
   const timeslots = await prisma.roomTimeslot.findMany({
     where: {
       roomId,
-      day: req.query.day as string,
+      day,
       room: {
         creatorId: account.id,
       },
@@ -173,13 +188,14 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
 const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
   const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
+  const day = getRequiredDay(req.query.day);
 
   const timeslots = await prisma.roomTimeslot.findMany({
     where: {
       roomId,
       enabled: true,
       status: { not: "ended" },
-      day: req.query.day as string,
+      day,
       room: {
         creatorId: account.id,
       },
@@ -248,12 +264,28 @@ const getEnabledTimeslotDaysAndFirstSlot: RequestHandler = asyncHandler(
           creatorId: account.id,
         },
       },
-      select: { day: true, label: true },
+      select: {
+        id: true,
+        day: true,
+        label: true,
+        min_players: true,
+        max_players: true,
+        _count: { select: { timeslot_players: true } },
+      },
       orderBy: { start_time: "asc" },
       distinct: ["day"],
     });
 
-    res.send(rows.map((r) => ({ day: r.day, label: r.label })));
+    const response: EnabledDaySummary[] = rows.map((r) => ({
+      day: r.day,
+      label: r.label,
+      timeslotId: r.id,
+      players_count: r._count.timeslot_players,
+      min_players: r.min_players,
+      max_players: r.max_players,
+    }));
+
+    res.send(response);
   }
 );
 

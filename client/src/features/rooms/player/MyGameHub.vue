@@ -256,21 +256,21 @@ import { useQueryClient } from "@tanstack/vue-query";
 import { socket } from "@/socket";
 import type { JoinedSlotSummary } from "@football/shared";
 import { useAuthStore } from "@/stores/auth";
-import { useLeaveTimeslot } from "./composables/queries";
-import { useGameMode } from "./composables/useGameMode";
-import { useNow } from "./composables/useNow";
-import { isSlotLiveNow, isSlotFailedNow } from "./composables/isSlotLiveNow";
+import { useLeaveTimeslot } from "../composables/queries";
+import { useGameMode } from "../composables/useGameMode";
+import { useNow } from "../composables/useNow";
+import { isSlotLiveNow, isSlotFailedNow } from "../composables/isSlotLiveNow";
 import {
   getSlotLeavability,
   type Leavability,
-} from "./composables/slotJoinability";
+} from "../composables/slotJoinability";
 import {
   dayDisplay,
   shortDay,
   minutesUntil,
   formatCountdown,
   elapsedMinutes,
-} from "./composables/gameTime";
+} from "../composables/gameTime";
 
 const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";

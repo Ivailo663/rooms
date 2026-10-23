@@ -1,4 +1,13 @@
 {
   "extends": "@tsconfig/node24/tsconfig.json",
-  "include": ["./**/*"]
+  // playwright.config.ts is pulled in because the setup spec imports
+  // STORAGE_STATE from it; Playwright runs both through its own bundler, so
+  // the extensionless import needs Bundler resolution rather than nodenext's.
+  "include": ["./**/*", "../playwright.config.ts"],
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"]
+  }
 }

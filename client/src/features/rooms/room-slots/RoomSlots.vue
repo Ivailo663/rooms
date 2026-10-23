@@ -322,18 +322,17 @@ import {
   useUpdateTimeslot,
   useDeleteTimeslot,
   useGetPendingRequestDays,
-} from "../../composables/queries";
+} from "../composables/queries";
 import { useGetTenantSettings } from "@/features/settings/composables/queries";
-import { useNow } from "../../composables/useNow";
-import {
-  isSlotLiveNow,
-  isSlotFailedNow,
-} from "../../composables/isSlotLiveNow";
+import { DAYS, dayValueOf } from "@/constants";
+import { useNow } from "../composables/useNow";
+import { dayDisplay } from "../composables/gameTime";
+import { isSlotLiveNow, isSlotFailedNow } from "../composables/isSlotLiveNow";
 import RoomFormSlot from "./RoomSlotForm.vue";
 import SlotMonitor from "./SlotMonitor.vue";
 import StatusDot from "@/components/StatusDot.vue";
-import SlotPlayerCount from "../../components/SlotPlayerCount.vue";
-import { slotPlayerInfo, gatheredTitle } from "../../composables/slotQuorum";
+import SlotPlayerCount from "../components/SlotPlayerCount.vue";
+import { slotPlayerInfo, gatheredTitle } from "../composables/slotQuorum";
 
 const props = defineProps<{ id: number }>();
 
@@ -342,16 +341,6 @@ const tabOptions = [
   { value: "settings", icon: "fa-solid fa-sliders" },
 ];
 const activeTab = ref<"monitor" | "settings">("monitor");
-
-const DAYS = [
-  { label: "Mo", value: "mo", full: "Monday" },
-  { label: "Tu", value: "tu", full: "Tuesday" },
-  { label: "We", value: "we", full: "Wednesday" },
-  { label: "Th", value: "th", full: "Thursday" },
-  { label: "Fr", value: "fr", full: "Friday" },
-  { label: "Sa", value: "sa", full: "Saturday" },
-  { label: "Su", value: "su", full: "Sunday" },
-];
 
 const ALL_TIME_OPTIONS = Array.from({ length: 25 }, (_, h) => {
   const t = `${String(h).padStart(2, "0")}:00`;
@@ -397,10 +386,13 @@ const slotToForm = (slot: TimeslotResponse) => ({
     : [],
 });
 
-const todayValue =
-  DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]?.value;
+const now = useNow();
 
-const weekDay = ref(todayValue as string);
+// Follows the clock so the switcher's "today" dot moves at midnight; the
+// initial selection is a deliberate snapshot — it is the host's to change.
+const todayValue = computed(() => dayValueOf(now.value));
+
+const weekDay = ref(todayValue.value);
 const debouncedWeekDay = refDebounced(weekDay, 300);
 
 const { data: slots } = useGetTimeslots({
@@ -417,18 +409,6 @@ const updateMutation = useUpdateTimeslot();
 const deleteMutation = useDeleteTimeslot();
 
 // ── Slot time labels ──
-const now = useNow();
-const DAY_MAP = ["su", "mo", "tu", "we", "th", "fr", "sa"];
-const DAY_LABELS: Record<string, string> = {
-  su: "Sunday",
-  mo: "Monday",
-  tu: "Tuesday",
-  we: "Wednesday",
-  th: "Thursday",
-  fr: "Friday",
-  sa: "Saturday",
-};
-
 const liveNow = (slot: TimeslotResponse) => isSlotLiveNow(slot, now.value);
 
 // Counts + quorum for a chip, on the same rule the room card uses: a slot the
@@ -447,22 +427,10 @@ const slotDotColor = (
   return liveNow(slot) ? "green" : "amber";
 };
 
-const minutesUntilStart = (slot: TimeslotResponse) => {
-  const n = now.value;
-  return slot.start_time - (n.getHours() * 60 + n.getMinutes());
-};
-
-const nextLabel = (slot: TimeslotResponse): string => {
-  const n = now.value;
-  const diff = minutesUntilStart(slot);
-  if (slot.day === DAY_MAP[n.getDay()] && diff > -60)
-    return `Today ${slot.label}`;
-
-  const daysUntil = (DAY_MAP.indexOf(slot.day) - n.getDay() + 7) % 7 || 7;
-
-  if (daysUntil === 1) return `Tomorrow ${slot.label}`;
-  return `Next ${DAY_LABELS[slot.day]} ${slot.label}`;
-};
+// "Today 19:00" / "Tomorrow 19:00" / "Friday 19:00" / "Next Friday 19:00",
+// on the same wording every other view uses.
+const nextLabel = (slot: TimeslotResponse): string =>
+  `${dayDisplay(slot, now.value)} ${slot.label}`;
 
 const selectedIndex = ref(0);
 const isCreating = ref(false);
@@ -521,7 +489,7 @@ const isDirty = form.useStore((s) => s.isDirty);
 
 // On today's list, default to the slot that is live or starts next; otherwise the first one.
 const defaultSlotIndex = (list: TimeslotResponse[]) => {
-  if (debouncedWeekDay.value !== todayValue) return 0;
+  if (debouncedWeekDay.value !== todayValue.value) return 0;
   const nowMinutes = now.value.getHours() * 60 + now.value.getMinutes();
   let best = -1;
   list.forEach((slot, index) => {

@@ -7,6 +7,8 @@ build/
 **/build/
 coverage/
 **/coverage/
+.eslintcache
+**/.eslintcache
 
 .env
 .env.*
@@ -23,3 +25,9 @@ serviceAccountKey.json
 Thumbs.db
 .vscode/
 .idea/
+# playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+**/playwright/.auth/

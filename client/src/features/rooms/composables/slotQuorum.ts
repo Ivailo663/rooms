@@ -1,4 +1,8 @@
-import type { LiveSlotSummary, TimeslotResponse } from "@football/shared";
+import type {
+  EnabledDaySummary,
+  LiveSlotSummary,
+  TimeslotResponse,
+} from "@football/shared";
 
 export interface SlotPlayerInfo {
   count: number;
@@ -35,6 +39,17 @@ export const liveSlotPlayerInfo = (slot: LiveSlotSummary): SlotPlayerInfo => ({
   count: slot.players_count,
   max: slot.max_players,
   gathered: true,
+});
+
+// Same shape again for a slot on a later day, whose roster reaches the card as
+// a per-day summary rather than a full slot. Never live by definition — a slot
+// on another day cannot be running now — so the minimum is re-checked.
+export const enabledDayPlayerInfo = (
+  entry: EnabledDaySummary
+): SlotPlayerInfo => ({
+  count: entry.players_count,
+  max: entry.max_players,
+  gathered: hasGathered(entry.players_count, entry.min_players),
 });
 
 export const gatheredTitle = (live: boolean): string =>

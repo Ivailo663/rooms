@@ -1,17 +1,22 @@
 import type { TimeslotResponse } from "@football/shared";
+import { dayValueOf } from "@/constants";
 
-const DAY_MAP = ["su", "mo", "tu", "we", "th", "fr", "sa"];
 const SLOT_DURATION_MINUTES = 60;
 
-type SlotWindow = Pick<TimeslotResponse, "status" | "day" | "start_time">;
+// A weekday plus a start time is all the occurrence math needs, so this serves
+// the host's TimeslotResponse and the player's JoinedSlotSummary alike.
+export type SlotWindow = Pick<
+  TimeslotResponse,
+  "status" | "day" | "start_time"
+>;
 
 // True when the wall clock currently sits inside this slot's occurrence window
 // on its scheduled day. The server drives `status`, but that value can go stale
 // (e.g. the scheduler missed a transition while the process was down), so any
 // occurrence-scoped presentation is gated on the clock rather than trusting the
 // stored status indefinitely.
-const isWithinWindow = (slot: SlotWindow, now: Date): boolean => {
-  if (slot.day !== DAY_MAP[now.getDay()]) return false;
+export const isWithinWindow = (slot: SlotWindow, now: Date): boolean => {
+  if (slot.day !== dayValueOf(now)) return false;
   const minutesNow = now.getHours() * 60 + now.getMinutes();
   return (
     minutesNow >= slot.start_time &&

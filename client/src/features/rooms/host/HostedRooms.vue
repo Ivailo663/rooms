@@ -31,7 +31,7 @@
   <div v-else class="flex flex-col !gap-4">
     <RoomSettingsBar />
     <div class="grid grid-cols-1 !gap-4 lg:grid-cols-2 items-start">
-      <HRoomCard v-for="room in rooms" :key="room.id" :room="room" />
+      <HostedRoomCard v-for="room in rooms" :key="room.id" :room="room" />
     </div>
   </div>
 </template>
@@ -40,15 +40,16 @@
 import { onMounted, onBeforeUnmount } from "vue";
 import { Button } from "primevue";
 import { useQueryClient } from "@tanstack/vue-query";
-import HRoomCard from "./components/HRoomCard.vue";
-import RoomSettingsBar from "./components/RoomSettingsBar.vue";
-import { useGetHostedRooms } from "./composables/queries";
+import HostedRoomCard from "./HostedRoomCard.vue";
+import RoomSettingsBar from "./RoomSettingsBar.vue";
+import { useGetHostedRooms } from "../composables/queries";
 import { useCreateRoom } from "@/composables/useCreateRoom";
 import { useActiveDay } from "@/composables/useActiveDay";
 import { socket } from "@/socket";
 import type { TimeslotStatusChangedPayload } from "@football/shared";
 
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
+const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
 
 const createRoomVisible = useCreateRoom();
 const queryClient = useQueryClient();
@@ -62,11 +63,29 @@ const handleStatusChanged = ({ roomId }: TimeslotStatusChangedPayload) => {
   // slot failing deletes those pending requests. Refresh both feeds so the card
   // never shows a stale status or an already-cleared request.
   queryClient.invalidateQueries({ queryKey: ["timeslots", roomId] });
+  // Not covered by the line above: the enabled-days key puts its discriminator
+  // before the room id, so a ["timeslots", roomId] prefix never matches it.
+  queryClient.invalidateQueries({
+    queryKey: ["timeslots", "enabled-days", roomId],
+  });
   queryClient.invalidateQueries({ queryKey: ["hosted-rooms"] });
 };
 
-onMounted(() => socket.on(TIMESLOT_STATUS_CHANGED_EVENT, handleStatusChanged));
-onBeforeUnmount(() =>
-  socket.off(TIMESLOT_STATUS_CHANGED_EVENT, handleStatusChanged),
-);
+// Someone joined or left. The payload identifies only the slot, and a card's
+// player widget can be fed by any of three queries — today's slots, the
+// enabled-day summary for a later game, or the room's live slot in the hosted
+// summary — so refresh all three rather than guess which card moved.
+const handleMembershipChanged = () => {
+  queryClient.invalidateQueries({ queryKey: ["timeslots"] });
+  queryClient.invalidateQueries({ queryKey: ["hosted-rooms"] });
+};
+
+onMounted(() => {
+  socket.on(TIMESLOT_STATUS_CHANGED_EVENT, handleStatusChanged);
+  socket.on(TIMESLOT_MEMBERSHIP_CHANGED_EVENT, handleMembershipChanged);
+});
+onBeforeUnmount(() => {
+  socket.off(TIMESLOT_STATUS_CHANGED_EVENT, handleStatusChanged);
+  socket.off(TIMESLOT_MEMBERSHIP_CHANGED_EVENT, handleMembershipChanged);
+});
 </script>

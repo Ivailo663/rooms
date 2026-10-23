@@ -59,117 +59,18 @@
 
     <!-- Widget Grid -->
     <div class="grid grid-cols-2 !gap-2 !px-4 !pb-3">
-      <!-- Status Widget -->
-      <div
-        class="rounded-lg border !p-3"
-        :class="
-          roomStatus === 'live'
-            ? 'border-emerald-100 bg-emerald-50/50'
-            : roomStatus === 'redistributed'
-              ? 'border-violet-100 bg-violet-50/50'
-              : roomStatus === 'failed'
-                ? 'border-rose-100 bg-rose-50/50'
-                : roomStatus === 'scheduled'
-                  ? 'border-amber-100 bg-amber-50/50'
-                  : 'border-surface-100 bg-surface-50'
-        "
-      >
-        <StatusBadge :status="roomStatus" class="!mb-2">
-          <template v-if="roomStatus === 'live'" #adornment>
-            {{ elapsed }}'
-          </template>
-        </StatusBadge>
-
-        <div v-if="primaryLabel" class="flex items-baseline !gap-1.5">
-          <span class="text-lg font-bold text-surface-900">
-            {{ primaryLabel }}
-          </span>
-          <span
-            v-if="!room.liveSlot && nextSlotInfo?.countdown"
-            class="text-xs text-surface-400"
-          >
-            {{ nextSlotInfo.countdown }}
-          </span>
-        </div>
-
-        <p v-if="nextHint" class="!mt-1.5 text-[10px] text-surface-400">
-          {{ nextHint }}
-        </p>
-        <p
-          v-else-if="!primaryLabel"
-          class="text-sm font-medium text-surface-300"
-        >
-          No slots
-        </p>
-      </div>
-
-      <!-- Players Widget -->
-      <div
-        class="rounded-lg border !p-3 transition-colors"
-        :class="
-          hasQuorum
-            ? 'border-emerald-300 bg-emerald-50/60'
-            : 'border-surface-100 bg-surface-50'
-        "
-      >
-        <div class="flex items-center justify-between !mb-2">
-          <div class="flex items-center !gap-1.5">
-            <i
-              class="fa-solid fa-users"
-              :class="hasQuorum ? 'text-emerald-500' : 'text-surface-400'"
-              style="font-size: 0.55rem"
-            />
-            <span
-              class="text-[10px] font-semibold uppercase tracking-widest"
-              :class="hasQuorum ? 'text-emerald-600' : 'text-surface-400'"
-            >
-              Players
-            </span>
-          </div>
-          <SlotPlayerCount
-            v-if="activePlayerInfo"
-            :count="activePlayerInfo.count"
-            :max="activePlayerInfo.max"
-            :gathered="hasQuorum"
-            :title="quorumTitle"
-          />
-        </div>
-
-        <template v-if="activePlayerInfo">
-          <div
-            class="!mb-2 h-1.5 w-full overflow-hidden rounded-full transition-colors"
-            :class="hasQuorum ? 'bg-emerald-100' : 'bg-surface-200'"
-          >
-            <div
-              class="h-full rounded-full transition-all"
-              :class="capacityColor"
-              :style="{ width: `${playerPercent}%` }"
-            />
-          </div>
-          <div v-if="activePlayerInfo.count" class="flex items-center !gap-1.5">
-            <div class="flex -space-x-1">
-              <div
-                v-for="n in Math.min(activePlayerInfo.count, 3)"
-                :key="n"
-                class="flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-primary-100 text-primary-600"
-              >
-                <i class="fa-solid fa-user" style="font-size: 0.35rem" />
-              </div>
-              <div
-                v-if="activePlayerInfo.count > 3"
-                class="flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-surface-200 text-[8px] font-bold text-surface-500"
-              >
-                +{{ activePlayerInfo.count - 3 }}
-              </div>
-            </div>
-          </div>
-          <p v-else class="text-xs text-surface-300">No players yet</p>
-        </template>
-
-        <template v-else>
-          <p class="text-sm font-medium text-surface-300">&mdash;</p>
-        </template>
-      </div>
+      <StatusWidget
+        :status="roomStatus"
+        :label="primaryLabel"
+        :hint="nextHint"
+        :elapsed="elapsed"
+        :countdown="nextSlotInfo?.countdown"
+      />
+      <PlayersWidget
+        :info="activePlayerInfo"
+        :players="activeRoster"
+        :live="!!room.liveSlot"
+      />
     </div>
 
     <!-- Failed / under-filled notice -->
@@ -220,13 +121,19 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import type { HostedRoomResponse } from "@football/shared";
+import type { EnabledDaySummary, HostedRoomResponse } from "@football/shared";
 import ManageSlotsDrawer from "./ManageSlotsDrawer.vue";
-import SlotChat from "./SlotChat.vue";
-import RedistributionNotice from "./RedistributionNotice.vue";
-import SlotFailedNotice from "./SlotFailedNotice.vue";
-import SlotPlayerCount from "./SlotPlayerCount.vue";
-import StatusBadge from "@/components/StatusBadge.vue";
+import PlayersWidget from "./widgets/PlayersWidget.vue";
+import StatusWidget from "./widgets/StatusWidget.vue";
+import SlotChat from "../components/SlotChat.vue";
+import RedistributionNotice from "../components/RedistributionNotice.vue";
+import SlotFailedNotice from "../components/SlotFailedNotice.vue";
+import {
+  DAYS_PER_WEEK,
+  dayValueOf,
+  daysUntilDay,
+  relativeDayLabel,
+} from "@/constants";
 import { useNow } from "../composables/useNow";
 import { isSlotFailedNow } from "../composables/isSlotLiveNow";
 import { elapsedMinutes } from "../composables/gameTime";
@@ -235,19 +142,8 @@ import { useRedistributionNotices } from "../composables/useRedistributionNotice
 import {
   slotPlayerInfo,
   liveSlotPlayerInfo,
-  gatheredTitle,
+  enabledDayPlayerInfo,
 } from "../composables/slotQuorum";
-
-const DAY_ORDER = ["mo", "tu", "we", "th", "fr", "sa", "su"];
-const DAY_LABELS: Record<string, string> = {
-  mo: "Monday",
-  tu: "Tuesday",
-  we: "Wednesday",
-  th: "Thursday",
-  fr: "Friday",
-  sa: "Saturday",
-  su: "Sunday",
-};
 
 const props = defineProps<{ room: HostedRoomResponse }>();
 
@@ -255,7 +151,11 @@ const chatOpen = ref(false);
 const drawerVisible = ref(false);
 const now = useNow();
 
-const todayDay = DAY_ORDER[(new Date().getDay() + 6) % 7]!;
+// Derived from the ticking clock, not a setup-time snapshot: a card left open
+// across midnight would otherwise keep querying the day the tab was opened on
+// and label those slots "Today". Driving the query key off this also makes the
+// slot list refetch itself on the rollover.
+const todayDay = computed(() => dayValueOf(now.value));
 
 const { data: todaySlots } = useGetTimeslots({
   room_id: props.room.id,
@@ -270,9 +170,14 @@ const nextSlot = computed(() => {
   // A slot that hasn't started yet is upcoming by definition — any
   // live/failed/ended on it is a stale status from a past occurrence the
   // scheduler didn't reset, so we gate on the clock, not the stored status.
+  // The day is re-checked rather than assumed from the query: anything else
+  // here would be rendered as "Today", the way isSlotLiveNow guards too.
   return (
     todaySlots.value
-      .filter((s) => s.enabled && s.start_time > currentMinutes)
+      .filter(
+        (s) =>
+          s.enabled && s.day === todayDay.value && s.start_time > currentMinutes
+      )
       .sort((a, b) => a.start_time - b.start_time)[0] ?? null
   );
 });
@@ -289,42 +194,41 @@ const failedSlot = computed(() => {
   );
 });
 
+// The soonest day that has slots at all, used when today has nothing left.
+// Carries the roster of that day's first slot so the player widget has
+// something to show for a game that isn't today.
 const nextEnabledDay = computed(() => {
   if (nextSlot.value) return null;
   if (!enabledDays.value?.length) return null;
-  const todayIndex = DAY_ORDER.indexOf(todayDay);
 
-  let best: { day: string; label: string; offset: number } | null = null;
-  let bestOffset = Infinity;
+  let best: (EnabledDaySummary & { offset: number }) | null = null;
   for (const entry of enabledDays.value) {
-    const idx = DAY_ORDER.indexOf(entry.day);
-    if (idx === -1) continue;
-    let offset = (idx - todayIndex + 7) % 7;
-    if (offset === 0) offset = 7;
-    if (offset < bestOffset) {
-      bestOffset = offset;
-      best = { ...entry, offset };
-    }
+    let offset = daysUntilDay(entry.day, now.value);
+    if (offset === -1) continue;
+    // Today is already spent — nextSlot was null — so today's own weekday
+    // means this time next week, not a few hours ago.
+    if (offset === 0) offset = DAYS_PER_WEEK;
+    if (offset < (best?.offset ?? Infinity)) best = { ...entry, offset };
   }
   return best;
 });
 
 // The next upcoming slot, resolved once as { when, label, countdown }.
 // `when` is relative ("Today"/"Tomorrow"/"Next Monday"); `countdown` is
-// only set for same-day slots. offset === 1 covers tomorrow for any weekday,
-// so Sunday → Monday reads "Tomorrow" without a special case.
+// only set for same-day slots.
 const nextSlotInfo = computed(() => {
   if (nextSlot.value) {
     return {
-      when: "Today",
+      when: relativeDayLabel(todayDay.value, 0, now.value),
       label: nextSlot.value.label,
       countdown: nextSlotTimeLabel.value,
     };
   }
+
   if (nextEnabledDay.value) {
     const { day, label, offset } = nextEnabledDay.value;
     return {
-      when: offset === 1 ? "Tomorrow" : `Next ${DAY_LABELS[day]}`,
+      when: relativeDayLabel(day, offset, now.value),
       label,
       countdown: "",
     };
@@ -389,29 +293,20 @@ const nextSlotTimeLabel = computed(() => {
   return rem ? `in ${hrs}h${rem}m` : `in ${hrs}h`;
 });
 
+// Follows whichever slot the status widget is describing, so the counts always
+// belong to the game named above them — today's next slot, or the first slot
+// of the next day that has one.
 const activePlayerInfo = computed(() => {
   if (props.room.liveSlot) return liveSlotPlayerInfo(props.room.liveSlot);
   if (nextSlot.value) return slotPlayerInfo(nextSlot.value);
+  if (nextEnabledDay.value) return enabledDayPlayerInfo(nextEnabledDay.value);
   return null;
 });
 
-const hasQuorum = computed(() => activePlayerInfo.value?.gathered ?? false);
-
-const quorumTitle = computed(() => gatheredTitle(!!props.room.liveSlot));
-
-const playerPercent = computed(() => {
-  if (!activePlayerInfo.value) return 0;
-  return Math.min(
-    100,
-    (activePlayerInfo.value.count / activePlayerInfo.value.max) * 100
-  );
-});
-
-const capacityColor = computed(() => {
-  if (!activePlayerInfo.value) return "bg-surface-300";
-  const ratio = activePlayerInfo.value.count / activePlayerInfo.value.max;
-  if (ratio >= 1) return "bg-emerald-500";
-  if (ratio >= 0.6) return "bg-amber-400";
-  return "bg-primary-400";
-});
+// Who those counts are, when the slot above them is one we hold the full roster
+// for. The live slot and a later day both reach the card as summaries carrying
+// a count only, so their avatars stay unnamed until that changes.
+const activeRoster = computed(() =>
+  !props.room.liveSlot && nextSlot.value ? nextSlot.value.players : undefined
+);
 </script>
