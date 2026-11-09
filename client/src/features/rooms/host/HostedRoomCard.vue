@@ -100,14 +100,14 @@
       <SlotChat />
     </div>
 
-    <!-- Manage Slots Button -->
+    <!-- Manage Button -->
     <div class="!mt-auto border-t border-surface-100">
       <button
         class="flex w-full cursor-pointer items-center justify-center !gap-2 border-none bg-transparent !py-2.5 text-[11px] font-semibold text-primary-500 transition-colors hover:bg-surface-50"
         @click="drawerVisible = true"
       >
         <i class="fa-solid fa-sliders" style="font-size: 0.5rem" />
-        Manage slots
+        Manage
       </button>
     </div>
 

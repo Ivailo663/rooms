@@ -4,7 +4,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "dev": "nodemon --watch . --ext ts,json --exec tsx app.ts",
     "start": "tsx app.ts",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
@@ -27,7 +27,8 @@
   },
   "devDependencies": {
     "prisma": "^7.8.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
   },
   "optionalDependencies": {
     "bufferutil": "^4.1.0",

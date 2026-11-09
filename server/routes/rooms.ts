@@ -9,9 +9,7 @@ import type {
 } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger } from "../utils/validation.js";
-
-// Mirrors the join route's fallback so the client computes the same lock window.
-const DEFAULT_LATE_JOIN_CUTOFF = 15;
+import { resolveCutoff } from "../slotRules.js";
 
 const getCurrentAccount = async (email: string) => {
   const account = await prisma.account.findUnique({
@@ -198,11 +196,7 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
       price: room.price?.toString() ?? null,
       address: room.address,
       deniedMessage: settings.deniedMessage?.trim() || null,
-      lateJoinCutoff:
-        typeof settings.lateJoinCutoff === "number" &&
-        settings.lateJoinCutoff > 0
-          ? settings.lateJoinCutoff
-          : DEFAULT_LATE_JOIN_CUTOFF,
+      lateJoinCutoff: resolveCutoff(settings),
       allowJoinOnLive: settings.allowJoinOnLive ?? false,
       timeslots: room.timeslots.map((timeslot) => {
         const players = timeslot.timeslot_players.map(({ accounts }) => ({

@@ -18,52 +18,20 @@
         v-if="!isHostedRooms"
         class="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white/70 backdrop-blur-xl border border-surface-200/40 shadow-sm transition-all focus-within:shadow-md focus-within:border-primary-300/50"
       >
-        <!-- Mobile-only toggle for the search + filters panel -->
-        <Button
-          type="button"
-          size="small"
-          variant="text"
-          severity="secondary"
-          rounded
-          :aria-label="panelOpen ? 'Hide search and filters' : 'Search rooms'"
-          :aria-expanded="panelOpen"
-          aria-controls="rooms-search-panel"
-          class="!absolute !right-1.5 !top-1.5 !z-10 !h-8 !w-8 !p-0 sm:!hidden"
-          @click="togglePanel"
-        >
-          <i
-            :class="
-              panelOpen
-                ? 'fa-solid fa-xmark'
-                : 'fa-solid fa-magnifying-glass text-surface-400'
-            "
-            style="font-size: 0.8rem"
-          />
-          <span
-            v-if="!panelOpen && hasActiveQuery"
-            class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary-500"
-          />
-        </Button>
-
         <!-- Search row -->
-        <div
-          id="rooms-search-panel"
-          class="items-center"
-          :class="panelOpen ? 'flex' : 'hidden sm:flex'"
-        >
+        <div class="flex items-center">
           <i
             class="fa-solid fa-magnifying-glass !ml-4 text-surface-300"
             style="font-size: 0.75rem"
           />
           <InputText
-            ref="searchInput"
             :model-value="search"
             placeholder="Search rooms..."
             class="flex-1 !bg-transparent !border-none !shadow-none !outline-none !py-3 !px-3 !text-sm !text-surface-700 placeholder:!text-surface-300"
             @update:model-value="emit('update:search', $event ?? '')"
           />
           <div
-            class="flex items-center !gap-1.5 !mr-11 sm:!mr-3 rounded-lg bg-primary-50/60 !px-2 !py-1"
+            class="flex items-center !gap-1.5 !mr-3 rounded-lg bg-primary-50/60 !px-2 !py-1"
           >
             <i
               class="fa-solid fa-wand-magic-sparkles text-primary-400"
@@ -74,16 +42,9 @@
         </div>
 
         <!-- Day selector row -->
-        <div
-          :class="`flex flex-wrap justify-center ${panelOpen ? '!mb-2' : undefined} md:!mb-0 px-2`"
-        >
+        <div class="flex flex-wrap justify-center !mb-2 md:!mb-0 px-2">
           <div
-            class="flex items-center justify-center !gap-0.5 border-surface-100/50 !py-1.5"
-            :class="
-              panelOpen
-                ? 'border-t !px-1 sm:!px-3'
-                : 'border-t-0 sm:border-t !pl-1 sm:!px-3'
-            "
+            class="flex items-center justify-center !gap-0.5 border-t border-surface-100/50 !py-1.5 !px-1 sm:!px-3"
           >
             <Button
               v-for="day in DAYS"
@@ -107,11 +68,7 @@
           </div>
 
           <!-- Quick filters -->
-          <div
-            v-if="!isHostedRooms"
-            class="flex-wrap items-center justify-center !gap-2"
-            :class="panelOpen ? 'flex' : 'hidden sm:flex'"
-          >
+          <div class="flex flex-wrap items-center justify-center !gap-2">
             <Button
               v-for="filter in quickFilters"
               :key="filter.value"
@@ -141,13 +98,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef } from "vue";
+import { computed, ref } from "vue";
 import { Button, InputText } from "primevue";
 import { useRoomView } from "@/composables/useRoomView";
 import { useActiveDay } from "@/composables/useActiveDay";
 import { RoomView, DAYS, getTodayValue } from "@/constants";
 
-const props = defineProps<{ search: string }>();
+defineProps<{ search: string }>();
 
 const emit = defineEmits<{
   "update:search": [value: string];
@@ -170,26 +127,6 @@ const todayValue = getTodayValue();
 
 const activeFilters = ref<string[]>([]);
 const activeDay = useActiveDay();
-
-// Below `sm` the search field and quick filters collapse behind the magnifier
-// button so the week strip is the only thing on screen. From `sm` up both rows
-// are always laid out and this flag is ignored.
-const panelOpen = ref(false);
-const searchInput = useTemplateRef<{ $el: HTMLInputElement }>("searchInput");
-
-// A collapsed panel can still be filtering the list, so the button carries a
-// dot whenever there is something hidden behind it.
-const hasActiveQuery = computed(
-  () => props.search.trim().length > 0 || activeFilters.value.length > 0
-);
-
-const togglePanel = async () => {
-  panelOpen.value = !panelOpen.value;
-  if (!panelOpen.value) return;
-
-  await nextTick();
-  searchInput.value?.$el.focus();
-};
 
 const toggleFilter = (value: string) => {
   activeFilters.value = activeFilters.value.includes(value)

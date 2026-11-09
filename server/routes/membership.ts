@@ -20,54 +20,16 @@ import {
   getUpdatedPlayers,
   redistributeSlot,
 } from "../redistribution.js";
+import {
+  SLOT_DURATION_MINUTES,
+  isRosterLocked,
+  resolveCutoff,
+} from "../slotRules.js";
 
 export const JOIN_REQUEST_CREATED_EVENT = "join-request:created";
 export const JOIN_REQUEST_RESOLVED_EVENT = "join-request:resolved";
 export const JOIN_REQUEST_VALIDITY_CHANGED_EVENT =
   "join-request:validity-changed";
-
-// Kept in sync with the scheduler's fallback so an untenanted room (or a
-// tenant with no setting) locks and redistributes on the same 15-minute lead.
-const DEFAULT_LATE_JOIN_CUTOFF = 15;
-const SLOT_DURATION_MINUTES = 60;
-const DAY_INDEX: Record<string, number> = {
-  su: 0,
-  mo: 1,
-  tu: 2,
-  we: 3,
-  th: 4,
-  fr: 5,
-  sa: 6,
-};
-
-const resolveCutoff = (settings: Partial<TenantSettings> | null): number => {
-  const value = settings?.lateJoinCutoff;
-  return typeof value === "number" && value > 0
-    ? value
-    : DEFAULT_LATE_JOIN_CUTOFF;
-};
-
-// The roster freezes from `cutoff` minutes before start until the end of the
-// occurrence window — the span over which the scheduler runs its verdict and
-// the game plays out. Joins into a still-"scheduled" slot are rejected here,
-// and so are departures: the headcount the cutoff verdict is about to judge
-// (and the one the host is staffing for) must not move under it.
-//
-// Deliberately clock-derived rather than status-derived: a stale status left
-// behind by a missed transition would otherwise lock a roster forever.
-const isRosterLocked = (
-  day: string,
-  startTime: number,
-  cutoff: number,
-  now: Date
-): boolean => {
-  if (now.getDay() !== DAY_INDEX[day]) return false;
-  const minutesNow = now.getHours() * 60 + now.getMinutes();
-  return (
-    minutesNow >= startTime - cutoff &&
-    minutesNow < startTime + SLOT_DURATION_MINUTES
-  );
-};
 
 // One seat per hour. Every occurrence window is SLOT_DURATION_MINUTES long, so
 // any confirmed membership on the same day whose window overlaps this one would

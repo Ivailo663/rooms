@@ -6,13 +6,7 @@ import { TIMESLOT_QUEUE_NAME } from "../queues/timeslotQueue.js";
 import { GO_LIVE, GO_ENDED, GO_REDISTRIBUTE, emit } from "../scheduler.js";
 import { emitMembershipChanged, redistributeSlot } from "../redistribution.js";
 import type { TenantSettings } from "../../packages/shared/index.js";
-
-// A slot may run only with a real game: at least one player, and its minimum
-// met when one is set. Enforced at BOTH the cutoff verdict and go-live, so a
-// slot never kicks off empty even if the cutoff job never fired (server down
-// at the cutoff minute, or the slot was launched after the cutoff had passed).
-const meetsQuorum = (playerCount: number, min: number | null): boolean =>
-  playerCount > 0 && (min === null || playerCount >= min);
+import { cutoffVerdict, goLiveVerdict } from "../slotRules.js";
 
 // Mark a slot as failed for this occurrence. Pending join requests are dropped
 // with it — the host can't act on them once the game is off. Denied rows stay:
@@ -47,8 +41,8 @@ export const createTimeslotWorker = (io: Server) => {
         if (slot.status !== "scheduled") return;
 
         // Re-check quorum here rather than trusting the cutoff verdict ran — it
-        // may not have (see meetsQuorum note). An under-filled slot fails
-        // instead of kicking off empty.
+        // may not have (see meetsQuorum in slotRules). An under-filled slot
+        // fails instead of kicking off empty.
         const detail = await prisma.roomTimeslot.findUnique({
           where: { id: slot.id },
           select: {
@@ -56,9 +50,13 @@ export const createTimeslotWorker = (io: Server) => {
             _count: { select: { timeslot_players: true } },
           },
         });
-        const playerCount = detail?._count.timeslot_players ?? 0;
+        const verdict = goLiveVerdict(
+          slot.status,
+          detail?._count.timeslot_players ?? 0,
+          detail?.min_players ?? null
+        );
 
-        if (!meetsQuorum(playerCount, detail?.min_players ?? null)) {
+        if (verdict === "failed") {
           await markFailed(slot.id, slot.roomId);
           return;
         }
@@ -116,21 +114,22 @@ export const createTimeslotWorker = (io: Server) => {
         });
         if (!detail) return;
 
-        const playerCount = detail._count.timeslot_players;
-        const min = detail.min_players;
+        const settings = detail.room?.tenant?.settings as TenantSettings | null;
+        const verdict = cutoffVerdict(
+          slot.status,
+          detail._count.timeslot_players,
+          detail.min_players,
+          Boolean(settings?.autoRedistribute)
+        );
 
         // A healthy slot (quorum met) is left alone to go live.
-        if (meetsQuorum(playerCount, min)) return;
+        if (verdict === null || verdict === "keep") return;
 
         // Try to rescue the group into sibling slots first; only a slot that
         // can't be evacuated (no room, or redistribution disabled) fails.
-        if (playerCount > 0) {
-          const settings = detail.room?.tenant
-            ?.settings as TenantSettings | null;
-          if (settings?.autoRedistribute) {
-            const outcome = await redistributeSlot(slot.id, io);
-            if (outcome === "redistributed") return;
-          }
+        if (verdict === "redistribute") {
+          const outcome = await redistributeSlot(slot.id, io);
+          if (outcome === "redistributed") return;
         }
 
         await markFailed(slot.id, slot.roomId);

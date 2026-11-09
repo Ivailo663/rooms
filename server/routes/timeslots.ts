@@ -11,13 +11,12 @@ import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger } from "../utils/validation.js";
 import { Prisma } from "@prisma/client";
 import { syncSlot } from "../scheduler.js";
+import { slotsClash } from "../slotRules.js";
 
 const labelToStartTime = (label: string): number => {
   const [h, m] = label.split(":").map(Number);
   return (h ?? 0) * 60 + (m ?? 0);
 };
-
-const SLOT_DURATION_MINUTES = 60;
 
 type SlotWithRequests = {
   id: number;
@@ -69,9 +68,7 @@ const findInvalidRequests = async (
         (seat) =>
           seat.accountId === request.accountId &&
           seat.timeslotId !== slot.id &&
-          seat.room_timeslots.day === slot.day &&
-          Math.abs(seat.room_timeslots.start_time - slot.start_time) <
-            SLOT_DURATION_MINUTES
+          slotsClash(seat.room_timeslots, slot)
       );
 
       if (clashes) {

@@ -2,25 +2,15 @@ import type { Server } from "socket.io";
 import type { SlotStatus } from "@prisma/client";
 import prisma from "./prisma.js";
 import { timeslotQueue } from "./queues/timeslotQueue.js";
-import type {
-  TenantSettings,
-  TimeslotStatusChangedPayload,
-} from "../packages/shared/index.js";
-
-// Fallback roster-lock / redistribution lead time when a tenant has no
-// setting (or an untenanted room). Kept in sync with the client default.
-const DEFAULT_LATE_JOIN_CUTOFF = 15;
-
-const resolveCutoff = (settings: unknown): number => {
-  const value = (settings as Partial<TenantSettings> | null)?.lateJoinCutoff;
-  return typeof value === "number" && value > 0
-    ? value
-    : DEFAULT_LATE_JOIN_CUTOFF;
-};
+import type { TimeslotStatusChangedPayload } from "../packages/shared/index.js";
+import {
+  SLOT_DURATION_MINUTES,
+  isInsideWindow,
+  resolveCutoff,
+  toCron,
+} from "./slotRules.js";
 
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
-const SLOT_DURATION_MS = 60 * 60 * 1000;
-const SLOT_DURATION_MINUTES = SLOT_DURATION_MS / (60 * 1000);
 // How often to re-check every slot's status against the wall clock. Delayed
 // BullMQ jobs handle the exact transitions while the process is alive, but a
 // slot can be orphaned in "live" if the server is down (or Redis loses the
@@ -30,16 +20,6 @@ const RECONCILE_INTERVAL_MS = 60 * 1000;
 export const GO_LIVE = "go-live";
 export const GO_ENDED = "go-ended";
 export const GO_REDISTRIBUTE = "go-redistribute";
-
-const DAY_INDEX: Record<string, number> = {
-  su: 0,
-  mo: 1,
-  tu: 2,
-  we: 3,
-  th: 4,
-  fr: 5,
-  sa: 6,
-};
 
 type SlotInfo = {
   id: number;
@@ -59,26 +39,6 @@ export const emit = (
     roomId,
     status,
   } satisfies TimeslotStatusChangedPayload);
-};
-
-export const isInsideWindow = (day: string, startMinutes: number): boolean => {
-  const now = new Date();
-  if (now.getDay() !== DAY_INDEX[day]) return false;
-  const minutesNow = now.getHours() * 60 + now.getMinutes();
-  return (
-    minutesNow >= startMinutes &&
-    minutesNow < startMinutes + SLOT_DURATION_MINUTES
-  );
-};
-
-// Converts a (day, minutes-from-midnight) pair into a "minute hour * * dow"
-// cron pattern. minutesFromMidnight may exceed 1440 (e.g. start_time + 60 for
-// a slot starting at 23:00+), in which case the day-of-week rolls over too.
-const toCron = (day: string, minutesFromMidnight: number): string => {
-  const wrapped = ((minutesFromMidnight % 1440) + 1440) % 1440;
-  const dayOffset = Math.floor(minutesFromMidnight / 1440);
-  const dow = (DAY_INDEX[day] + dayOffset + 7) % 7;
-  return `${wrapped % 60} ${Math.floor(wrapped / 60)} * * ${dow}`;
 };
 
 const liveSchedulerId = (slotId: number) => `slot-${slotId}-live`;
@@ -114,7 +74,7 @@ const removeSlotJobs = async (slotId: number) => {
 // stuck "live" past the end of the window, or should already be "live" but
 // isn't yet, by enqueuing an immediate one-off job.
 const catchUp = async (slot: SlotInfo & { status: SlotStatus }) => {
-  const inWindow = isInsideWindow(slot.day, slot.start_time);
+  const inWindow = isInsideWindow(slot.day, slot.start_time, new Date());
 
   if (slot.status === "live" && !inWindow) {
     await timeslotQueue.add(GO_ENDED, { slotId: slot.id });
