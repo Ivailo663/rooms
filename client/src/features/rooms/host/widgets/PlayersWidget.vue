@@ -52,10 +52,11 @@
               player ? 'cursor-pointer text-[8px] font-bold outline-none' : ''
             "
             :tabindex="player ? 0 : undefined"
-            @mouseenter="player && openDetails(player, $event)"
+            @mouseenter="player && show(player, $event)"
             @mouseleave="player && scheduleClose()"
-            @focus="player && openDetails(player, $event)"
-            @blur="player && closeDetails()"
+            @focus="player && show(player, $event)"
+            @blur="player && close()"
+            @click="player && show(player, $event)"
           >
             <span v-if="player">{{ initialOf(player) }}</span>
             <i v-else class="fa-solid fa-user" style="font-size: 0.35rem" />
@@ -74,17 +75,17 @@
     <p v-else class="text-sm font-medium text-surface-300">&mdash;</p>
 
     <PlayerDetailsCard
-      v-if="hovered"
-      :name="hovered.player.name"
-      :anchor="hovered.anchor"
+      v-if="open"
+      :name="open.player.name"
+      :anchor="open.anchor"
       @hold="cancelClose"
-      @close="closeDetails"
+      @close="close"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed } from "vue";
 import type { PlayerSummary } from "@football/shared";
 import SlotPlayerCount from "../../components/SlotPlayerCount.vue";
 import PlayerDetailsCard from "../../components/PlayerDetailsCard.vue";
@@ -92,6 +93,7 @@ import {
   gatheredTitle,
   type SlotPlayerInfo,
 } from "../../composables/slotQuorum";
+import { usePlayerDetails } from "../../composables/usePlayerDetails";
 
 const props = withDefaults(
   defineProps<{
@@ -112,10 +114,6 @@ const props = withDefaults(
 // Avatars drawn before the remainder collapses into a "+N" bubble.
 const AVATAR_LIMIT = 3;
 
-// Delay before a card closes, so moving the pointer across the gap between an
-// avatar and the card below it doesn't dismiss what you were reaching for.
-const CLOSE_DELAY = 120;
-
 // One entry per drawn avatar: the player it stands for, or null when the
 // roster is unknown and all we have is a count.
 const avatars = computed<(PlayerSummary | null)[]>(() => {
@@ -126,35 +124,7 @@ const avatars = computed<(PlayerSummary | null)[]>(() => {
 const initialOf = (player: PlayerSummary) =>
   player.name.trim()[0]?.toUpperCase() ?? "?";
 
-const hovered = ref<{ player: PlayerSummary; anchor: HTMLElement } | null>(
-  null
-);
-let closeTimer: ReturnType<typeof setTimeout> | undefined;
-
-const cancelClose = () => {
-  clearTimeout(closeTimer);
-  closeTimer = undefined;
-};
-
-const closeDetails = () => {
-  cancelClose();
-  hovered.value = null;
-};
-
-const scheduleClose = () => {
-  cancelClose();
-  closeTimer = setTimeout(closeDetails, CLOSE_DELAY);
-};
-
-const openDetails = (player: PlayerSummary, event: Event) => {
-  cancelClose();
-  hovered.value = {
-    player,
-    anchor: event.currentTarget as HTMLElement,
-  };
-};
-
-onBeforeUnmount(cancelClose);
+const { open, show, scheduleClose, cancelClose, close } = usePlayerDetails();
 
 const hasQuorum = computed(() => props.info?.gathered ?? false);
 

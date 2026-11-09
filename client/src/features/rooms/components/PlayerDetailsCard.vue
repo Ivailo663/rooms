@@ -4,6 +4,7 @@
   <Teleport to="body">
     <div
       ref="cardEl"
+      data-player-details-card
       class="fixed z-50 w-56 rounded-2xl border border-surface-200 bg-white !p-4 shadow-xl transition-opacity"
       :style="style"
       @mouseenter="emit('hold')"

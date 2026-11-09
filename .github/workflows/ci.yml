@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  specs-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Unit tests import @prisma/client types, so the client must be generated.
+      - run: npm run prisma:generate -w server
+      - run: npm run spec:check
+      - run: npm test
+      # Type-checks and e2e are left out on purpose: both type-checks are
+      # already red on main, and e2e needs Supabase, Redis and Firebase creds.

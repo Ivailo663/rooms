@@ -1,23 +1,40 @@
 <template>
-  <div
-    class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-white transition-shadow"
-    :class="
-      hasJoinedSlot
-        ? 'room-card--joined border-emerald-200'
-        : 'border-surface-200/70'
-    "
-  >
-    <!-- Soft wash bleeding down from the top edge — the card's only mood
-         lighting, tinted emerald once the user holds a seat here. -->
-    <div
-      class="pointer-events-none absolute inset-x-0 top-0 h-40"
-      :class="hasJoinedSlot ? 'card-glow--joined' : 'card-glow'"
-    />
+  <!-- Unclipped shell so the status pill can straddle the card's top edge;
+       the card itself keeps overflow-hidden for its rounded glow. -->
+  <div class="relative h-full w-full">
+    <span
+      v-if="hasJoinedSlot"
+      class="absolute left-1/2 top-0 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center !gap-1 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 !px-2 !py-0.5 text-[0.6rem] font-bold uppercase leading-none tracking-widest text-emerald-600"
+    >
+      <i class="fa-solid fa-circle-check" style="font-size: 0.5rem" />
+      You're in
+    </span>
+    <span
+      v-else-if="hasPendingSlot"
+      class="absolute left-1/2 top-0 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center !gap-1 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 !px-2 !py-0.5 text-[0.6rem] font-bold uppercase leading-none tracking-widest text-amber-600"
+    >
+      <i class="fa-solid fa-user-clock" style="font-size: 0.5rem" />
+      Requested
+    </span>
 
-    <div class="relative flex min-h-0 flex-1 flex-col !p-6 sm:!p-7">
-      <!-- Identity -->
-      <div class="flex shrink-0 items-start justify-between !gap-3">
-        <div class="min-w-0">
+    <div
+      class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-white transition-shadow"
+      :class="
+        hasJoinedSlot
+          ? 'room-card--joined border-emerald-200'
+          : 'border-surface-200/70'
+      "
+    >
+      <!-- Soft wash bleeding down from the top edge — the card's only mood
+         lighting, tinted emerald once the user holds a seat here. -->
+      <div
+        class="pointer-events-none absolute inset-x-0 top-0 h-40"
+        :class="hasJoinedSlot ? 'card-glow--joined' : 'card-glow'"
+      />
+
+      <div class="relative flex min-h-0 flex-1 flex-col !p-6 sm:!p-7">
+        <!-- Identity -->
+        <div class="flex shrink-0 flex-col !mb-5">
           <h2
             class="truncate text-2xl font-bold leading-tight tracking-tight text-surface-900"
           >
@@ -31,223 +48,152 @@
               {{ room.address || "Location not set" }}
             </span>
           </span>
-        </div>
 
-        <span
-          v-if="hasJoinedSlot"
-          class="inline-flex shrink-0 items-center !gap-2 rounded-full bg-emerald-50 !px-3 !py-1.5 text-xs font-bold uppercase tracking-widest text-emerald-600"
-        >
-          <i class="fa-solid fa-circle-check" style="font-size: 0.6rem" />
-          You're in
-        </span>
-        <span
-          v-else-if="hasPendingSlot"
-          class="inline-flex shrink-0 items-center !gap-2 rounded-full bg-amber-50 !px-3 !py-1.5 text-xs font-bold uppercase tracking-widest text-amber-600"
-        >
-          <i class="fa-solid fa-user-clock" style="font-size: 0.6rem" />
-          Requested
-        </span>
-      </div>
-
-      <template v-if="hasSlots">
-        <!-- Features + price: everything the room offers, on one scannable row -->
-        <div
-          v-if="features.length || selectedSlot?.price"
-          class="!mt-4 flex shrink-0 flex-wrap items-center !gap-2"
-        >
-          <span
-            v-for="feature in features"
-            :key="feature"
-            class="inline-flex items-center !gap-1.5 rounded-full bg-surface-100 !px-3 !py-1.5 text-xs font-medium text-surface-600"
+          <p
+            v-if="room.description"
+            class="!mb-0 !mt-3 text-sm text-surface-600 line-clamp-2"
           >
-            <i
-              :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
-              style="font-size: 0.5rem"
-            />
-            {{ feature }}
-          </span>
-          <span
-            v-if="selectedSlot?.price"
-            class="!ml-auto inline-flex items-center rounded-full bg-emerald-50 !px-3 !py-1.5 text-xs font-bold text-emerald-700"
-          >
-            {{ selectedSlot.price }}€
-          </span>
-        </div>
+            {{ room.description }}
+          </p>
 
-        <!-- Slot picker -->
-        <div
-          class="!mt-5 shrink-0 rounded-2xl border border-surface-100 bg-surface-50/60 !p-4"
-        >
-          <SlotCarousel
-            :timeslots="room.timeslots"
-            :markers="slotMarkers"
-            :initial-index="initialSlotIndex"
-            @select="handleSlotSelect"
-            @teams="showDetail = true"
-          />
-        </div>
-
-        <p
-          v-if="selectedSlot?.message"
-          class="!mt-3 shrink-0 text-sm italic text-surface-400 line-clamp-2"
-        >
-          "{{ selectedSlot.message }}"
-        </p>
-
-        <!-- Roster: takes the slack so the card fills its height with content
-             rather than empty gradient -->
-        <Transition name="card-flip" mode="out-in">
           <div
-            v-if="!showDetail"
-            key="roster"
-            class="!mt-4 flex min-h-0 flex-1 flex-col rounded-2xl border border-surface-100 bg-surface-50/60 !p-4"
+            v-if="features.length || selectedSlot?.price"
+            class="!mt-3 flex flex-wrap items-center !gap-2"
           >
-            <div class="flex shrink-0 items-center justify-between !mb-2.5">
-              <span class="text-sm font-medium text-surface-500">Roster</span>
-              <span v-if="spotsLeft !== null" class="text-xs text-surface-400">
-                {{ spotsLeft === 0 ? "Full squad" : `${spotsLeft} spots left` }}
-              </span>
-            </div>
-
-            <div
-              class="!mb-3 h-1.5 w-full shrink-0 overflow-hidden rounded-full bg-surface-100"
+            <span
+              v-for="feature in features"
+              :key="feature"
+              class="inline-flex items-center !gap-1.5 rounded-full bg-surface-100 !px-3 !py-1.5 text-xs font-medium text-surface-600"
             >
-              <div
-                class="h-full rounded-full transition-all"
-                :class="spotsLeft === 0 ? 'bg-surface-300' : 'bg-emerald-500'"
-                :style="{ width: `${rosterPercent}%` }"
+              <i
+                :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
+                style="font-size: 0.5rem"
               />
-            </div>
+              {{ feature }}
+            </span>
+            <span
+              v-if="selectedSlot?.price"
+              class="!ml-auto inline-flex items-center rounded-full bg-emerald-50 !px-3 !py-1.5 text-xs font-bold text-emerald-700"
+            >
+              {{ selectedSlot.price }}€
+            </span>
+          </div>
+        </div>
 
-            <div class="min-h-0 flex-1 overflow-y-auto">
-              <div v-if="rosterPlayers.length" class="flex flex-wrap !gap-2">
-                <span
-                  v-for="player in rosterPlayers"
-                  :key="player.id"
-                  class="inline-flex items-center !gap-2 rounded-full !px-3 !py-1.5 text-sm"
-                  :class="
-                    player.id === currentUserId
-                      ? 'bg-emerald-100 font-medium text-emerald-700'
-                      : 'border border-surface-100 bg-white text-surface-600'
-                  "
-                >
-                  <i class="fa-solid fa-user" style="font-size: 0.55rem" />
-                  {{
-                    player.id === currentUserId
-                      ? "You"
-                      : player.name || "Player #" + player.id
-                  }}
-                </span>
-              </div>
-              <p v-else class="text-sm text-surface-300">
-                No one's in yet — be the first.
-              </p>
-            </div>
+        <template v-if="hasSlots">
+          <!-- Slot picker: takes all the height between the identity block and
+               Join, so the tiles — each carrying its own slot's roster — grow
+               into it. No panel — a border would box in the tiles' depth. -->
+          <div class="flex min-h-0 flex-1 flex-col">
+            <SlotCarousel
+              class="min-h-[10rem] flex-1"
+              :timeslots="room.timeslots"
+              :markers="slotMarkers"
+              :initial-index="initialSlotIndex"
+              :current-user-id="currentUserId"
+              @select="handleSlotSelect"
+            />
+            <p
+              v-if="selectedSlot?.message"
+              class="!mb-0 !mt-1 shrink-0 text-sm italic text-surface-400 line-clamp-2"
+            >
+              "{{ selectedSlot.message }}"
+            </p>
           </div>
 
-          <!-- Detail view (teams) -->
-          <div
-            v-else
-            key="detail"
-            class="!mt-4 flex min-h-0 flex-1 flex-col rounded-2xl border border-surface-100 bg-surface-50/60 !p-4"
-          >
-            <PlayableRoomTeams
-              :timeslot="selectedSlot"
-              @back="showDetail = false"
-            />
-          </div>
-        </Transition>
-
-        <!-- Join / Leave -->
-        <div class="!mt-4 shrink-0">
-          <button
-            v-if="isCurrentUserInSlot && !leavability.canLeave"
-            class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400 outline-none cursor-not-allowed"
-            disabled
-          >
-            <i
-              :class="`fa-solid ${leavability.icon}`"
-              style="font-size: 0.65rem"
-            />
-            {{ leavability.label }}
-          </button>
-          <button
-            v-else-if="isCurrentUserInSlot"
-            class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-200 bg-white !py-3 text-sm font-medium text-surface-500 transition-all hover:border-surface-300 hover:text-surface-700 cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="leaveMutation.isPending.value"
-            @click="handleLeave"
-          >
-            <i
-              :class="
-                leaveMutation.isPending.value
-                  ? 'fa-solid fa-spinner fa-spin'
-                  : 'fa-solid fa-right-from-bracket'
-              "
-              style="font-size: 0.65rem"
-            />
-            Leave game
-          </button>
-          <button
-            v-else-if="isAwaitingApproval"
-            class="flex w-full items-center justify-center !gap-2 rounded-xl border border-amber-100 bg-amber-50 !py-3 text-sm font-medium text-amber-600 outline-none cursor-not-allowed"
-            disabled
-          >
-            <i class="fa-solid fa-user-clock" style="font-size: 0.65rem" />
-            Awaiting approval
-          </button>
-          <div v-else-if="isDeclined">
+          <div class="shrink-0 !mt-4" :class="{ '!mt-auto': !selectedSlot }">
             <button
+              v-if="isCurrentUserInSlot && !leavability.canLeave"
               class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400 outline-none cursor-not-allowed"
               disabled
             >
-              <i class="fa-solid fa-circle-xmark" style="font-size: 0.65rem" />
-              Not accepted for this slot
+              <i
+                :class="`fa-solid ${leavability.icon}`"
+                style="font-size: 0.65rem"
+              />
+              {{ leavability.label }}
             </button>
-            <p
-              v-if="room.deniedMessage"
-              class="!mt-2 text-center text-xs italic text-surface-400"
+            <button
+              v-else-if="isCurrentUserInSlot"
+              class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-200 bg-white !py-3 text-sm font-medium text-surface-500 transition-all hover:border-surface-300 hover:text-surface-700 cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="leaveMutation.isPending.value"
+              @click="handleLeave"
             >
-              "{{ room.deniedMessage }}"
-            </p>
+              <i
+                :class="
+                  leaveMutation.isPending.value
+                    ? 'fa-solid fa-spinner fa-spin'
+                    : 'fa-solid fa-right-from-bracket'
+                "
+                style="font-size: 0.65rem"
+              />
+              Leave game
+            </button>
+            <button
+              v-else-if="isAwaitingApproval"
+              class="flex w-full items-center justify-center !gap-2 rounded-xl border border-amber-100 bg-amber-50 !py-3 text-sm font-medium text-amber-600 outline-none cursor-not-allowed"
+              disabled
+            >
+              <i class="fa-solid fa-user-clock" style="font-size: 0.65rem" />
+              Awaiting approval
+            </button>
+            <div v-else-if="isDeclined">
+              <button
+                class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400 outline-none cursor-not-allowed"
+                disabled
+              >
+                <i
+                  class="fa-solid fa-circle-xmark"
+                  style="font-size: 0.65rem"
+                />
+                Not accepted for this slot
+              </button>
+              <p
+                v-if="room.deniedMessage"
+                class="!mt-2 text-center text-xs italic text-surface-400"
+              >
+                "{{ room.deniedMessage }}"
+              </p>
+            </div>
+            <button
+              v-else-if="!joinability.joinable"
+              class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400 outline-none cursor-not-allowed"
+              disabled
+            >
+              <i
+                :class="`fa-solid ${joinability.icon}`"
+                style="font-size: 0.65rem"
+              />
+              {{ joinability.label }}
+            </button>
+            <button
+              v-else
+              class="join-button flex w-full items-center justify-center !gap-2 rounded-xl border-none bg-emerald-600 !py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-700 cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="joinMutation.isPending.value"
+              @click="handleJoin"
+            >
+              <i
+                :class="
+                  joinMutation.isPending.value
+                    ? 'fa-solid fa-spinner fa-spin'
+                    : 'fa-solid fa-right-to-bracket'
+                "
+                style="font-size: 0.65rem"
+              />
+              Join game
+            </button>
           </div>
-          <button
-            v-else-if="!joinability.joinable"
-            class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400 outline-none cursor-not-allowed"
-            disabled
-          >
-            <i
-              :class="`fa-solid ${joinability.icon}`"
-              style="font-size: 0.65rem"
-            />
-            {{ joinability.label }}
-          </button>
-          <button
-            v-else
-            class="join-button flex w-full items-center justify-center !gap-2 rounded-xl border-none bg-emerald-600 !py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-700 cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="joinMutation.isPending.value"
-            @click="handleJoin"
-          >
-            <i
-              :class="
-                joinMutation.isPending.value
-                  ? 'fa-solid fa-spinner fa-spin'
-                  : 'fa-solid fa-right-to-bracket'
-              "
-              style="font-size: 0.65rem"
-            />
-            Join game
-          </button>
-        </div>
-      </template>
+        </template>
 
-      <!-- A room with no slots has nothing to pick, fill or join, so one quiet
+        <!-- A room with no slots has nothing to pick, fill or join, so one quiet
            line stands in for the whole body and holds the card's height. -->
-      <div
-        v-else
-        class="!mt-5 flex min-h-0 flex-1 flex-col items-center justify-center !gap-2 rounded-2xl border border-surface-100 bg-surface-50/60 !p-4"
-      >
-        <i class="fa-solid fa-calendar-xmark text-2xl text-surface-200" />
-        <span class="text-sm text-surface-300">No time slots</span>
+        <div
+          v-else
+          class="!mt-5 flex min-h-0 flex-1 flex-col items-center justify-center !gap-2 rounded-2xl border border-surface-100 bg-surface-50/60 !p-4"
+        >
+          <i class="fa-solid fa-calendar-xmark text-2xl text-surface-200" />
+          <span class="text-sm text-surface-300">No time slots</span>
+        </div>
       </div>
     </div>
   </div>
@@ -271,7 +217,6 @@ import {
 import { useAuthStore } from "@/stores/auth";
 import type { PlayableRoomResponse } from "@football/shared";
 import SlotCarousel, { type SlotMarker } from "./SlotCarousel.vue";
-import PlayableRoomTeams from "./PlayableRoomTeams.vue";
 
 type Slot = PlayableRoomResponse["timeslots"][number];
 
@@ -303,7 +248,6 @@ const heldSlots = computed(() =>
 );
 
 const selectedIndex = ref(0);
-const showDetail = ref(false);
 
 const hasSlots = computed(() => props.room.timeslots.length > 0);
 
@@ -317,42 +261,8 @@ const features = computed(() =>
     : []
 );
 
-// Roster of the slot on screen, with the current user pulled to the front so
-// their own chip is the one that's always visible before any scrolling.
-const rosterPlayers = computed(() => {
-  const players = selectedSlot.value?.players ?? [];
-  const userId = currentUserId.value;
-  if (userId === undefined) return players;
-  const mine = players.filter((player) => player.id === userId);
-  return mine.length
-    ? [...mine, ...players.filter((p) => p.id !== userId)]
-    : players;
-});
-
-// Null rather than 0 with no slot on screen: "there is no roster" and "the
-// roster is full" are different answers, and only the second one is "Full squad".
-const spotsLeft = computed<number | null>(() =>
-  selectedSlot.value
-    ? Math.max(
-        0,
-        selectedSlot.value.max_players - selectedSlot.value.players.length
-      )
-    : null
-);
-
-const rosterPercent = computed(() =>
-  selectedSlot.value?.max_players
-    ? Math.min(
-        100,
-        (selectedSlot.value.players.length / selectedSlot.value.max_players) *
-          100
-      )
-    : 0
-);
-
 const handleSlotSelect = (index: number) => {
   selectedIndex.value = index;
-  showDetail.value = false;
 };
 
 const isCurrentUserInSlot = computed(() => {
@@ -476,20 +386,5 @@ const handleLeave = () => {
 
 .join-button {
   box-shadow: 0 6px 16px -8px rgba(16, 185, 129, 0.7);
-}
-
-.card-flip-enter-active,
-.card-flip-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-.card-flip-enter-from {
-  opacity: 0;
-  transform: translateY(10px);
-}
-.card-flip-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
 }
 </style>

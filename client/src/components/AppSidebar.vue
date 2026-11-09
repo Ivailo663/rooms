@@ -159,24 +159,22 @@
     </aside>
   </div>
 
-  <!-- Mobile pull-out tab: the sliver of the collapsed sidebar that stays on
-       screen. Flush to the viewport's left edge and rounded only on its right so
-       it reads as cut out of the sidebar's edge, and owned by the sidebar rather
-       than by a view, so every route keeps a way back to the drawer without
-       making room for a trigger of its own. Mid-edge rather than at the top
-       corner: a zero-width sidebar has no corner to notch, and the top-left of
-       every screen is the busiest — here it overlays only the content gutter and
-       the cards' own padding. -->
+  <!-- Mobile drawer handle. A left-edge swipe is the real way in; this is the
+       hairline that makes it discoverable, so it's a grab pill rather than a
+       button — no card, border, shadow or icon to sit on top of the view. The
+       touch target around it is invisible and much larger than the line. -->
   <button
     v-if="isMobile && !expanded"
     type="button"
     aria-label="Open menu"
     aria-controls="app-sidebar"
     :aria-expanded="expanded"
-    class="fixed left-0 top-1/2 z-40 flex h-12 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-l-none rounded-r-2xl border border-l-0 border-surface-200/40 bg-white/70 text-surface-500 shadow-sm backdrop-blur-xl transition-colors hover:text-surface-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300"
+    class="group fixed left-0 top-1/2 z-40 flex h-16 w-6 -translate-y-1/2 cursor-pointer items-center justify-start border-none bg-transparent outline-none"
     @click="openMenu"
   >
-    <i class="fa-solid fa-bars" style="font-size: 0.8rem" />
+    <span
+      class="h-11 w-1 rounded-r-full bg-surface-400/60 transition-colors group-hover:bg-surface-400 group-focus-visible:bg-primary-400"
+    />
   </button>
 </template>
 
@@ -195,6 +193,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useRoomView } from "@/composables/useRoomView";
 import { useCreateRoom } from "@/composables/useCreateRoom";
 import { useMenuExpanded } from "@/composables/useMenuExpanded";
+import { useSwipe } from "@/composables/useSwipe";
 import { RoomView } from "@/constants";
 import { signOut, getAuth } from "firebase/auth";
 import RoleGate from "./RoleGate.vue";
@@ -216,6 +215,32 @@ const checkMobile = () => {
   isMobile.value = window.innerWidth < MOBILE_BREAKPOINT;
 };
 
+const collapsed = computed(() => !isMobile.value && !expanded.value);
+
+// Opening the drawer unmounts the handle that was just pressed, which would
+// drop focus back to <body>. Hand it to the drawer's close button instead.
+const closeButton = useTemplateRef<{ $el: HTMLButtonElement }>("closeButton");
+
+const openMenu = async () => {
+  expanded.value = true;
+  await nextTick();
+  closeButton.value?.$el.focus();
+};
+
+// Swipe is the primary way in and out of the drawer on mobile: a drag from the
+// screen's left edge opens it, a leftward drag across the open drawer closes
+// it. Closed, only the edge counts, so the gesture can't fire from the middle
+// of a room list; open, the drawer's own width is the zone.
+const EDGE_ZONE = 28;
+const DRAWER_WIDTH = 288;
+
+useSwipe({
+  enabled: isMobile,
+  canStart: ({ x }) => x <= (expanded.value ? DRAWER_WIDTH : EDGE_ZONE),
+  onSwipeRight: () => !expanded.value && openMenu(),
+  onSwipeLeft: () => (expanded.value = false),
+});
+
 onMounted(() => {
   checkMobile();
   window.addEventListener("resize", checkMobile);
@@ -224,18 +249,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("resize", checkMobile);
 });
-
-const collapsed = computed(() => !isMobile.value && !expanded.value);
-
-// Opening the drawer unmounts the tab that was just pressed, which would drop
-// focus back to <body>. Hand it to the drawer's close button instead.
-const closeButton = useTemplateRef<{ $el: HTMLButtonElement }>("closeButton");
-
-const openMenu = async () => {
-  expanded.value = true;
-  await nextTick();
-  closeButton.value?.$el.focus();
-};
 
 const sidebarContainerClass = computed(() => {
   if (isMobile.value) {

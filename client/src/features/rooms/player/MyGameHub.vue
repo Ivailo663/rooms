@@ -149,46 +149,12 @@
           </div>
         </div>
 
-        <!-- Roster -->
-        <div
-          class="!mt-6 rounded-2xl border border-surface-100 bg-surface-50/60 !p-4"
-        >
-          <div class="flex items-center justify-between !mb-2.5">
-            <span class="text-sm font-medium text-surface-500">Roster</span>
-            <span class="text-xs text-surface-400">
-              {{ spotsLeft === 0 ? "Full squad" : `${spotsLeft} spots left` }}
-            </span>
-          </div>
-
-          <div
-            class="!mb-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-100"
-          >
-            <div
-              class="h-full rounded-full bg-emerald-500 transition-all"
-              :style="{ width: `${rosterPercent}%` }"
-            />
-          </div>
-
-          <div class="flex flex-wrap !gap-2">
-            <span
-              v-for="player in primaryGame.players"
-              :key="player.id"
-              class="inline-flex items-center !gap-2 rounded-full !px-3 !py-1.5 text-sm"
-              :class="
-                player.id === currentUserId
-                  ? 'bg-emerald-100 font-medium text-emerald-700'
-                  : 'bg-white text-surface-600 border border-surface-100'
-              "
-            >
-              <i class="fa-solid fa-user" style="font-size: 0.55rem" />
-              {{
-                player.id === currentUserId
-                  ? "You"
-                  : player.name || "Player #" + player.id
-              }}
-            </span>
-          </div>
-        </div>
+        <SlotRoster
+          class="!mt-6"
+          :players="primaryGame.players"
+          :max-players="primaryGame.max_players"
+          :current-user-id="currentUserId"
+        />
 
         <!-- Pending requests elsewhere -->
         <div
@@ -271,6 +237,7 @@ import {
   formatCountdown,
   elapsedMinutes,
 } from "../composables/gameTime";
+import SlotRoster from "./SlotRoster.vue";
 
 const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
@@ -335,24 +302,6 @@ const countdown = computed(() =>
   primaryGame.value
     ? formatCountdown(minutesUntil(primaryGame.value, now.value))
     : ""
-);
-
-const spotsLeft = computed(() =>
-  primaryGame.value
-    ? Math.max(
-        0,
-        primaryGame.value.max_players - primaryGame.value.players.length
-      )
-    : 0
-);
-
-const rosterPercent = computed(() =>
-  primaryGame.value
-    ? Math.min(
-        100,
-        (primaryGame.value.players.length / primaryGame.value.max_players) * 100
-      )
-    : 0
 );
 
 // From the cutoff onwards the seat is committed: the card stays up for the

@@ -62,11 +62,16 @@ onBeforeUnmount(() =>
 <style scoped>
 .deck-scroll {
   scroll-snap-type: y mandatory;
-  scroll-padding-top: 0;
+  padding-top: 0.5rem;
+  scroll-padding-top: 0.5rem;
   width: 100%;
   max-width: 42rem;
   margin: 0 auto;
   height: 100%;
+  /* Caps the card (deck height - 3rem) near its content's natural height, so
+     tall screens don't stretch it into empty space; the peek of the next card
+     stays the same because it's measured from the deck, not the screen. */
+  max-height: 38rem;
   scrollbar-width: none;
 }
 

@@ -1,6 +1,7 @@
 import type { Server } from "socket.io";
 import { Prisma } from "@prisma/client";
 import prisma from "./prisma.js";
+import { needsRedistribution, planRedistribution } from "./slotRules.js";
 import type {
   TimeslotMembershipChangedPayload,
   TimeslotRedistributedPayload,
@@ -68,17 +69,8 @@ export const redistributeSlot = async (
         },
       });
 
-      if (
-        !slot?.enabled ||
-        slot.status !== "scheduled" ||
-        slot.min_players === null
-      ) {
-        return noop;
-      }
-
-      // Redistribution is not needed if the slot is already full or empty.
-      const playerIds = slot.timeslot_players.map((p) => p.accountId);
-      if (!playerIds.length || playerIds.length >= slot.min_players) {
+      const playerIds = slot?.timeslot_players.map((p) => p.accountId) ?? [];
+      if (!slot || !needsRedistribution(slot, playerIds.length)) {
         return noop;
       }
 
@@ -104,48 +96,21 @@ export const redistributeSlot = async (
         },
       });
 
-      // Track open seats and existing members per sibling — a player already
-      // in a sibling slot can't be assigned there again (unique constraint on
-      // timeslotId+accountId), even if that sibling has open seats. Players
-      // the sibling's host denied this occurrence are likewise off-limits:
-      // redistribution must not sneak them past the denial.
-      const candidates = siblingsSlots
-        .map((s) => ({
-          id: s.id,
-          label: s.label,
-          roomId: s.room.id,
-          roomName: s.room.name,
-          open: s.max_players - s.timeslot_players.length,
-          members: new Set(s.timeslot_players.map((p) => p.accountId)),
-          denied: new Set(s.join_requests.map((r) => r.accountId)),
-        }))
-        .filter((s) => s.open > 0);
-
-      //TODO: this must be refined
-      const totalOpen = candidates.reduce((sum, s) => sum + s.open, 0);
-      if (totalOpen < playerIds.length) {
-        return noop;
-      }
+      // Per-sibling open seats, existing members and this occurrence's
+      // denials feed the planner, which applies the placement rules.
+      const candidates = siblingsSlots.map((s) => ({
+        id: s.id,
+        label: s.label,
+        roomId: s.room.id,
+        roomName: s.room.name,
+        open: s.max_players - s.timeslot_players.length,
+        members: new Set(s.timeslot_players.map((p) => p.accountId)),
+        denied: new Set(s.join_requests.map((r) => r.accountId)),
+      }));
 
       const shuffledPlayerIds = [...playerIds].sort(() => Math.random() - 0.5);
-      const assignments = new Map<number, number[]>();
-
-      for (const accountId of shuffledPlayerIds) {
-        const target = candidates.find(
-          (c) =>
-            c.open > 0 && !c.members.has(accountId) && !c.denied.has(accountId)
-        );
-        // No sibling has room for this specific player (e.g. they're already
-        // a member of every sibling with open seats) — bail out entirely
-        // rather than leave the group partially redistributed.
-        if (!target) return noop;
-
-        target.open -= 1;
-        target.members.add(accountId);
-        const accountIds = assignments.get(target.id) ?? [];
-        accountIds.push(accountId);
-        assignments.set(target.id, accountIds);
-      }
+      const assignments = planRedistribution(shuffledPlayerIds, candidates);
+      if (!assignments) return noop;
 
       await tx.timeslotPlayer.deleteMany({ where: { timeslotId: slot.id } });
 

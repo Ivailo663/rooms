@@ -1,107 +1,96 @@
 <template>
-  <div class="flex flex-col !gap-3">
-    <div class="flex items-center justify-between">
-      <span class="text-sm font-medium text-surface-500">Available slots</span>
-      <span class="text-xs tabular-nums text-surface-400">
-        {{
-          timeslots.length ? `${selectedIndex + 1} / ${timeslots.length}` : ""
-        }}
+  <!-- Native horizontal scroll-snap does the gesture: the browser only claims a
+       pan once it is clearly sideways, so the vertical room deck keeps
+       scrolling. Touches stop here so a sideways swipe never reaches the
+       window-level listeners (the mobile drawer's gesture). -->
+  <!-- The strip, not each tile, takes focus for the arrow keys: a tile is a
+       plain container so the avatars inside it can be buttons of their own. -->
+  <div
+    ref="strip"
+    class="slot-strip relative flex snap-x snap-mandatory !gap-2 overflow-x-auto !py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500"
+    role="group"
+    aria-label="Time slots"
+    tabindex="0"
+    @touchstart.passive.stop
+    @scroll.passive="onScroll"
+    @keydown="onKeydown"
+  >
+    <div
+      v-for="(slot, index) in timeslots"
+      :key="slot.id"
+      role="group"
+      class="slot-tile relative flex shrink-0 snap-center flex-col justify-between rounded-2xl !p-4 sm:!p-5"
+      :class="[
+        index === centredIndex
+          ? 'slot-tile--current bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-400'
+          : 'cursor-pointer bg-surface-100 text-surface-700',
+      ]"
+      :style="tileStyle(index)"
+      :aria-current="index === selectedIndex ? 'true' : undefined"
+      :aria-label="tileLabel(slot)"
+      @click="goTo(index)"
+    >
+      <span
+        class="whitespace-nowrap text-3xl font-bold leading-none tracking-tight tabular-nums sm:text-4xl"
+      >
+        {{ slot.label }}
       </span>
-    </div>
 
-    <div class="flex items-center !gap-2">
-      <button
-        class="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-surface-200 bg-white text-surface-400 outline-none transition-all hover:border-surface-300 hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-30"
-        :disabled="selectedIndex === 0"
-        @click="go(-1)"
-      >
-        <i class="fa-solid fa-chevron-left" style="font-size: 0.6rem" />
-      </button>
+      <span class="flex flex-col !gap-2.5">
+        <span
+          class="flex items-baseline justify-between !gap-2 text-sm tabular-nums"
+        >
+          <span class="whitespace-nowrap font-medium opacity-80">
+            {{ slot.players.length }} / {{ slot.max_players }} players
+          </span>
+          <span class="truncate text-xs opacity-70">
+            {{ spotsLeftLabel(slot.players.length, slot.max_players) }}
+          </span>
+        </span>
+        <span
+          class="h-1.5 w-full overflow-hidden rounded-full"
+          :class="index === centredIndex ? 'bg-emerald-100' : 'bg-surface-200'"
+        >
+          <span
+            class="block h-full rounded-full"
+            :class="fillClass(slot)"
+            :style="{ width: `${fillPercent(slot)}%` }"
+          />
+        </span>
+        <SlotAvatars
+          v-if="slot.players.length"
+          :players="slot.players"
+          :current-user-id="currentUserId"
+        />
+        <span v-else class="flex h-8 items-center text-sm opacity-60">
+          No one's in yet
+        </span>
+      </span>
 
-      <div class="relative flex flex-1 overflow-hidden">
-        <Transition :name="transitionName" mode="out-in">
-          <div
-            v-if="current"
-            :key="selectedIndex"
-            class="flex w-full items-center justify-between rounded-xl border !px-4 !py-2.5"
-            :class="
-              currentMarker === 'joined'
-                ? 'border-emerald-200 bg-emerald-50/70'
-                : currentMarker === 'pending'
-                  ? 'border-amber-200 bg-amber-50/70'
-                  : 'border-surface-200 bg-white'
-            "
-          >
-            <span
-              class="flex items-center !gap-2 text-lg font-bold tabular-nums tracking-tight"
-              :class="
-                currentMarker === 'joined'
-                  ? 'text-emerald-700'
-                  : 'text-surface-900'
-              "
-            >
-              {{ current.label }}
-              <i
-                v-if="currentMarker === 'joined'"
-                class="fa-solid fa-circle-check text-emerald-500"
-                style="font-size: 0.7rem"
-                title="You're in this slot"
-              />
-              <i
-                v-else-if="currentMarker === 'pending'"
-                class="fa-solid fa-user-clock text-amber-500"
-                style="font-size: 0.7rem"
-                title="Awaiting approval"
-              />
-            </span>
-            <button
-              class="flex cursor-pointer items-center !gap-2 rounded-lg border-none bg-surface-100 !px-3 !py-1.5 text-surface-500 outline-none transition-colors hover:bg-surface-200 hover:text-surface-700"
-              title="See who's in"
-              @click.stop="emit('teams')"
-            >
-              <i class="fa-solid fa-users" style="font-size: 0.55rem" />
-              <span class="text-sm font-semibold tabular-nums">
-                {{ currentTaken }}/{{ currentMax }}
-              </span>
-            </button>
-          </div>
-          <div
-            v-else
-            key="empty"
-            class="flex w-full items-center justify-center rounded-xl border border-dashed border-surface-200 !py-4"
-          >
-            <span class="text-sm text-surface-300">No time slots</span>
-          </div>
-        </Transition>
-      </div>
-
-      <button
-        class="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-surface-200 bg-white text-surface-400 outline-none transition-all hover:border-surface-300 hover:text-surface-700 disabled:cursor-not-allowed disabled:opacity-30"
-        :disabled="selectedIndex >= timeslots.length - 1"
-        @click="go(1)"
-      >
-        <i class="fa-solid fa-chevron-right" style="font-size: 0.6rem" />
-      </button>
-    </div>
-
-    <!-- Position rail: how many slots this room runs, and which one is up -->
-    <div v-if="timeslots.length > 1" class="flex items-center !gap-1.5">
-      <button
-        v-for="(slot, index) in timeslots"
-        :key="slot.id"
-        type="button"
-        class="h-1 flex-1 cursor-pointer rounded-full border-none !p-0 outline-none transition-colors"
-        :class="railClass(slot, index)"
-        :title="slot.label"
-        @click="jumpTo(index)"
+      <span
+        v-if="markers[slot.id]"
+        class="absolute right-4 top-4 h-2 w-2 rounded-full"
+        :class="
+          markers[slot.id] === 'joined' ? 'bg-emerald-500' : 'bg-amber-500'
+        "
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import {
+  ref,
+  shallowRef,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  useTemplateRef,
+} from "vue";
+import { usePreferredReducedMotion, useResizeObserver } from "@vueuse/core";
 import type { PlayableRoomResponse } from "@football/shared";
+import { spotsLeftLabel } from "../composables/spotsLeft";
+import SlotAvatars from "./SlotAvatars.vue";
 
 type Slot = PlayableRoomResponse["timeslots"][number];
 export type SlotMarker = "joined" | "pending";
@@ -111,93 +100,201 @@ const props = withDefaults(
     timeslots: Slot[];
     // Per-slot membership badges for the current user, keyed by slot id.
     markers?: Record<number, SlotMarker>;
-    // Slot to land on when the carousel mounts (e.g. the user's joined slot).
+    // Slot to land on when the strip mounts (e.g. the user's joined slot).
     initialIndex?: number;
+    // Puts the current user first, in emerald, in each tile's avatar row.
+    currentUserId?: number;
   }>(),
-  { markers: () => ({}), initialIndex: 0 }
+  { markers: () => ({}), initialIndex: 0, currentUserId: undefined }
 );
-const emit = defineEmits<{ select: [index: number]; teams: [] }>();
+const emit = defineEmits<{ select: [index: number] }>();
 
+// How far a neighbour recedes: at one tile's distance from the centre it is
+// this much smaller and fainter, which is what puts the current tile "closer".
+const NEIGHBOUR_SCALE = 0.86;
+const NEIGHBOUR_OPACITY = 0.55;
+// Quiet time after the last scroll event before a tile counts as settled.
+const SETTLE_MS = 120;
+
+const strip = useTemplateRef<HTMLElement>("strip");
+const reducedMotion = usePreferredReducedMotion();
+
+// selectedIndex is what the card shows (and what's emitted); centredIndex
+// follows the finger so the highlight moves with the swipe, not after it.
 const selectedIndex = ref(0);
-const slideDirection = ref<1 | -1>(1);
+const centredIndex = ref(0);
+// Each tile's signed distance from the strip's centre, in tile widths, capped
+// at ±1: negative to the left, positive to the right.
+const distances = shallowRef<number[]>([]);
 
-const clampIndex = (index: number) =>
-  Math.min(Math.max(index, 0), props.timeslots.length - 1);
+const tiles = () =>
+  strip.value
+    ? (Array.from(strip.value.children) as HTMLElement[])
+    : ([] as HTMLElement[]);
 
-onMounted(() => {
-  if (props.timeslots.length > 0) {
-    selectedIndex.value = clampIndex(props.initialIndex);
-    emit("select", selectedIndex.value);
+const measure = () => {
+  const el = strip.value;
+  if (!el) return;
+  const centre = el.scrollLeft + el.clientWidth / 2;
+  let nearest = 0;
+  let nearestGap = Infinity;
+  distances.value = tiles().map((tile, index) => {
+    const offset = tile.offsetLeft + tile.offsetWidth / 2 - centre;
+    if (Math.abs(offset) < nearestGap) {
+      nearestGap = Math.abs(offset);
+      nearest = index;
+    }
+    return Math.max(-1, Math.min(1, offset / tile.offsetWidth));
+  });
+  centredIndex.value = nearest;
+};
+
+// A neighbour shrinks towards its inner edge, the one facing the centre:
+// scaling about its middle would pull that edge out of the sliver of strip it
+// peeks through, and the peek is what tells you there's more to swipe to.
+const tileStyle = (index: number) => {
+  const d = distances.value[index] ?? 0;
+  const reach = Math.abs(d);
+  return {
+    transform: `scale(${1 - (1 - NEIGHBOUR_SCALE) * reach})`,
+    transformOrigin: d > 0 ? "left center" : "right center",
+    opacity: 1 - (1 - NEIGHBOUR_OPACITY) * reach,
+  };
+};
+
+const select = (index: number) => {
+  if (index === selectedIndex.value) return;
+  selectedIndex.value = index;
+  emit("select", index);
+};
+
+let frame = 0;
+let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
+const onScroll = () => {
+  if (!frame) {
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      measure();
+    });
   }
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => {
+    measure();
+    select(centredIndex.value);
+    // Desktop trackpads often leave scroll-snap short of the snap point, so
+    // finish the job: glide the nearest tile the rest of the way to centre.
+    // Once it lands, this check passes and the nudging stops.
+    const el = strip.value;
+    const target = centredLeft(centredIndex.value);
+    if (el && target !== undefined && Math.abs(el.scrollLeft - target) > 1) {
+      centreOn(centredIndex.value, smoothness());
+    }
+  }, SETTLE_MS);
+};
+
+const centredLeft = (index: number) => {
+  const el = strip.value;
+  const tile = tiles()[index];
+  if (!el || !tile) return undefined;
+  return tile.offsetLeft - (el.clientWidth - tile.offsetWidth) / 2;
+};
+
+const smoothness = () =>
+  reducedMotion.value === "reduce" ? "auto" : "smooth";
+
+const centreOn = (index: number, behavior: "auto" | "smooth") => {
+  const left = centredLeft(index);
+  // Scroll the strip only — scrollIntoView would also drag the vertical room
+  // deck to a card that isn't on screen.
+  if (left !== undefined) strip.value?.scrollTo({ left, behavior });
+};
+
+// Taps and arrow keys move the strip; selection follows once it settles, so
+// every route to a tile goes through the same path as a swipe.
+const goTo = (index: number) => {
+  const target = Math.min(Math.max(index, 0), props.timeslots.length - 1);
+  centreOn(target, smoothness());
+};
+
+const onKeydown = (event: KeyboardEvent) => {
+  if (event.key === "ArrowRight") goTo(centredIndex.value + 1);
+  else if (event.key === "ArrowLeft") goTo(centredIndex.value - 1);
+  else return;
+  event.preventDefault();
+};
+
+useResizeObserver(strip, measure);
+
+onMounted(async () => {
+  if (!props.timeslots.length) return;
+  const initial = Math.min(
+    Math.max(props.initialIndex, 0),
+    props.timeslots.length - 1
+  );
+  selectedIndex.value = initial;
+  centredIndex.value = initial;
+  emit("select", initial);
+  await nextTick();
+  centreOn(initial, "auto");
+  measure();
 });
 
-const transitionName = computed(() =>
-  slideDirection.value === 1 ? "slide-left" : "slide-right"
-);
+onBeforeUnmount(() => {
+  cancelAnimationFrame(frame);
+  clearTimeout(settleTimer);
+});
 
-const current = computed<Slot | undefined>(
-  () => props.timeslots[selectedIndex.value]
-);
+const fillPercent = (slot: Slot) =>
+  slot.max_players
+    ? Math.min(100, (slot.players.length / slot.max_players) * 100)
+    : 0;
 
-const currentMarker = computed<SlotMarker | undefined>(() =>
-  current.value ? props.markers[current.value.id] : undefined
-);
+const fillClass = (slot: Slot) =>
+  slot.max_players && slot.players.length >= slot.max_players
+    ? "bg-surface-400"
+    : "bg-emerald-500";
 
-const currentTaken = computed(() => current.value?.players?.length ?? 0);
-const currentMax = computed(() => current.value?.max_players ?? 0);
-
-// The rail doubles as a legend: membership colours the segment even when that
-// slot isn't the one on screen.
-const railClass = (slot: Slot, index: number) => {
+// The dot and bar are visual shorthand; screen readers get them in words.
+const tileLabel = (slot: Slot) => {
   const marker = props.markers[slot.id];
-  if (marker === "joined") return "bg-emerald-400";
-  if (marker === "pending") return "bg-amber-300";
-  return index === selectedIndex.value ? "bg-surface-400" : "bg-surface-200";
-};
-
-const select = (next: number, direction: 1 | -1) => {
-  slideDirection.value = direction;
-  selectedIndex.value = next;
-  emit("select", next);
-};
-
-const go = (direction: -1 | 1) => {
-  const next = selectedIndex.value + direction;
-  if (next >= 0 && next < props.timeslots.length) select(next, direction);
-};
-
-const jumpTo = (index: number) => {
-  if (index !== selectedIndex.value) {
-    select(index, index > selectedIndex.value ? 1 : -1);
-  }
+  const status =
+    marker === "joined"
+      ? ", you're in"
+      : marker === "pending"
+        ? ", awaiting approval"
+        : "";
+  return `${slot.label}, ${slot.players.length} of ${slot.max_players} players${status}`;
 };
 </script>
 
 <style scoped>
-.slide-left-enter-active,
-.slide-left-leave-active,
-.slide-right-enter-active,
-.slide-right-leave-active {
-  transition:
-    transform 0.18s ease,
-    opacity 0.18s ease;
+/* The side padding alone sizes the tile: each tile is the full content box,
+   i.e. the strip minus both paddings, so it is exactly centred at every snap
+   point (first and last included) and neighbours peek in through the padding.
+   Phones: tile = 86% of the strip, leaving each neighbour a ~15px sliver;
+   wider screens: 90%. */
+.slot-strip {
+  padding-inline: 7%;
+  scrollbar-width: none;
 }
 
-.slide-left-enter-from {
-  transform: translateX(16px);
-  opacity: 0;
-}
-.slide-left-leave-to {
-  transform: translateX(-16px);
-  opacity: 0;
+@media (min-width: 640px) {
+  .slot-strip {
+    padding-inline: 5%;
+  }
 }
 
-.slide-right-enter-from {
-  transform: translateX(-16px);
-  opacity: 0;
+.slot-strip::-webkit-scrollbar {
+  display: none;
 }
-.slide-right-leave-to {
-  transform: translateX(16px);
-  opacity: 0;
+
+.slot-tile {
+  width: 100%;
+  will-change: transform;
+}
+
+.slot-tile--current {
+  box-shadow: 0 14px 30px -14px rgba(16, 185, 129, 0.5);
 }
 </style>
