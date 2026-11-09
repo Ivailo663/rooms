@@ -26,7 +26,6 @@ model Room {
   id          Int            @id(map: "playgrounds_pkey") @default(autoincrement())
   name        String
   creatorId   Int?           @map("creator_id")
-  hostId      Int?           @map("host_id")
   description String?
   price       Decimal        @db.Money
   address     String         @db.VarChar(100)

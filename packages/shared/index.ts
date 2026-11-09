@@ -139,7 +139,6 @@ export interface CreateRoomRequest {
   name: string;
   description?: string | null;
   creator_id: number;
-  host_id: number;
   price: string | number;
 }
 

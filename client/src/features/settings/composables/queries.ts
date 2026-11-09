@@ -5,6 +5,7 @@ import {
   keepPreviousData,
 } from "@tanstack/vue-query";
 import { computed, toValue, type MaybeRefOrGetter } from "vue";
+import { isAxiosError } from "axios";
 import type {
   AccountSearchResult,
   TenantSettingsResponse,
@@ -21,10 +22,21 @@ import {
 // Keep the client guard in lockstep with the server's MIN_SEARCH_LENGTH.
 const MIN_SEARCH_LENGTH = 3;
 
-export const useGetTenantSettings = (tenantId: number) => {
+export const isForbidden = (error: unknown) =>
+  isAxiosError(error) && error.response?.status === 403;
+
+// A caller without a tenant never asks; a 403 means they don't manage this
+// venue, and retrying won't change that.
+export const useGetTenantSettings = (
+  tenantId: MaybeRefOrGetter<number | null>,
+) => {
+  const id = computed(() => toValue(tenantId));
+
   return useQuery<TenantSettingsResponse>({
-    queryKey: ["tenant-settings", tenantId],
-    queryFn: () => getTenantSettings(tenantId),
+    queryKey: ["tenant-settings", id],
+    queryFn: () => getTenantSettings(id.value as number),
+    enabled: computed(() => id.value !== null),
+    retry: (failureCount, error) => !isForbidden(error) && failureCount < 3,
   });
 };
 

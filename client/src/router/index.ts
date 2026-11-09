@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
+import { useRoleStore } from "../stores/role";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,6 +18,7 @@ const router = createRouter({
           path: "settings",
           name: "settings",
           component: () => import("@/views/SettingsView.vue"),
+          meta: { requiresVenue: true },
         },
       ],
     },
@@ -28,14 +30,19 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore();
 
   if (to.meta.requiresAuth && !authStore.user) {
-    return next("/");
+    return "/";
   }
 
-  next();
+  // Settings is only for someone who manages a venue (SET-10). On a hard
+  // refresh the account isn't loaded yet, so wait for it before deciding.
+  if (to.meta.requiresVenue) {
+    await authStore.ready;
+    if (!useRoleStore().managesVenue) return { name: "home" };
+  }
 });
 
 export default router;

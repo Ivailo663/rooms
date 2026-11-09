@@ -82,7 +82,6 @@ const handleCreateRoom = async ({
     name,
     description,
     creator_id: user?.value?.id,
-    host_id: user?.value?.id,
     price,
   });
 

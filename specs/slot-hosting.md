@@ -12,9 +12,10 @@ it does today.
 
 - **HOST-01** A room has one **owner**, the account in `creatorId`. The owner
   manages the room's schedule (SLOT-10..17: times, capacity, price, enabling)
-  and approves hosts. `Room.hostId` is removed.
+  and approves hosts. `Room.hostId` is removed: nothing reads or writes it.
 - **HOST-02** A **slot host** is attached to one occurrence of one slot, never
-  to a room. A slot has at most one host at a time.
+  to a room. It's stored on the slot, not on the room. A slot has at most one
+  host at a time.
 
 ## Becoming a host
 

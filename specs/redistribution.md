@@ -27,8 +27,10 @@ the cutoff verdict ([LIFE-05](slot-lifecycle.md)) or manually through
   destinations with player counts), and `timeslot-status:changed {status:
   "redistributed"}`.
 - **RED-08** The manual endpoint is restricted to the room's owner
-  ([HOST-01](slot-hosting.md)). `[gap]` — today any authenticated user can
-  trigger it.
+  (`creatorId`, [HOST-01](slot-hosting.md)). A slot host has no need for it,
+  since a hosted slot is never redistributed ([HOST-15](slot-hosting.md)).
+  Anyone else gets 403 "You do not manage this room", an unknown slot gets
+  404, and neither runs redistribution.
 
 - **RED-09** Redistribution doesn't apply the join policy (REQ-01..04). The
   policy belongs to the tenant, and that same tenant admitted the player and
