@@ -13,6 +13,11 @@ export const useAuthStore = defineStore("auth", () => {
 
   const router = useRouter();
 
+  // Settles once the first auth state (and, when signed in, the account) is
+  // known. Route guards wait on it: the router starts its first navigation
+  // before main.ts has finished awaiting init().
+  const { promise: ready, resolve: markReady } = Promise.withResolvers<void>();
+
   const fetchUser = async () => {
     const { data } = await api.post("/user");
     userDBState.value = data;
@@ -43,6 +48,7 @@ export const useAuthStore = defineStore("auth", () => {
           router.push({ name: "auth" });
         }
 
+        markReady();
         resolve();
       });
     });
@@ -57,5 +63,5 @@ export const useAuthStore = defineStore("auth", () => {
     return !Object.keys(result).length ? null : result;
   });
 
-  return { user, init, fetchUser, initialized: initializedState };
+  return { user, init, fetchUser, ready, initialized: initializedState };
 });

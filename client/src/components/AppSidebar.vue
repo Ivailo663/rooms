@@ -50,7 +50,7 @@
       <nav class="flex flex-col !gap-1">
         <router-link
           v-for="item in items"
-          :key="item.route"
+          :key="item.route.name"
           :to="item.route"
           class="flex items-center rounded-lg text-sm font-medium text-surface-500 transition-colors hover:bg-surface-50 hover:text-surface-900"
           :class="collapsed ? 'justify-center !p-2.5' : '!gap-3 !px-3 !py-2.5'"
@@ -190,6 +190,7 @@ import {
 } from "vue";
 import { Button, SelectButton } from "primevue";
 import { useAuthStore } from "@/stores/auth";
+import { useRoleStore } from "@/stores/role";
 import { useRoomView } from "@/composables/useRoomView";
 import { useCreateRoom } from "@/composables/useCreateRoom";
 import { useMenuExpanded } from "@/composables/useMenuExpanded";
@@ -201,6 +202,7 @@ import RoleGate from "./RoleGate.vue";
 const expanded = useMenuExpanded();
 
 const authStore = useAuthStore();
+const roleStore = useRoleStore();
 const auth = getAuth();
 const router = useRouter();
 
@@ -276,10 +278,25 @@ const viewOptions = [
   { label: "Play", value: RoomView.Play },
 ];
 
-const items = [
-  { label: "Home", icon: "fa-solid fa-house", route: { name: "home" } },
-  { label: "Settings", icon: "fa-solid fa-gear", route: { name: "settings" } },
-];
+// Each entry says who it's for; the sidebar shows only the visible ones.
+// Settings is for someone who manages a venue (SET-10), since for anyone else
+// the page would have nothing to show.
+const items = computed(() =>
+  [
+    {
+      label: "Home",
+      icon: "fa-solid fa-house",
+      route: { name: "home" },
+      visible: true,
+    },
+    {
+      label: "Settings",
+      icon: "fa-solid fa-gear",
+      route: { name: "settings" },
+      visible: roleStore.managesVenue,
+    },
+  ].filter((item) => item.visible)
+);
 
 const isHomeRoute = computed(() => router.currentRoute.value.name === "home");
 

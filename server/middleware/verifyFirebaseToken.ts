@@ -15,6 +15,15 @@ type AuthenticatedRequest = Request<
   AuthenticatedLocals
 >;
 
+// Every API prefix. Socket.IO's transport requests must stay outside this list.
+export const AUTHENTICATED_PATHS = [
+  "/rooms",
+  "/timeslots",
+  "/user",
+  "/accounts",
+  "/tenants",
+];
+
 export const verifyFirebaseToken = asyncHandler(
   async (
     req: AuthenticatedRequest,

@@ -5,7 +5,10 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.vitest.tsbuildinfo",
 
-    "lib": [],
+    // The scaffold's empty `lib` is here to drop the DOM libs, which jsdom's
+    // types supply instead — but it also drops tsconfig.app.json's ES2024, and
+    // with it Promise.withResolvers (stores/auth.ts). Name the ES lib only.
+    "lib": ["ES2024"],
     "types": ["node", "jsdom"]
   }
 }

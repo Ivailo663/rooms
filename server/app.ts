@@ -5,7 +5,10 @@ import express, {
 } from "express";
 import cors from "cors";
 import { Server } from "socket.io";
-import { verifyFirebaseToken } from "./middleware/verifyFirebaseToken.js";
+import {
+  AUTHENTICATED_PATHS,
+  verifyFirebaseToken,
+} from "./middleware/verifyFirebaseToken.js";
 import { registerMembershipRoutes } from "./routes/membership.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerTimeslotRoutes } from "./routes/timeslots.js";
@@ -33,8 +36,7 @@ const io = new Server(httpServer, {
   },
 });
 
-// Apply auth only to API routes — socket.io transport requests must be excluded
-app.use(["/rooms", "/timeslots", "/user", "/accounts"], verifyFirebaseToken);
+app.use(AUTHENTICATED_PATHS, verifyFirebaseToken);
 
 registerUserRoutes(app);
 registerRoomRoutes(app);

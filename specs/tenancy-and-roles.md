@@ -20,8 +20,8 @@ Code: [server/prisma/schema.prisma](../server/prisma/schema.prisma),
 - **ROLE-04** A clientAdmin (and a host) is bound to one tenant by
   `accounts.tenantid`. That column is the ownership link and stays.
 - **ROLE-05** A clientAdmin can read and edit only their own tenant's settings
-  and flags. `[gap]` — the server doesn't check this, and the client hardcodes
-  `tenantId = 1`.
+  and flags ([SET-09, SET-10](tenant-settings.md)). A superAdmin can manage
+  any tenant.
 - **ROLE-06** The server enforces ROLE-02 capabilities on every mutating
   endpoint. `[gap]` — roles are only checked in the client (`RoleGate`).
   Today the server checks room ownership where noted, and nothing else.

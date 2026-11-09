@@ -25,18 +25,16 @@ const getCurrentAccount = async (email: string) => {
 };
 
 const createRoom: RequestHandler = asyncHandler(async (req, res) => {
-  const { name, description, creator_id, price, host_id } =
+  const { name, description, creator_id, price } =
     req.body as CreateRoomRequest;
 
   const creatorId = toInteger(creator_id, "creator_id");
-  const hostId = toInteger(host_id, "host_id");
 
   const room = await prisma.room.create({
     data: {
       name,
       description,
       creatorId,
-      hostId,
       price,
       address: "",
     },
@@ -59,7 +57,7 @@ const getHostedRooms: RequestHandler = asyncHandler(async (req, res) => {
 
   const rooms = await prisma.room.findMany({
     where: {
-      hostId: account.id,
+      creatorId: account.id,
     },
     select: {
       id: true,
@@ -136,7 +134,7 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
 
   const rooms = await prisma.room.findMany({
     where: {
-      hostId: {
+      creatorId: {
         not: account.id,
       },
     },

@@ -7,8 +7,7 @@ Those types are the contract, so change them together with this table.
 ## Cross-cutting
 
 - **API-01** Every endpoint requires `Authorization: Bearer <Firebase ID
-  token>`, and a missing one is 401 "No token". `[gap]` — `/tenants*` is not
-  behind the auth middleware.
+  token>`, and a missing one is 401 "No token".
 - **API-02** Errors are returned as the HTTP status plus a plain-text message
   body. `[gap]` — `/tenants*` answers JSON `{message}` instead.
 - **API-03** `GET /accounts?search=` returns `[]` for a term shorter than 3
@@ -43,10 +42,10 @@ Those types are the contract, so change them together with this table.
 | POST | `/timeslots/:id/requests/:accountId/approve` | room owner or slot host | `MutationMessageResponse` | REQ-11 |
 | POST | `/timeslots/:id/requests/:accountId/deny` | room owner or slot host | `MutationMessageResponse` | REQ-12 |
 | DELETE | `/timeslots/:id/requests/:accountId` | room owner or slot host | `MutationMessageResponse` | REQ-13 |
-| POST | `/timeslots/:id/redistribute` | room owner (gap) | `MutationMessageResponse` | RED-08 |
-| GET | `/tenants/:tenantId` | tenant clientAdmin (gap) | `TenantSettingsResponse` | SET-02 |
-| POST | `/tenants` | tenant clientAdmin (gap) | `{message}` | SET-03 |
-| POST | `/tenants/accounts` | tenant clientAdmin (gap) | `{message}` | SET-04 |
+| POST | `/timeslots/:id/redistribute` | room owner | `MutationMessageResponse` | RED-08 |
+| GET | `/tenants/:tenantId` | tenant clientAdmin or superAdmin | `TenantSettingsResponse` | SET-02 |
+| POST | `/tenants` | tenant clientAdmin or superAdmin | `{message}` | SET-03 |
+| POST | `/tenants/accounts` | tenant clientAdmin or superAdmin | `{message}` | SET-04 |
 
 ## Not yet
 

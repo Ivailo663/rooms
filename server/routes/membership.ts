@@ -489,7 +489,7 @@ const createLeaveTimeslotHandler = (io: Server): RequestHandler =>
     res.send(response);
   });
 
-// Ensures the caller owns (created or hosts) the room the slot belongs to.
+// Ensures the caller owns (created) the room the slot belongs to.
 const assertSlotOwner = async (timeslotId: number, accountId: number) => {
   const timeslot = await prisma.roomTimeslot.findUnique({
     where: { id: timeslotId },
@@ -498,7 +498,7 @@ const assertSlotOwner = async (timeslotId: number, accountId: number) => {
       start_time: true,
       max_players: true,
       _count: { select: { timeslot_players: true } },
-      room: { select: { id: true, creatorId: true, hostId: true } },
+      room: { select: { id: true, creatorId: true } },
     },
   });
 
@@ -506,11 +506,7 @@ const assertSlotOwner = async (timeslotId: number, accountId: number) => {
     throw createHttpError(404, "Timeslot not found");
   }
 
-  const owns =
-    timeslot.room?.creatorId === accountId ||
-    timeslot.room?.hostId === accountId;
-
-  if (!owns) {
+  if (timeslot.room?.creatorId !== accountId) {
     throw createHttpError(403, "You do not manage this room");
   }
 
@@ -685,8 +681,10 @@ const createRedestributePlayersBetweenTimeslotHandler = (
   io: Server
 ): RequestHandler =>
   asyncHandler(async (req, res) => {
+    const account = await getCurrentAccount(res.locals.user.email);
     const timeslotId = toInteger(req.params.id, "id");
 
+    await assertSlotOwner(timeslotId, account.id);
     await redistributeSlot(timeslotId, io);
 
     const response: MutationMessageResponse = {

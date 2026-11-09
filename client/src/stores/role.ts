@@ -83,6 +83,14 @@ function getCapabilitiesForRole(role: AccountRole): Set<Capability> {
   return result;
 }
 
+// Mirrors the server's canManageTenant (SET-09) for the caller's own tenant, so
+// Settings is only offered to someone the server would actually let in.
+export const canManageVenue = (
+  account: { role?: AccountRole; tenantid?: number | null } | null,
+): boolean =>
+  account?.role === "superAdmin" ||
+  (account?.role === "clientAdmin" && typeof account.tenantid === "number");
+
 export const useRoleStore = defineStore("role", () => {
   const authStore = useAuthStore();
   const { user } = storeToRefs(authStore);
@@ -103,5 +111,19 @@ export const useRoleStore = defineStore("role", () => {
   const isClientAdmin = computed(() => role.value === "clientAdmin");
   const isSuperAdmin = computed(() => role.value === "superAdmin");
 
-  return { role, can, isPlayer, isHost, isClientAdmin, isSuperAdmin };
+  const managesVenue = computed(() =>
+    canManageVenue(
+      user.value as { role?: AccountRole; tenantid?: number | null } | null,
+    ),
+  );
+
+  return {
+    role,
+    can,
+    isPlayer,
+    isHost,
+    isClientAdmin,
+    isSuperAdmin,
+    managesVenue,
+  };
 });

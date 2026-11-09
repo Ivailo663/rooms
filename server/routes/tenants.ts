@@ -6,13 +6,33 @@ import type {
   UpdateTenantSettingsRequest,
 } from "@football/shared";
 import { syncSlot } from "../scheduler.js";
+import { asyncHandler, createHttpError } from "../utils/http.js";
+import { canManageTenant } from "../tenantAccess.js";
 
-const getTenantSettings: RequestHandler = async (req, res) => {
+// Runs after the 400 checks and before any lookup of the tenant itself, so a
+// clientAdmin probing another tenant's id gets the same 403 whether or not that
+// tenant exists.
+const assertManagesTenant = async (email: string | undefined, tenantId: number) => {
+  const account = email
+    ? await prisma.account.findUnique({
+        where: { email },
+        select: { role: true, tenantid: true },
+      })
+    : null;
+
+  if (!canManageTenant(account, tenantId)) {
+    throw createHttpError(403, "You do not manage this venue");
+  }
+};
+
+const getTenantSettings: RequestHandler = asyncHandler(async (req, res) => {
   const tenantId = Number(req.params.tenantId);
 
   if (!tenantId) {
     return res.status(400).json({ message: "Tenant ID is required." });
   }
+
+  await assertManagesTenant(res.locals.user?.email, tenantId);
 
   try {
     const tenant = await prisma.tenant.findUnique({
@@ -58,9 +78,9 @@ const getTenantSettings: RequestHandler = async (req, res) => {
     console.error("Error fetching tenant settings:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
-};
+});
 
-const updateTenantSettings: RequestHandler = async (req, res) => {
+const updateTenantSettings: RequestHandler = asyncHandler(async (req, res) => {
   const { tenantId, settings } = req.body as UpdateTenantSettingsRequest;
 
   if (!tenantId || !settings) {
@@ -68,6 +88,8 @@ const updateTenantSettings: RequestHandler = async (req, res) => {
       .status(400)
       .json({ message: "Tenant ID and settings are required." });
   }
+
+  await assertManagesTenant(res.locals.user?.email, tenantId);
 
   try {
     await prisma.tenant.update({
@@ -90,9 +112,9 @@ const updateTenantSettings: RequestHandler = async (req, res) => {
     console.error("Error updating tenant settings:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
-};
+});
 
-const updateTenantAccount: RequestHandler = async (req, res) => {
+const updateTenantAccount: RequestHandler = asyncHandler(async (req, res) => {
   const { tenantId, accountId, requiresApproval, blacklisted } =
     req.body as UpdateTenantAccountRequest;
 
@@ -101,6 +123,8 @@ const updateTenantAccount: RequestHandler = async (req, res) => {
       .status(400)
       .json({ message: "Tenant ID and account ID are required." });
   }
+
+  await assertManagesTenant(res.locals.user?.email, tenantId);
 
   try {
     const existing = await prisma.tenantAccount.findUnique({
@@ -141,7 +165,7 @@ const updateTenantAccount: RequestHandler = async (req, res) => {
     console.error("Error updating tenant account:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
-};
+});
 
 export const registerTenantRoutes = (app: Application) => {
   app.get("/tenants/:tenantId", getTenantSettings);
