@@ -48,7 +48,7 @@ Monorepo (npm workspaces + Turborepo). You own `client/`; treat `server/` as an 
 - **Firebase** auth on the client (`client/src/firebase.ts`); every API call carries a Bearer ID token
 - **socket.io-client** via `client/src/socket.ts` for live slot/chat updates
 - Tests: `npm run test:unit --workspace=client` (Vitest + @vue/test-utils), `npm run test:e2e --workspace=client` (Playwright)
-- Types: `npm run check-types --workspace=client` (vue-tsc). Lint: `npm run lint --workspace=client`
+- Types: `npm run type-check --workspace=client` (vue-tsc --build; it is the only one that reads `.vue` files). Lint: `npm run lint --workspace=client`
 - Read `README.md` at the repo root before asking how to run anything.
 
 ## Conventions that already exist — follow them, don't reinvent them
@@ -70,7 +70,7 @@ Monorepo (npm workspaces + Turborepo). You own `client/`; treat `server/` as an 
 5. **Performance is a design decision, not a pass at the end.** Keep reactive graphs shallow and keys stable; `v-memo`/`shallowRef` where a list is large; never `v-if` a subtree that only needed `hidden`. Watch for request waterfalls — colocated `useQuery` calls run in parallel, sequential `await`s do not. Reserve space for async content so nothing shifts under the user's cursor. Lazy-route anything heavy.
 6. **Accessibility is table stakes.** Real buttons for actions, labels tied to inputs, focus visible and trapped in dialogs/drawers, `aria-live` for things that change on their own (slot going live, a join being approved), hit targets that work with a thumb. PrimeVue gives you most of this — don't undo it with a `div` that listens for clicks.
 7. **Mobile first.** This is a product people open standing next to a pitch. Test narrow widths; nothing horizontally scrolls except something deliberately scrollable.
-8. **Verify what you changed.** Run `check-types` and `lint` for the client. Add or update a Vitest test when you touch a pure rule module; those are cheap and they are where the bugs hide. If the change is visual and the app is runnable, say what you'd look at to confirm it.
+8. **Verify what you changed.** Run `type-check` and `lint` for the client. Add or update a Vitest test when you touch a pure rule module; those are cheap and they are where the bugs hide. If the change is visual and the app is runnable, say what you'd look at to confirm it.
 
 ## Standing judgment calls
 

@@ -47,7 +47,7 @@ Monorepo (npm workspaces + Turborepo). You own `server/` and `packages/shared/`;
 - **Socket.IO** for live slot and chat updates; CORS allows only `http://localhost:5173`
 - **firebase-admin** for auth: `server/middleware/verifyFirebaseToken.ts` verifies the Bearer ID token and puts the decoded token on `res.locals.user` (typed via `server/types/auth.ts`)
 - Domain logic worth knowing before you touch slots: `server/scheduler.ts` (locking, go-live) and `server/redistribution.ts` (player redistribution when a slot fails)
-- Types: `npm run typecheck --workspace=server`. Prisma: `npm run prisma:generate --workspace=server` after any schema edit.
+- Types: `npm run type-check --workspace=server`. Tests: `npm test --workspace=server` (Vitest). Prisma: `npm run prisma:generate --workspace=server` after any schema edit.
 - Read `README.md` at the repo root first — env files, Supabase pausing, Redis, and the common failure modes are all documented there.
 
 ## Conventions that already exist — follow them, don't reinvent them
@@ -70,7 +70,7 @@ Monorepo (npm workspaces + Turborepo). You own `server/` and `packages/shared/`;
 5. **Honest HTTP semantics.** 400 for malformed input, 401 unauthenticated, 403 authorized-but-not-allowed, 404 absent, 409 for a conflict with current state (the one-game-per-hour rule is a 409), 422 for a semantically invalid-but-wellformed body. Error messages are for a developer reading a log *and* a user seeing a toast — short, specific, no internals, no stack traces, no leaking another tenant's existence.
 6. **Authorize every handler explicitly.** Authentication (`verifyFirebaseToken`) is not authorization. Every query must be scoped by the caller's account/tenant/role — see `server/types/tenant.ts` and the client's `stores/role.ts` for the role model. A missing tenant scope is a data leak, and you should treat it as the most serious class of bug in this codebase.
 7. **Background work is idempotent.** BullMQ jobs retry and can run twice. A scheduler or worker step must be safe to re-run — guard on state, don't assume a job runs exactly once. Never leave a job that can wedge the scheduler if the DB is briefly unreachable.
-8. **Verify what you changed.** Run `typecheck` for the server, `prisma:generate` after schema edits, and the client's `check-types` when you touched `packages/shared`. There is no server test suite; if a change is risky, say precisely what you exercised by hand (which endpoint, which payload, what you saw).
+8. **Verify what you changed.** Run `type-check` and `npm test` for the server, `prisma:generate` after schema edits, and the client's `type-check` when you touched `packages/shared`. The server suite runs handlers with Prisma mocked, so a route's authorization and error codes are testable without a database — add to it rather than only exercising things by hand. If something genuinely can't be tested that way, say precisely what you exercised (which endpoint, which payload, what you saw).
 
 ## Standing judgment calls
 

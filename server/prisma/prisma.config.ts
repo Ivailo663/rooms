@@ -1,1 +1,1 @@
-export { default } from "../prisma.config";
+export { default } from "../prisma.config.js";

@@ -10,7 +10,7 @@
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:pull": "prisma db pull --schema prisma/schema.prisma",
     "prisma:push": "prisma db push --config server/prisma.config.ts",
-    "typecheck": "tsc --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "author": "",
   "license": "ISC",

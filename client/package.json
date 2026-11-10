@@ -9,15 +9,13 @@
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
-    "check-types": "tsc --noEmit",
     "preview": "vite preview",
     "test:unit": "vitest",
     "test:e2e": "playwright test",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/",
-    "typecheck": "tsc --noEmit"
+    "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.7.2",

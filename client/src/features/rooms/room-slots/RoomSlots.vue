@@ -183,6 +183,10 @@
                 :show-enabled-toggle="true"
               />
 
+              <Message v-if="saveError" severity="error" size="small">
+                {{ saveError }}
+              </Message>
+
               <div
                 class="flex justify-end !gap-2 border-t border-surface-100 !pt-3"
               >
@@ -199,7 +203,7 @@
                   severity="success"
                   icon="fa-solid fa-check"
                   size="small"
-                  :disabled="!newTimeslot"
+                  :disabled="!newTimeslot || !canSubmit"
                   @click="form.handleSubmit()"
                 />
               </div>
@@ -237,6 +241,15 @@
                 />
               </div>
 
+              <Message
+                v-if="activeTab === 'settings' && saveError"
+                severity="error"
+                size="small"
+                class="!mb-3"
+              >
+                {{ saveError }}
+              </Message>
+
               <div
                 v-if="activeTab === 'settings'"
                 class="flex items-center justify-between border-t border-surface-100 !pt-3"
@@ -256,13 +269,14 @@
                     outlined
                     icon="fa-solid fa-rotate"
                     size="small"
-                    @click="form.reset()"
+                    @click="discardEdits"
                   />
                   <Button
                     label="Save"
                     severity="success"
                     icon="fa-solid fa-check"
                     size="small"
+                    :disabled="!canSubmit"
                     @click="form.handleSubmit()"
                   />
                 </div>
@@ -312,7 +326,8 @@
 
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
-import { Button, Popover, SelectButton, Tag } from "primevue";
+import { Button, Message, Popover, SelectButton, Tag } from "primevue";
+import { errorMessage } from "@/axios";
 import { refDebounced } from "@vueuse/core";
 import { useForm } from "@tanstack/vue-form";
 import type { TimeslotResponse } from "@football/shared";
@@ -452,40 +467,62 @@ const pickHour = (
 
 const selectedSlot = computed(() => slots.value?.[selectedIndex.value]);
 
+// Why the last save failed (SLOT-18). The form keeps the host's edits.
+const saveError = ref<string | null>(null);
+
 const form = useForm({
   defaultValues: { ...defaultForm.value },
   onSubmit: async ({ value }) => {
-    if (isCreating.value && newTimeslot.value) {
-      await createMutation.mutateAsync({
-        room_id: props.id,
-        order: newTimeslot.value.order,
-        day: weekDay.value,
-        name: newTimeslot.value.name,
-        label: newTimeslot.value.code,
-        min_players: value.min_players,
-        max_players: value.max_players ?? 0,
-        price: value.price,
-        message: value.message,
-        features: value.features,
-        enabled: enabled.value,
-      });
-      discardNewSlot();
-    } else if (selectedSlot.value) {
-      await updateMutation.mutateAsync({
-        id: selectedSlot.value.id,
-        label: value.label,
-        min_players: value.min_players,
-        max_players: value.max_players ?? 0,
-        price: value.price,
-        message: value.message,
-        features: value.features,
-      });
-      form.reset(value);
+    saveError.value = null;
+    // max_players is required and at least 1 (SLOT-17) and handleSubmit won't
+    // reach here while a field is invalid, so this only narrows the form's
+    // `number | null` to the number the request types ask for.
+    if (value.max_players === null) return;
+
+    try {
+      if (isCreating.value && newTimeslot.value) {
+        await createMutation.mutateAsync({
+          room_id: props.id,
+          order: newTimeslot.value.order,
+          day: weekDay.value,
+          name: newTimeslot.value.name,
+          label: newTimeslot.value.code,
+          min_players: value.min_players,
+          max_players: value.max_players,
+          price: value.price,
+          message: value.message,
+          features: value.features,
+          enabled: enabled.value,
+        });
+        discardNewSlot();
+      } else if (selectedSlot.value) {
+        await updateMutation.mutateAsync({
+          id: selectedSlot.value.id,
+          label: value.label,
+          min_players: value.min_players,
+          max_players: value.max_players,
+          price: value.price,
+          message: value.message,
+          features: value.features,
+        });
+        form.reset(value);
+      }
+    } catch (error) {
+      saveError.value = errorMessage(
+        error,
+        "Couldn't save the slot. Try again."
+      );
     }
   },
 });
 
+const discardEdits = () => {
+  saveError.value = null;
+  form.reset();
+};
+
 const isDirty = form.useStore((s) => s.isDirty);
+const canSubmit = form.useStore((s) => s.canSubmit);
 
 // On today's list, default to the slot that is live or starts next; otherwise the first one.
 const defaultSlotIndex = (list: TimeslotResponse[]) => {
@@ -521,6 +558,7 @@ watch(
   [() => selectedSlot.value?.id, isCreating],
   ([, creating]) => {
     activeTab.value = "monitor";
+    saveError.value = null;
     if (creating || !selectedSlot.value) {
       form.reset({ ...defaultForm.value });
       if (creating) enabled.value = false;
@@ -539,6 +577,7 @@ const selectSlot = (index: number) => {
 };
 
 const discardNewSlot = () => {
+  saveError.value = null;
   isCreating.value = false;
   newTimeslot.value = null;
   if (slots.value?.length) selectedIndex.value = 0;

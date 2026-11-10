@@ -8,7 +8,6 @@ import type {
   TenantSettings,
 } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
-import { toInteger } from "../utils/validation.js";
 import { resolveCutoff } from "../slotRules.js";
 
 const getCurrentAccount = async (email: string) => {
@@ -25,16 +24,14 @@ const getCurrentAccount = async (email: string) => {
 };
 
 const createRoom: RequestHandler = asyncHandler(async (req, res) => {
-  const { name, description, creator_id, price } =
-    req.body as CreateRoomRequest;
-
-  const creatorId = toInteger(creator_id, "creator_id");
+  const account = await getCurrentAccount(res.locals.user.email);
+  const { name, description, price } = req.body as CreateRoomRequest;
 
   const room = await prisma.room.create({
     data: {
       name,
       description,
-      creatorId,
+      creatorId: account.id,
       price,
       address: "",
     },

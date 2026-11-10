@@ -1,6 +1,15 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
+    // The server is ESM ("type": "module"), runs under tsx, and imports with
+    // explicit .js extensions — so nodenext, which is also what lets
+    // `import.meta` be used at all (prisma.ts, prisma.config.ts).
+    "target": "ES2022",
+    "module": "nodenext",
+    // The errors this hides are all inside dependencies' own .d.ts files
+    // (Prisma's runtime utils, @types/request, vite, vitest) and none are
+    // actionable from here. The client's @vue/tsconfig base does the same.
+    "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   }

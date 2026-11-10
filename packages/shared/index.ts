@@ -138,7 +138,6 @@ export interface PlayableRoomResponse extends RoomSummaryResponse {
 export interface CreateRoomRequest {
   name: string;
   description?: string | null;
-  creator_id: number;
   price: string | number;
 }
 

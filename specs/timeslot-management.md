@@ -8,8 +8,8 @@ Code: [server/routes/timeslots.ts](../server/routes/timeslots.ts),
 - **SLOT-01** `POST /rooms` creates a room with `name`, `description` and
   `price` (`address` is empty). The caller becomes its owner
   ([HOST-01](slot-hosting.md)).
-- **SLOT-02** The room's owner is the authenticated caller, not a body field.
-  `[gap]` — `creator_id` and `host_id` are taken from the request body.
+- **SLOT-02** The room's owner is the authenticated caller. The request has no
+  owner field, and one sent anyway is ignored.
 - **SLOT-03** `GET /rooms/hosted` lists the rooms the caller **owns**
   (`creatorId`). Each carries `pendingRequestCount` ([REQ-15](join-requests.md))
   and the first currently `live` enabled slot, if there is one (optionally
@@ -39,5 +39,19 @@ Code: [server/routes/timeslots.ts](../server/routes/timeslots.ts),
 - **SLOT-16** `min_players`, `max_players`, `price`, `features` and `message`
   are enforced from the slot's own columns. The tenant's `default*` settings
   only pre-fill the form ([SET-07](tenant-settings.md)).
-- **SLOT-17** `1 ≤ min_players ≤ max_players` is validated on create and
-  update, with 400 on violation. `[gap]` — not validated today.
+- **SLOT-17** On create and update, `max_players` must be an integer ≥ 1
+  and `min_players` must be empty or an integer with `1 ≤ min_players ≤
+  max_players`. An update checks the values the slot would end up with, so
+  lowering `max_players` below the stored minimum is rejected too. A violation
+  is 400 and changes nothing. The slot form checks the same rules as the host
+  types, and never changes what they typed. A broken rule shows an error under
+  that field ("Required", "At least 1", or "Can't be more than max players"),
+  and Save is disabled until it's fixed.
+- **SLOT-18** When saving a slot fails (create or update), the slot form shows
+  the server's message above its save buttons, or "Couldn't save the slot. Try
+  again." when there's none. The host's edits stay in the form. The message
+  clears on the next save attempt, on discard, and when another slot is
+  selected.
+- **SLOT-19** Editing a slot, Save and Discard appear as soon as any field
+  differs from the saved slot: on each keystroke or button press, not when the
+  field loses focus.

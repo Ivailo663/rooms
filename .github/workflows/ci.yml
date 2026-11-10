@@ -19,5 +19,8 @@ jobs:
       - run: npm run prisma:generate -w server
       - run: npm run spec:check
       - run: npm test
-      # Type-checks and e2e are left out on purpose: both type-checks are
-      # already red on main, and e2e needs Supabase, Redis and Firebase creds.
+      # Both workspaces. Tests run through esbuild and never type-check, so
+      # without this a type error lands green — which is how the client's
+      # Promise.withResolvers error reached main.
+      - run: npm run type-check
+      # e2e is left out on purpose: it needs Supabase, Redis and Firebase creds.
