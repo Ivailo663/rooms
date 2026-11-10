@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 import { getAuth } from 'firebase/auth'
 
 export const api = axios.create({
@@ -16,3 +16,9 @@ api.interceptors.request.use(async (config) => {
 
   return config
 })
+
+// The server answers errors with a plain-text message (API-02).
+export const errorMessage = (error: unknown, fallback: string) => {
+  const data = isAxiosError(error) ? error.response?.data : undefined
+  return typeof data === 'string' && data.trim() ? data : fallback
+}

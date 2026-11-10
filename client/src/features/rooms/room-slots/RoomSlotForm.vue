@@ -81,36 +81,64 @@
       </FieldWrapper>
     </form.Field>
 
+    <!-- No min/max clamping on the inputs: InputNumber would silently rewrite
+         the value on blur. The validators report it instead (SLOT-17), and
+         @input commits every keystroke so Save shows up at once (SLOT-19). -->
     <div class="flex !gap-4">
-      <form.Field v-slot="{ field }" name="min_players">
+      <form.Field
+        v-slot="{ field }"
+        name="min_players"
+        :validators="{
+          onChange: validateMin,
+          onChangeListenTo: ['max_players'],
+        }"
+      >
         <FieldWrapper block-label="Min players" class="flex-1 min-w-0">
           <InputNumber
             :model-value="field.state.value"
             class="w-full"
-            :min="0"
+            :invalid="field.state.meta.errors.length > 0"
             :show-buttons="true"
             button-layout="horizontal"
             decrement-button-icon="fa-solid fa-minus"
             increment-button-icon="fa-solid fa-plus"
             :disabled="disabled"
+            @input="(e: { value: unknown }) => field.handleChange(e.value)"
             @update:model-value="field.handleChange"
           />
+          <small
+            v-if="field.state.meta.errors.length"
+            class="text-[11px] text-red-500"
+          >
+            {{ field.state.meta.errors[0] }}
+          </small>
         </FieldWrapper>
       </form.Field>
 
-      <form.Field v-slot="{ field }" name="max_players">
+      <form.Field
+        v-slot="{ field }"
+        name="max_players"
+        :validators="{ onChange: validateMax }"
+      >
         <FieldWrapper block-label="Max players" class="flex-1 min-w-0">
           <InputNumber
             :model-value="field.state.value"
             class="w-full"
-            :min="0"
+            :invalid="field.state.meta.errors.length > 0"
             :show-buttons="true"
             button-layout="horizontal"
             decrement-button-icon="fa-solid fa-minus"
             increment-button-icon="fa-solid fa-plus"
             :disabled="disabled"
+            @input="(e: { value: unknown }) => field.handleChange(e.value)"
             @update:model-value="field.handleChange"
           />
+          <small
+            v-if="field.state.meta.errors.length"
+            class="text-[11px] text-red-500"
+          >
+            {{ field.state.meta.errors[0] }}
+          </small>
         </FieldWrapper>
       </form.Field>
     </div>
@@ -161,6 +189,26 @@ const props = defineProps<{
   showEnabledToggle?: boolean;
   disabled?: boolean;
 }>();
+
+// The same limits the server enforces (SLOT-17); undefined means valid.
+const validateMax = ({ value }: { value: number | null }) => {
+  if (value === null || value === undefined) return "Required";
+  if (value < 1) return "At least 1";
+};
+
+const validateMin = ({
+  value,
+  fieldApi,
+}: {
+  value: number | null;
+  fieldApi: { form: { getFieldValue: (name: string) => unknown } };
+}) => {
+  if (value === null || value === undefined) return;
+  if (value < 1) return "At least 1";
+  const max = fieldApi.form.getFieldValue("max_players");
+  if (typeof max === "number" && value > max)
+    return "Can't be more than max players";
+};
 
 const featureChips = computed(() => {
   const labels = props.availableFeatures ?? Object.keys(BUILTIN_FEATURES);

@@ -33,8 +33,8 @@ order, so the button label matches the error a click would get.
   `timeslot-membership:changed` is emitted, and
   `join-request:validity-changed {valid: false}` is emitted for the caller's
   pending requests in clashing slots.
-- **MEM-10** A disabled slot can't be joined. It answers 404 like a missing
-  one. `[gap]` — the join handler doesn't check `enabled`.
+- **MEM-10** A disabled slot can't be joined or requested. It answers 404
+  "Timeslot not found", like a missing one, and nothing is created.
 - **MEM-11** The join runs in a serializable transaction, so two concurrent
   joins can't both take the last seat.
 

@@ -221,6 +221,7 @@ const createJoinTimeslotHandler = (io: Server): RequestHandler =>
             day: true,
             start_time: true,
             status: true,
+            enabled: true,
             max_players: true,
             _count: { select: { timeslot_players: true } },
             room: {
@@ -233,7 +234,8 @@ const createJoinTimeslotHandler = (io: Server): RequestHandler =>
           },
         });
 
-        if (!timeslot) {
+        // A disabled slot isn't offered to players, so it reads as missing.
+        if (!timeslot || !timeslot.enabled) {
           throw createHttpError(404, "Timeslot not found");
         }
 

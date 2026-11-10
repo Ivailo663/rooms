@@ -8,7 +8,7 @@ import type {
   CreateTimeslotResponse,
 } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
-import { toInteger } from "../utils/validation.js";
+import { assertPlayerLimits, toInteger } from "../utils/validation.js";
 import { Prisma } from "@prisma/client";
 import { syncSlot } from "../scheduler.js";
 import { slotsClash } from "../slotRules.js";
@@ -323,6 +323,8 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
     throw createHttpError(404, "Room not found or not owned by user");
   }
 
+  assertPlayerLimits(body.min_players, body.max_players);
+
   const timeslot = await prisma.roomTimeslot.create({
     data: {
       roomId: body.room_id,
@@ -371,6 +373,16 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   if (!existingTimeslot) {
     throw createHttpError(404, "Timeslot not found or not owned by user");
   }
+
+  // Check the limits the slot would end up with, not just the ones sent.
+  assertPlayerLimits(
+    body.min_players !== undefined
+      ? body.min_players
+      : existingTimeslot.min_players,
+    body.max_players !== undefined
+      ? body.max_players
+      : existingTimeslot.max_players
+  );
 
   const updateData: Partial<Prisma.RoomTimeslotUpdateInput> = {};
 
