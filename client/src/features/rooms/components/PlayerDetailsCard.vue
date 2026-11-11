@@ -1,11 +1,13 @@
 <template>
   <!-- Teleported and fixed-positioned: the room card that owns the avatars
-       clips its overflow, so an in-flow overlay would be cut off. -->
+       clips its overflow, so an in-flow overlay would be cut off. The z-index
+       clears PrimeVue's modal layer (masks start at 1100 and count up), since
+       avatars also live inside the Manage drawer. -->
   <Teleport to="body">
     <div
       ref="cardEl"
       data-player-details-card
-      class="fixed z-50 w-56 rounded-2xl border border-surface-200 bg-white !p-4 shadow-xl transition-opacity"
+      class="fixed z-[1200] w-56 rounded-2xl border border-surface-200 bg-white !p-4 shadow-xl transition-opacity"
       :style="style"
       @mouseenter="emit('hold')"
       @mouseleave="emit('close')"

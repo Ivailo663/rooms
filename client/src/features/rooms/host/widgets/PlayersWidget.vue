@@ -42,45 +42,17 @@
         />
       </div>
 
-      <div v-if="info.count" class="flex items-center !gap-1.5">
-        <div class="flex -space-x-1">
-          <div
-            v-for="(player, index) in avatars"
-            :key="player?.id ?? index"
-            class="flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-primary-100 text-primary-600"
-            :class="
-              player ? 'cursor-pointer text-[8px] font-bold outline-none' : ''
-            "
-            :tabindex="player ? 0 : undefined"
-            @mouseenter="player && show(player, $event)"
-            @mouseleave="player && scheduleClose()"
-            @focus="player && show(player, $event)"
-            @blur="player && close()"
-            @click="player && show(player, $event)"
-          >
-            <span v-if="player">{{ initialOf(player) }}</span>
-            <i v-else class="fa-solid fa-user" style="font-size: 0.35rem" />
-          </div>
-          <div
-            v-if="info.count > AVATAR_LIMIT"
-            class="flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-surface-200 text-[8px] font-bold text-surface-500"
-          >
-            +{{ info.count - AVATAR_LIMIT }}
-          </div>
-        </div>
-      </div>
-      <p v-else class="text-xs text-surface-300">No players yet</p>
+      <p v-if="!info.count" class="text-xs text-surface-300">
+        No players yet
+      </p>
+      <SlotAvatars
+        v-else
+        :players="players"
+        :current-user-id="currentUserId"
+      />
     </template>
 
     <p v-else class="text-sm font-medium text-surface-300">&mdash;</p>
-
-    <PlayerDetailsCard
-      v-if="open"
-      :name="open.player.name"
-      :anchor="open.anchor"
-      @hold="cancelClose"
-      @close="close"
-    />
   </div>
 </template>
 
@@ -88,43 +60,30 @@
 import { computed } from "vue";
 import type { PlayerSummary } from "@football/shared";
 import SlotPlayerCount from "../../components/SlotPlayerCount.vue";
-import PlayerDetailsCard from "../../components/PlayerDetailsCard.vue";
+import SlotAvatars from "../../player/SlotAvatars.vue";
 import {
   gatheredTitle,
   type SlotPlayerInfo,
 } from "../../composables/slotQuorum";
-import { usePlayerDetails } from "../../composables/usePlayerDetails";
+import { useAuthStore } from "@/stores/auth";
 
 const props = withDefaults(
   defineProps<{
     // Counts for whichever slot the card is describing above — null when the
     // room has no game to count players for at all.
     info: SlotPlayerInfo | null;
-    // Roster behind those counts, when the caller has one: it names the avatars
-    // and gives each a details card on hover. Slots whose counts arrive as a
-    // summary have no roster, so those avatars stay anonymous.
-    players?: PlayerSummary[];
+    // Who those counts are. Every slot the card can describe carries its
+    // roster, so there is always someone behind each avatar.
+    players: PlayerSummary[];
     // Only picks the wording of the quorum check mark's tooltip; whether quorum
     // is met already comes in on `info.gathered`.
     live?: boolean;
   }>(),
-  { players: undefined, live: false }
+  { live: false }
 );
 
-// Avatars drawn before the remainder collapses into a "+N" bubble.
-const AVATAR_LIMIT = 3;
-
-// One entry per drawn avatar: the player it stands for, or null when the
-// roster is unknown and all we have is a count.
-const avatars = computed<(PlayerSummary | null)[]>(() => {
-  const drawn = Math.min(props.info?.count ?? 0, AVATAR_LIMIT);
-  return Array.from({ length: drawn }, (_, i) => props.players?.[i] ?? null);
-});
-
-const initialOf = (player: PlayerSummary) =>
-  player.name.trim()[0]?.toUpperCase() ?? "?";
-
-const { open, show, scheduleClose, cancelClose, close } = usePlayerDetails();
+const authStore = useAuthStore();
+const currentUserId = computed(() => authStore.user?.id);
 
 const hasQuorum = computed(() => props.info?.gathered ?? false);
 

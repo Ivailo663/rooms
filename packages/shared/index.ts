@@ -290,6 +290,7 @@ export interface EnabledDaySummary {
   // only place its counts and quorum can come from.
   timeslotId: number;
   players_count: number;
+  players: PlayerSummary[];
   min_players: number | null;
   max_players: number;
 }
@@ -303,6 +304,7 @@ export interface LiveSlotSummary {
   label: string;
   start_time: number;
   players_count: number;
+  players: PlayerSummary[];
   max_players: number;
   day: string;
 }
