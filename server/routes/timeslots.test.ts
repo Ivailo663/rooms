@@ -4,7 +4,14 @@ import type { Application, RequestHandler } from "express";
 const { prisma } = vi.hoisted(() => ({
   prisma: {
     account: { findUnique: vi.fn() },
-    roomTimeslot: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+    room: { findFirst: vi.fn() },
+    roomTimeslot: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
   },
 }));
 
@@ -35,7 +42,7 @@ const update = async (body: object) => {
 describe("PUT /timeslots", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prisma.account.findUnique.mockResolvedValue({ id: 7 });
+    prisma.account.findUnique.mockResolvedValue({ id: 7, role: "clientAdmin" });
     prisma.roomTimeslot.findFirst.mockResolvedValue({
       id: 5,
       min_players: 8,
@@ -59,7 +66,7 @@ describe("PUT /timeslots", () => {
 describe("GET /timeslots/enabled/days", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prisma.account.findUnique.mockResolvedValue({ id: 7 });
+    prisma.account.findUnique.mockResolvedValue({ id: 7, role: "player" });
   });
 
   it("SLOT-20: each day's first slot carries its roster (id and name only), counted from the same list", async () => {
@@ -124,6 +131,108 @@ describe("GET /timeslots/enabled/days", () => {
     expect(query.where).toMatchObject({ roomId: 1, room: { creatorId: 7 } });
     expect(query.select.timeslot_players).toEqual({
       select: { accounts: { select: { id: true, name: true } } },
+    });
+  });
+});
+
+// Ownership is the `creatorId` filter inside findFirst, so "owns the room" is a
+// findFirst that resolves a row and "doesn't" is one that resolves null.
+describe("ROLE-11: slot writes need clientAdmin and owning the room", () => {
+  const slotBody = {
+    room_id: 1,
+    order: 18,
+    day: "mo",
+    name: "Evening",
+    label: "18:00",
+    min_players: 6,
+    max_players: 10,
+    message: "",
+    features: [],
+  };
+
+  const writes = {
+    create: () => send("POST /timeslots", { body: slotBody }),
+    update: () => send("PUT /timeslots", { body: { id: 5, max_players: 10 } }),
+    delete: () => send("DELETE /timeslots/:id", { params: { id: "5" } }),
+  };
+
+  const send = async (route: string, req: object) => {
+    const next = vi.fn();
+    await handlers.get(route)!(
+      req as never,
+      { locals: { user: { email: "a@b.c" } }, send: vi.fn() } as never,
+      next
+    );
+    return next.mock.calls[0]?.[0];
+  };
+
+  const ownsRoom = (owns: boolean) => {
+    prisma.room.findFirst.mockResolvedValue(owns ? { id: 1 } : null);
+    prisma.roomTimeslot.findFirst.mockResolvedValue(
+      owns ? { id: 5, min_players: 6, max_players: 10 } : null
+    );
+  };
+
+  const nothingWritten = () => {
+    expect(prisma.roomTimeslot.create).not.toHaveBeenCalled();
+    expect(prisma.roomTimeslot.update).not.toHaveBeenCalled();
+    expect(prisma.roomTimeslot.delete).not.toHaveBeenCalled();
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prisma.roomTimeslot.create.mockResolvedValue({ id: 5 });
+  });
+
+  for (const [name, write] of Object.entries(writes)) {
+    it(`ROLE-11: a player who owns the room gets 403 on ${name}, before the ownership lookup`, async () => {
+      prisma.account.findUnique.mockResolvedValue({ id: 7, role: "player" });
+      ownsRoom(true);
+
+      expect(await write()).toMatchObject({
+        status: 403,
+        message: "Your role can't do this",
+      });
+      expect(prisma.room.findFirst).not.toHaveBeenCalled();
+      expect(prisma.roomTimeslot.findFirst).not.toHaveBeenCalled();
+      nothingWritten();
+    });
+
+    it(`ROLE-11: a clientAdmin who owns the room can ${name}`, async () => {
+      prisma.account.findUnique.mockResolvedValue({
+        id: 7,
+        role: "clientAdmin",
+      });
+      ownsRoom(true);
+
+      expect(await write()).toBeUndefined();
+    });
+
+    it(`ROLE-11: a clientAdmin who doesn't own the room still gets 404 on ${name}`, async () => {
+      prisma.account.findUnique.mockResolvedValue({
+        id: 9,
+        role: "clientAdmin",
+      });
+      ownsRoom(false);
+
+      expect(await write()).toMatchObject({ status: 404 });
+      nothingWritten();
+    });
+  }
+
+  it("ROLE-11: the owner check is scoped to the caller's account", async () => {
+    prisma.account.findUnique.mockResolvedValue({ id: 7, role: "superAdmin" });
+    ownsRoom(true);
+
+    await writes.create();
+    await writes.update();
+
+    expect(prisma.room.findFirst.mock.calls[0][0].where).toMatchObject({
+      id: 1,
+      creatorId: 7,
+    });
+    expect(prisma.roomTimeslot.findFirst.mock.calls[0][0].where).toMatchObject({
+      room: { creatorId: 7 },
     });
   });
 });

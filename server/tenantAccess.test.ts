@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { canManageTenant } from "./tenantAccess.js";
+import { assertRole, canManageTenant } from "./tenantAccess.js";
 import {
   AUTHENTICATED_PATHS,
   verifyFirebaseToken,
@@ -26,10 +26,8 @@ describe("canManageTenant", () => {
     );
   });
 
-  it("SET-09: a player or host manages no tenant, even their own", () => {
+  it("SET-09: a player manages no tenant, even their own", () => {
     expect(canManageTenant({ role: "player", tenantid: 7 }, 7)).toBe(false);
-    expect(canManageTenant({ role: "host", tenantid: 7 }, 7)).toBe(false);
-    expect(canManageTenant({ role: "owner", tenantid: 7 }, 7)).toBe(false);
   });
 
   it("SET-09: a superAdmin manages any tenant", () => {
@@ -41,6 +39,29 @@ describe("canManageTenant", () => {
 
   it("SET-09: an unknown caller manages no tenant", () => {
     expect(canManageTenant(null, 7)).toBe(false);
+  });
+});
+
+describe("assertRole", () => {
+  it("ROLE-06: a role below the minimum gets 403 \"Your role can't do this\"", () => {
+    expect(() => assertRole({ role: "player" }, "clientAdmin")).toThrow(
+      expect.objectContaining({ status: 403, message: "Your role can't do this" })
+    );
+    expect(() => assertRole({ role: "clientAdmin" }, "superAdmin")).toThrow(
+      expect.objectContaining({ status: 403 })
+    );
+  });
+
+  it("ROLE-01: roles are cumulative, so the minimum and anything above pass", () => {
+    expect(() => assertRole({ role: "player" }, "player")).not.toThrow();
+    expect(() => assertRole({ role: "clientAdmin" }, "clientAdmin")).not.toThrow();
+    expect(() => assertRole({ role: "superAdmin" }, "clientAdmin")).not.toThrow();
+  });
+
+  it("ROLE-01: a role outside the hierarchy (the DB still has host) is refused", () => {
+    expect(() =>
+      assertRole({ role: "host" } as never, "clientAdmin")
+    ).toThrow(expect.objectContaining({ status: 403 }));
   });
 });
 

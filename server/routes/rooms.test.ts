@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Application, RequestHandler } from "express";
 
 const { prisma } = vi.hoisted(() => ({
@@ -19,9 +19,42 @@ registerRoomRoutes({
   post: (path: string, h: RequestHandler) => handlers.set(`POST ${path}`, h),
 } as unknown as Application);
 
+const createRoom = async (role: string) => {
+  prisma.account.findUnique.mockResolvedValue({ id: 7, role });
+  prisma.room.create.mockResolvedValue({ id: 1 });
+  const next = vi.fn();
+  await handlers.get("POST /rooms")!(
+    { body: { name: "Pitch", description: "", price: 10 } } as never,
+    { locals: { user: { email: "a@b.c" } }, send: vi.fn() } as never,
+    next
+  );
+  return next.mock.calls[0]?.[0];
+};
+
 describe("POST /rooms", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("ROLE-10: a player gets 403 and no room is created", async () => {
+    const error = await createRoom("player");
+    expect(error).toMatchObject({
+      status: 403,
+      message: "Your role can't do this",
+    });
+    expect(prisma.room.create).not.toHaveBeenCalled();
+  });
+
+  it("ROLE-10: a clientAdmin can create a room", async () => {
+    expect(await createRoom("clientAdmin")).toBeUndefined();
+    expect(prisma.room.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("ROLE-10: a superAdmin can create a room", async () => {
+    expect(await createRoom("superAdmin")).toBeUndefined();
+    expect(prisma.room.create).toHaveBeenCalledTimes(1);
+  });
+
   it("SLOT-02: the caller owns the new room, whatever the body says", async () => {
-    prisma.account.findUnique.mockResolvedValue({ id: 7 });
+    prisma.account.findUnique.mockResolvedValue({ id: 7, role: "clientAdmin" });
     prisma.room.create.mockResolvedValue({ id: 1 });
     const next = vi.fn();
 

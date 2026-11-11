@@ -18,7 +18,7 @@ will run.
 | Who | Role | Wants |
 | --- | --- | --- |
 | Player | `player` | Find a game near them at a time that suits, join in one tap, know it will run. |
-| Room owner | `owner` (was `host`) | Run their room's weekly schedule, approve slot hosts and players. |
+| Room owner | `clientAdmin` who created the room | Run their room's weekly schedule, approve slot hosts and players. |
 | Slot host | any player, once approved | Gather their own people for one game, choose how many outsiders can join, remove players. |
 | Venue operator | `clientAdmin` | Set the rules for all their rooms: who can join freely, cutoffs, redistribution. |
 | Platform admin | `superAdmin` | Onboard and manage operators (tenants). *(inferred; not built)* |

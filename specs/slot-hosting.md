@@ -14,8 +14,10 @@ it does today.
   manages the room's schedule (SLOT-10..17: times, capacity, price, enabling)
   and approves hosts. `Room.hostId` is removed: nothing reads or writes it.
 - **HOST-02** A **slot host** is attached to one occurrence of one slot, never
-  to a room. It's stored on the slot, not on the room. A slot has at most one
-  host at a time.
+  to a room. A slot has at most one host at a time. It's stored once, as
+  `room_timeslots.hostId` (indexed, a relation to the account), and nowhere
+  else: a user's hostings are the slots whose `hostId` is theirs (MEM-30,
+  HOST-3x). No history is kept; the reset clears it (HOST-14).
 
 ## Becoming a host
 
