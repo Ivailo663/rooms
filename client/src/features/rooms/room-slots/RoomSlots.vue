@@ -176,7 +176,7 @@
             class="rounded-xl border-1 border-dashed border-primary-300 bg-white !p-5 flex flex-col !gap-4 overflow-hidden"
           >
             <template v-if="isCreating">
-              <RoomFormSlot
+              <RoomSlotForm
                 v-model:enabled="enabled"
                 :form="form"
                 :available-features="tenantData?.settings?.defaultFeatures"
@@ -210,14 +210,14 @@
             </template>
 
             <template v-else-if="selectedSlot">
-              <div class="relative">
+              <div class="flex flex-col !gap-4">
                 <SelectButton
                   v-model="activeTab"
                   :options="tabOptions"
                   option-value="value"
                   option-label="value"
                   :allow-empty="false"
-                  class="!absolute top-0 right-0"
+                  class="self-end"
                 >
                   <template #option="{ option }">
                     <i :class="option.icon" style="font-size: 0.8rem" />
@@ -230,7 +230,7 @@
                   :enabled="enabled"
                 />
 
-                <RoomFormSlot
+                <RoomSlotForm
                   v-else
                   v-model:enabled="enabled"
                   :form="form"
@@ -343,7 +343,7 @@ import { DAYS, dayValueOf } from "@/constants";
 import { useNow } from "../composables/useNow";
 import { dayDisplay } from "../composables/gameTime";
 import { isSlotLiveNow, isSlotFailedNow } from "../composables/isSlotLiveNow";
-import RoomFormSlot from "./RoomSlotForm.vue";
+import RoomSlotForm from "./RoomSlotForm.vue";
 import SlotMonitor from "./SlotMonitor.vue";
 import StatusDot from "@/components/StatusDot.vue";
 import SlotPlayerCount from "../components/SlotPlayerCount.vue";

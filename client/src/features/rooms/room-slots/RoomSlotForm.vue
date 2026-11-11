@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col !gap-4 !pt-10">
+  <div class="flex flex-col !gap-4">
     <div
       v-if="disabled"
       class="flex items-start !gap-2.5 rounded-lg border border-surface-200 bg-surface-50 !px-3 !py-2.5"
