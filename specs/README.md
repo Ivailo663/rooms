@@ -55,6 +55,8 @@ Each criterion is one bullet that starts with a bold id:
 | API | [api.md](api.md) | Endpoint contract, auth, error shape |
 | PROF | [player-profile.md](player-profile.md) | Player details card and its future profile endpoint |
 | CARD | [ui/playable-room-card.md](ui/playable-room-card.md) | Player browse card |
+| HCARD | [ui/hosted-room-card.md](ui/hosted-room-card.md) | Host dashboard room card |
+| NAV | [ui/navigation.md](ui/navigation.md) | Sidebar and mobile drawer |
 
 Terms used everywhere are defined in [glossary.md](glossary.md). What the
 product is for, and what's out of scope, is in [product.md](product.md). New

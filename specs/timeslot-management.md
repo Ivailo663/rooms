@@ -55,3 +55,8 @@ Code: [server/routes/timeslots.ts](../server/routes/timeslots.ts),
 - **SLOT-19** Editing a slot, Save and Discard appear as soon as any field
   differs from the saved slot: on each keystroke or button press, not when the
   field loses focus.
+- **SLOT-20** The `liveSlot` on each `GET /rooms/hosted` room and each entry
+  of `GET /timeslots/enabled/days` carry that slot's roster (`players`: id and
+  name of every member), alongside the existing counts. The host card never
+  has to show a count without knowing who it counts
+  ([HCARD-14](ui/hosted-room-card.md)).

@@ -45,23 +45,41 @@
     <div class="flex items-start justify-between !gap-3">
       <div class="flex min-w-0 flex-wrap items-center !gap-3">
         <template v-if="timeslot.players.length">
-          <div
+          <button
             v-for="player in timeslot.players"
             :key="player.id"
-            class="flex items-center !gap-2"
+            type="button"
+            class="flex cursor-pointer items-center !gap-2 rounded-full border-none bg-transparent !p-0 !pr-1 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            @mouseenter="show(player, $event)"
+            @mouseleave="scheduleClose"
+            @focus="show(player, $event)"
+            @blur="close"
+            @click="show(player, $event)"
           >
-            <div
+            <span
               class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600"
             >
-              <i class="fa-solid fa-user" style="font-size: 0.6rem" />
-            </div>
-            <span class="text-xs text-surface-600">
-              {{ player.name || "Player #" + player.id }}
+              <i
+                class="fa-solid fa-user"
+                style="font-size: 0.6rem"
+                aria-hidden="true"
+              />
             </span>
-          </div>
+            <span class="text-xs text-surface-600">
+              {{ displayName(player) }}
+            </span>
+          </button>
         </template>
         <p v-else class="text-xs italic text-surface-300">No players yet</p>
       </div>
+
+      <PlayerDetailsCard
+        v-if="open"
+        :name="displayName(open.player)"
+        :anchor="open.anchor"
+        @hold="cancelClose"
+        @close="close"
+      />
 
       <span
         class="flex shrink-0 items-center !gap-1.5 rounded-full !px-2.5 !py-1 text-xs font-semibold tabular-nums"
@@ -163,9 +181,11 @@
 import { computed, ref } from "vue";
 import { Button } from "primevue";
 import { useConfirm } from "primevue/useconfirm";
-import type { TimeslotResponse } from "@football/shared";
+import type { PlayerSummary, TimeslotResponse } from "@football/shared";
 import StatusBadge from "@/components/StatusBadge.vue";
 import SlotChat from "../components/SlotChat.vue";
+import PlayerDetailsCard from "../components/PlayerDetailsCard.vue";
+import { usePlayerDetails } from "../composables/usePlayerDetails";
 import RedistributionNotice from "../components/RedistributionNotice.vue";
 import SlotFailedNotice from "../components/SlotFailedNotice.vue";
 import { useNow } from "../composables/useNow";
@@ -186,6 +206,11 @@ const props = defineProps<{
   timeslot: TimeslotResponse;
   enabled: boolean;
 }>();
+
+const { open, show, scheduleClose, cancelClose, close } = usePlayerDetails();
+
+const displayName = (player: PlayerSummary) =>
+  player.name?.trim() || `Player #${player.id}`;
 
 const redistributeMutation = useRedistributeTimeslot();
 const approveMutation = useApproveJoinRequest();

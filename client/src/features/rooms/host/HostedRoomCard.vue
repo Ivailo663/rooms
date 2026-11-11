@@ -57,41 +57,36 @@
       </div>
     </div>
 
-    <!-- Widget Grid -->
-    <div class="grid grid-cols-2 !gap-2 !px-4 !pb-3">
+    <!-- Slot panel: everything about the slot the status describes -->
+    <div class="!px-4 !pb-3">
       <StatusWidget
         :status="roomStatus"
         :label="primaryLabel"
         :hint="nextHint"
         :elapsed="elapsed"
         :countdown="nextSlotInfo?.countdown"
-      />
-      <PlayersWidget
-        :info="activePlayerInfo"
-        :players="activeRoster"
-        :live="!!room.liveSlot"
-      />
+      >
+        <PlayersWidget
+          :info="activePlayerInfo"
+          :players="activeRoster"
+          :live="!!room.liveSlot"
+        />
+        <RedistributionNotice
+          v-for="notice in redistributionNotices"
+          :key="notice.id"
+          :notice="notice"
+          @close="dismissNotice(notice.id)"
+        />
+      </StatusWidget>
     </div>
 
-    <!-- Failed / under-filled notice -->
+    <!-- Failed / under-filled notice. Outside the panel: it is about an
+         earlier slot than the one the panel describes. -->
     <div v-if="failedSlot" class="!px-4 !pb-3">
       <SlotFailedNotice
         :players-count="failedSlot.players.length"
         :min-players="failedSlot.min_players"
         :slot-label="failedSlot.label"
-      />
-    </div>
-
-    <!-- Redistribution notices -->
-    <div
-      v-if="redistributionNotices.length"
-      class="flex flex-col !gap-2 !px-4 !pb-3"
-    >
-      <RedistributionNotice
-        v-for="notice in redistributionNotices"
-        :key="notice.id"
-        :notice="notice"
-        @close="dismissNotice(notice.id)"
       />
     </div>
 
@@ -124,7 +119,7 @@ import { ref, computed } from "vue";
 import type { EnabledDaySummary, HostedRoomResponse } from "@football/shared";
 import ManageSlotsDrawer from "./ManageSlotsDrawer.vue";
 import PlayersWidget from "./widgets/PlayersWidget.vue";
-import StatusWidget from "./widgets/StatusWidget.vue";
+import StatusWidget, { type PanelStatus } from "./widgets/StatusWidget.vue";
 import SlotChat from "../components/SlotChat.vue";
 import RedistributionNotice from "../components/RedistributionNotice.vue";
 import SlotFailedNotice from "../components/SlotFailedNotice.vue";
@@ -237,11 +232,7 @@ const nextSlotInfo = computed(() => {
 });
 
 const primaryLabel = computed(
-  () =>
-    props.room.liveSlot?.label ??
-    nextSlotInfo.value?.label ??
-    failedSlot.value?.label ??
-    null
+  () => props.room.liveSlot?.label ?? nextSlotInfo.value?.label ?? null
 );
 
 const nextHint = computed(() => {
@@ -250,29 +241,21 @@ const nextHint = computed(() => {
   if (props.room.liveSlot) {
     return info ? `Next: ${info.when} at ${info.label}` : "";
   }
-  // A failed slot with nothing upcoming: name the outcome rather than a time.
-  if (!info && failedSlot.value) return "Didn't run";
   // Otherwise the label already is the next slot — the hint just says when.
   return info?.when ?? "";
 });
 
-const { isRecentlyRedistributed, noticesForTimeslot, dismissNotice } =
-  useRedistributionNotices();
+const { noticesForTimeslot, dismissNotice } = useRedistributionNotices();
 
 const redistributionNotices = computed(() =>
   nextSlot.value ? noticesForTimeslot(nextSlot.value.id) : []
 );
 
-const roomStatus = computed(() => {
+// The panel only describes what's live or what's next. A failure or a
+// redistribution has its own notice, so it never takes the panel over.
+const roomStatus = computed<PanelStatus>(() => {
   if (props.room.liveSlot) return "live";
-  if (nextSlot.value && isRecentlyRedistributed(nextSlot.value.id)) {
-    return "redistributed";
-  }
-  // Anything still upcoming owns the widget — it describes what's next, not
-  // what already happened. A failed slot only takes it over when the day has
-  // nothing left; otherwise the failure lives solely in the banner below.
   if (nextSlot.value || nextEnabledDay.value) return "scheduled";
-  if (failedSlot.value) return "failed";
   return "inactive";
 });
 
@@ -303,10 +286,13 @@ const activePlayerInfo = computed(() => {
   return null;
 });
 
-// Who those counts are, when the slot above them is one we hold the full roster
-// for. The live slot and a later day both reach the card as summaries carrying
-// a count only, so their avatars stay unnamed until that changes.
-const activeRoster = computed(() =>
-  !props.room.liveSlot && nextSlot.value ? nextSlot.value.players : undefined
+// Who those counts are, from the same slot: every source carries its roster,
+// so the widget never shows a count without the players behind it.
+const activeRoster = computed(
+  () =>
+    props.room.liveSlot?.players ??
+    nextSlot.value?.players ??
+    nextEnabledDay.value?.players ??
+    []
 );
 </script>

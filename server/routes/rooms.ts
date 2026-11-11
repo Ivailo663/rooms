@@ -72,7 +72,9 @@ const getHostedRooms: RequestHandler = asyncHandler(async (req, res) => {
           start_time: true,
           max_players: true,
           day: true,
-          _count: { select: { timeslot_players: true } },
+          timeslot_players: {
+            select: { accounts: { select: { id: true, name: true } } },
+          },
         },
         take: 1,
       },
@@ -102,6 +104,11 @@ const getHostedRooms: RequestHandler = asyncHandler(async (req, res) => {
 
   const response: HostedRoomResponse[] = rooms.map((room) => {
     const live = room.timeslots[0] ?? null;
+    const players =
+      live?.timeslot_players.map(({ accounts }) => ({
+        id: accounts.id,
+        name: accounts.name,
+      })) ?? [];
     return {
       id: room.id,
       name: room.name,
@@ -114,7 +121,8 @@ const getHostedRooms: RequestHandler = asyncHandler(async (req, res) => {
             id: live.id,
             label: live.label,
             start_time: live.start_time,
-            players_count: live._count.timeslot_players,
+            players_count: players.length,
+            players,
             max_players: live.max_players,
             day: live.day,
           }

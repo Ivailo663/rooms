@@ -267,20 +267,29 @@ const getEnabledTimeslotDaysAndFirstSlot: RequestHandler = asyncHandler(
         label: true,
         min_players: true,
         max_players: true,
-        _count: { select: { timeslot_players: true } },
+        timeslot_players: {
+          select: { accounts: { select: { id: true, name: true } } },
+        },
       },
       orderBy: { start_time: "asc" },
       distinct: ["day"],
     });
 
-    const response: EnabledDaySummary[] = rows.map((r) => ({
-      day: r.day,
-      label: r.label,
-      timeslotId: r.id,
-      players_count: r._count.timeslot_players,
-      min_players: r.min_players,
-      max_players: r.max_players,
-    }));
+    const response: EnabledDaySummary[] = rows.map((r) => {
+      const players = r.timeslot_players.map(({ accounts }) => ({
+        id: accounts.id,
+        name: accounts.name,
+      }));
+      return {
+        day: r.day,
+        label: r.label,
+        timeslotId: r.id,
+        players_count: players.length,
+        players,
+        min_players: r.min_players,
+        max_players: r.max_players,
+      };
+    });
 
     res.send(response);
   }

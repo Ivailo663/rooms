@@ -8,8 +8,10 @@ player. It's one component, and it behaves the same everywhere.
 ## Where and how it opens
 
 - **PROF-01** The card opens from every avatar backed by a known player. Today
-  that's the host's players widget and the player's avatar rows (slot picker
-  tiles and My games roster, [CARD-24](ui/playable-room-card.md)). Avatars
+  that's the host's players widget ([HCARD-13](ui/hosted-room-card.md)), the
+  player list in the host's slot monitor (Manage drawer), and the player's
+  avatar rows (slot picker tiles and My games roster,
+  [CARD-24](ui/playable-room-card.md)). Avatars
   with only a count behind them, and the "+N" circle, don't open it.
 - **PROF-02** With a mouse, the card opens when the pointer enters an avatar.
   It opens on keyboard focus too, and the card closes when focus leaves.
