@@ -9,11 +9,12 @@ import type {
 } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { resolveCutoff } from "../slotRules.js";
+import { assertRole } from "../tenantAccess.js";
 
 const getCurrentAccount = async (email: string) => {
   const account = await prisma.account.findUnique({
     where: { email },
-    select: { id: true },
+    select: { id: true, role: true },
   });
 
   if (!account) {
@@ -25,6 +26,7 @@ const getCurrentAccount = async (email: string) => {
 
 const createRoom: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
+  assertRole(account, "clientAdmin");
   const { name, description, price } = req.body as CreateRoomRequest;
 
   const room = await prisma.room.create({

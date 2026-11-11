@@ -25,6 +25,7 @@ import {
   isRosterLocked,
   resolveCutoff,
 } from "../slotRules.js";
+import { assertRole } from "../tenantAccess.js";
 
 export const JOIN_REQUEST_CREATED_EVENT = "join-request:created";
 export const JOIN_REQUEST_RESOLVED_EVENT = "join-request:resolved";
@@ -107,7 +108,7 @@ const emitRequestValidityChanged = async (
 const getCurrentAccount = async (email: string) => {
   const account = await prisma.account.findUnique({
     where: { email },
-    select: { id: true, name: true },
+    select: { id: true, name: true, role: true },
   });
 
   if (!account) {
@@ -518,6 +519,7 @@ const assertSlotOwner = async (timeslotId: number, accountId: number) => {
 const createApproveRequestHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
     const account = await getCurrentAccount(res.locals.user.email);
+    assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
     const accountId = toInteger(req.params.accountId, "accountId");
 
@@ -605,6 +607,7 @@ const createApproveRequestHandler = (io: Server): RequestHandler =>
 const createDenyRequestHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
     const account = await getCurrentAccount(res.locals.user.email);
+    assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
     const accountId = toInteger(req.params.accountId, "accountId");
 
@@ -642,6 +645,7 @@ const createDenyRequestHandler = (io: Server): RequestHandler =>
 const createAcknowledgeRequestHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
     const account = await getCurrentAccount(res.locals.user.email);
+    assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
     const accountId = toInteger(req.params.accountId, "accountId");
 
@@ -684,6 +688,7 @@ const createRedestributePlayersBetweenTimeslotHandler = (
 ): RequestHandler =>
   asyncHandler(async (req, res) => {
     const account = await getCurrentAccount(res.locals.user.email);
+    assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
 
     await assertSlotOwner(timeslotId, account.id);

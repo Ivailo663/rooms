@@ -12,6 +12,7 @@ import { assertPlayerLimits, toInteger } from "../utils/validation.js";
 import { Prisma } from "@prisma/client";
 import { syncSlot } from "../scheduler.js";
 import { slotsClash } from "../slotRules.js";
+import { assertRole } from "../tenantAccess.js";
 
 const labelToStartTime = (label: string): number => {
   const [h, m] = label.split(":").map(Number);
@@ -108,6 +109,7 @@ const getCurrentAccount = async (email: string) => {
     },
     select: {
       id: true,
+      role: true,
     },
   });
 
@@ -321,6 +323,7 @@ const getPendingRequestDays: RequestHandler = asyncHandler(async (req, res) => {
 
 const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
+  assertRole(account, "clientAdmin");
   const body: CreateTimeslotRequest = req.body;
 
   // Validate room belongs to account
@@ -367,6 +370,7 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
 
 const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
+  assertRole(account, "clientAdmin");
   const body: UpdateTimeslotRequest = req.body;
 
   // Validate timeslot exists and belongs to user's room
@@ -427,6 +431,7 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
 
 const deleteTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.email);
+  assertRole(account, "clientAdmin");
   const timeslotId = toInteger(getQueryValue(req.params.id), "id");
 
   // Validate timeslot exists and belongs to user's room

@@ -43,7 +43,8 @@ const roleCapabilities: Record<AccountRole, readonly Capability[]> = {
     Cap.timeslots.join,
     Cap.timeslots.leave,
   ],
-  host: [
+  // Owning a room isn't a role (ROLE-01): venue admins create and run rooms.
+  clientAdmin: [
     Cap.rooms.create,
     Cap.rooms.edit,
     Cap.rooms.delete,
@@ -51,8 +52,6 @@ const roleCapabilities: Record<AccountRole, readonly Capability[]> = {
     Cap.timeslots.edit,
     Cap.timeslots.delete,
     Cap.timeslots.toggle,
-  ],
-  clientAdmin: [
     Cap.admin.dashboard,
     Cap.admin.manageUsers,
     Cap.admin.manageRooms,
@@ -63,14 +62,9 @@ const roleCapabilities: Record<AccountRole, readonly Capability[]> = {
   ],
 };
 
-const roleHierarchy: AccountRole[] = [
-  "player",
-  "host",
-  "clientAdmin",
-  "superAdmin",
-];
+const roleHierarchy: AccountRole[] = ["player", "clientAdmin", "superAdmin"];
 
-function getCapabilitiesForRole(role: AccountRole): Set<Capability> {
+export function getCapabilitiesForRole(role: AccountRole): Set<Capability> {
   const rank = roleHierarchy.indexOf(role);
   const result = new Set<Capability>();
 
@@ -107,7 +101,6 @@ export const useRoleStore = defineStore("role", () => {
     allowedCapabilities.value.has(capability);
 
   const isPlayer = computed(() => role.value === "player");
-  const isHost = computed(() => role.value === "host");
   const isClientAdmin = computed(() => role.value === "clientAdmin");
   const isSuperAdmin = computed(() => role.value === "superAdmin");
 
@@ -121,7 +114,6 @@ export const useRoleStore = defineStore("role", () => {
     role,
     can,
     isPlayer,
-    isHost,
     isClientAdmin,
     isSuperAdmin,
     managesVenue,

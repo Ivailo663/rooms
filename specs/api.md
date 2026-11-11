@@ -26,23 +26,23 @@ Those types are the contract, so change them together with this table.
 | POST | `/user` | any | `Account` | ROLE-07 |
 | GET | `/user` | any | `Account \| null` | ROLE-07 |
 | GET | `/accounts?search=` | any (should be admin) | `AccountSearchResult[]` | API-03 |
-| POST | `/rooms` | host | `CreateRoomResponse` | SLOT-01 |
+| POST | `/rooms` | clientAdmin or above | `CreateRoomResponse` | SLOT-01, ROLE-10 |
 | GET | `/rooms/hosted?day=` | host | `HostedRoomResponse[]` | SLOT-03 |
 | GET | `/rooms/playable?day=` | any | `PlayableRoomResponse[]` | SLOT-04 |
 | GET | `/timeslots?room_id&day` | room creator | `TimeslotResponse[]` | SLOT-15, REQ-14 |
 | GET | `/timeslots/enabled?room_id&day` | room creator | `TimeslotResponse[]` | SLOT-15, REQ-14 |
 | GET | `/timeslots/enabled/days?room_id` | room creator | `EnabledDaySummary[]` | SLOT-15 |
 | GET | `/timeslots/pending-days?room_id` | room creator | `string[]` | REQ-16 |
-| POST | `/timeslots` | room creator | `CreateTimeslotResponse` | SLOT-10 |
-| PUT | `/timeslots` | room creator | `MutationMessageResponse` | SLOT-11 |
-| DELETE | `/timeslots/:id` | room creator | `MutationMessageResponse` | SLOT-12 |
+| POST | `/timeslots` | clientAdmin or above, owning the room | `CreateTimeslotResponse` | SLOT-10, ROLE-11 |
+| PUT | `/timeslots` | clientAdmin or above, owning the room | `MutationMessageResponse` | SLOT-11, ROLE-11 |
+| DELETE | `/timeslots/:id` | clientAdmin or above, owning the room | `MutationMessageResponse` | SLOT-12, ROLE-11 |
 | GET | `/timeslots/joined` | any | `JoinedSlotSummary[]` | MEM-30 |
 | POST | `/timeslots/:id/join` | any | `JoinTimeslotResponse` | MEM-01..11 |
 | POST | `/timeslots/:id/leave` | any | `MutationMessageResponse` | MEM-12..15 |
 | POST | `/timeslots/:id/requests/:accountId/approve` | room owner or slot host | `MutationMessageResponse` | REQ-11 |
 | POST | `/timeslots/:id/requests/:accountId/deny` | room owner or slot host | `MutationMessageResponse` | REQ-12 |
 | DELETE | `/timeslots/:id/requests/:accountId` | room owner or slot host | `MutationMessageResponse` | REQ-13 |
-| POST | `/timeslots/:id/redistribute` | room owner | `MutationMessageResponse` | RED-08 |
+| POST | `/timeslots/:id/redistribute` | clientAdmin or above, owning the room | `MutationMessageResponse` | RED-08, ROLE-11 |
 | GET | `/tenants/:tenantId` | tenant clientAdmin or superAdmin | `TenantSettingsResponse` | SET-02 |
 | POST | `/tenants` | tenant clientAdmin or superAdmin | `{message}` | SET-03 |
 | POST | `/tenants/accounts` | tenant clientAdmin or superAdmin | `{message}` | SET-04 |
