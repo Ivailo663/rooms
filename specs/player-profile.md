@@ -40,7 +40,9 @@ The app is also growing into a database of amateur football players in
 Bulgaria. Every player has a profile, built in phases.
 
 - **PROF-20** A profile holds: picture, name, preferred position, city, a
-  short bio, and "member since" (the account's creation date). Facebook
+  short bio, and "member since": when the player's Firebase account was
+  created, which for accounts that existed before profiles is read back from
+  Firebase once. Facebook
   sign-in fills the name and picture ([AUTH-11](sign-in.md)).
 - **PROF-21** A player edits their own name, preferred position, city and bio.
   Nobody else can (403).
