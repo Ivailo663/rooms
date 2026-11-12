@@ -53,7 +53,8 @@ Each criterion is one bullet that starts with a bold id:
 | RED | [redistribution.md](redistribution.md) | Moving players out of an under-filled slot |
 | EVT | [realtime.md](realtime.md) | Socket.IO events |
 | API | [api.md](api.md) | Endpoint contract, auth, error shape |
-| PROF | [player-profile.md](player-profile.md) | Player details card and its future profile endpoint |
+| AUTH | [sign-in.md](sign-in.md) | Sign-in methods, Facebook, matching accounts, sign-up checks |
+| PROF | [player-profile.md](player-profile.md) | Player details card, profiles, ratings consent, player database |
 | CARD | [ui/playable-room-card.md](ui/playable-room-card.md) | Player browse card |
 | HCARD | [ui/hosted-room-card.md](ui/hosted-room-card.md) | Host dashboard room card |
 | NAV | [ui/navigation.md](ui/navigation.md) | Sidebar and mobile drawer |

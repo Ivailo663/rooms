@@ -29,9 +29,10 @@ Code: [server/prisma/schema.prisma](../server/prisma/schema.prisma),
   whose role lacks the capability gets 403 "Your role can't do this", and
   nothing changes. The role check comes before any ownership check.
   ROLE-10..12 list what each endpoint needs.
-- **ROLE-07** On first sign-in, `POST /user` creates the account by email, with
-  `name` set to the email's local part and `role: player`. Later calls return
-  the existing account unchanged.
+- **ROLE-07** On first sign-in, `POST /user` creates the account with
+  `role: player`, found and matched as [AUTH-01..03](sign-in.md) describe. The
+  name is the Facebook name, or else the email's local part. Later calls
+  return the existing account unchanged.
 - **ROLE-08** A superAdmin manages tenants as entities (plan, owners,
   playgrounds). `[deferred]` — none of this is modelled yet.
 

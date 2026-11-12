@@ -13,6 +13,11 @@ that's on the calendar **actually happens with enough players**. If a game
 can't fill, players find out before they travel, and are moved to a game that
 will run.
 
+Alongside that, it grows into a **database of amateur football players in
+Bulgaria**: profiles, ratings from people they actually played with, a
+ranklist, media, and a way to request a player for a game
+([player-profile.md](player-profile.md)).
+
 ## Who it's for
 
 | Who | Role | Wants |
