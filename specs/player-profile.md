@@ -27,12 +27,65 @@ player. It's one component, and it behaves the same everywhere.
 
 ## What it shows
 
-- **PROF-10** It shows the player's picture (initials until there are
-  pictures), name, rating (score and number of ratings), position, games
-  played, attendance and "member since".
+- **PROF-10** It shows the player's picture (initials when there's none),
+  name, preferred position, city and "member since". Rating, games played and
+  attendance join it with PROF-50..53.
 - **PROF-11** Everything except the name comes from the server for that
   player. `[gap]` — there's no profile data yet, so the rating and the detail
   rows are hardcoded placeholders, the same for every player.
+
+## The profile
+
+The app is also growing into a database of amateur football players in
+Bulgaria. Every player has a profile, built in phases.
+
+- **PROF-20** A profile holds: picture, name, preferred position, city, a
+  short bio, and "member since" (the account's creation date). Facebook
+  sign-in fills the name and picture ([AUTH-11](sign-in.md)).
+- **PROF-21** A player edits their own name, preferred position, city and bio.
+  Nobody else can (403).
+- **PROF-22** Preferred position is optional, and one of: goalkeeper,
+  defender, midfielder, forward. Anything else is 400.
+- **PROF-23** Name is required, up to 50 characters. Bio is optional, up to
+  300 characters. Over either limit is 400.
+- **PROF-24** City is optional, and one of a fixed list of every Bulgarian
+  city (nothing outside Bulgaria, no "Other") that the server holds and the
+  client offers. Anything else is 400.
+- **PROF-25** The picture comes from Facebook only. Players without one show
+  initials. Uploading a picture waits for PROF-60.
+
+## Who sees a profile
+
+- **PROF-30** Every player has a profile and appears in the player database
+  from sign-up. There's no opting out of the basic profile (PROF-20).
+- **PROF-31** Only signed-in users can see a profile. Signed out, it's 401.
+- **PROF-32** A profile never shows the player's email.
+
+## Ratings consent
+
+- **PROF-40** Every account has agreed to be rated, commented on and ranked
+  ([AUTH-20](sign-in.md)): nobody uses the app without it. There's no
+  in-app way to withdraw. Leaving means deleting the account
+  ([AUTH-30](sign-in.md)), which deletes their ratings and comments too.
+
+## Later phases
+
+- **PROF-50** After a game, the players who were on its roster can rate and
+  comment on each other. Nobody else can, and nobody rates themselves.
+  `[deferred]`
+- **PROF-51** Games played and attendance are counted from game rosters,
+  never typed in. Today's rosters are cleared at each reset
+  ([LIFE-08](slot-lifecycle.md)), so this needs a record of past games first.
+  `[deferred]`
+- **PROF-52** A ranklist of players ordered by rating, with a minimum number
+  of ratings to appear. `[deferred]`
+- **PROF-53** The ranklist resists friends rating each other up (for example
+  by weighting ratings or requiring raters from different games).
+  `[deferred]`
+- **PROF-60** A player uploads photos, videos and reels to their profile,
+  within size limits, and others can report them for removal. `[deferred]`
+- **PROF-61** A player can be requested for a game, at the price they ask.
+  Payment happens outside the app. `[deferred]`
 
 ## Open questions
 
@@ -47,5 +100,7 @@ player. It's one component, and it behaves the same everywhere.
    - Games played: count only slots that went `live`?
    - Attendance: no-shows aren't recorded today.
    - Position: set by the player?
-3. **Who can see a profile.** Any signed-in user, or only people who share a
-   game or venue? Emails are never shown.
+   Rating, games played and attendance now wait on PROF-50..53. Position is
+   set by the player (PROF-21).
+3. ~~Who can see a profile.~~ Settled 2026-11-11: any signed-in user
+   (PROF-31).
