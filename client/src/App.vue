@@ -9,6 +9,9 @@
     </div>
   </div>
 
+  <!-- AUTH-24: nothing else renders until the sign-up box is ticked. -->
+  <TermsGate v-else-if="authStore.needsTerms" />
+
   <div v-else class="flex min-h-screen bg-gradient-to-b from-slate-50 via-sky-50/40 to-emerald-50/30">
     <AppSidebar v-if="authStore.user" />
 
@@ -42,6 +45,7 @@ import { watch } from "vue";
 import ConfirmDialog from "primevue/confirmdialog";
 import { useAuthStore } from "./stores/auth";
 import AppSidebar from "./components/AppSidebar.vue";
+import TermsGate from "./components/TermsGate.vue";
 import { useJoinRequestSync } from "./features/rooms/composables/useJoinRequestSync";
 import { useRoomView } from "./composables/useRoomView";
 import { useMenuExpanded } from "./composables/useMenuExpanded";

@@ -11,11 +11,15 @@ const rejects = (body: unknown) => {
 };
 
 describe("parseProfileUpdate", () => {
-  it("PROF-23: name is required", () => {
-    expect(rejects({})).toMatchObject({ status: 400 });
+  it("PROF-23: a name that's sent can't be empty", () => {
     expect(rejects({ name: "   " })).toMatchObject({ status: 400 });
     expect(rejects({ name: 7 })).toMatchObject({ status: 400 });
-    expect(rejects(null)).toMatchObject({ status: 400 });
+  });
+
+  it("PROF-23: leaving name out keeps it unchanged", () => {
+    expect(parseProfileUpdate({ city: null })).toEqual({ city: null });
+    expect(parseProfileUpdate({})).toEqual({});
+    expect(parseProfileUpdate(null)).toEqual({});
   });
 
   it("PROF-23: name is up to 50 characters", () => {

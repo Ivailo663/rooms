@@ -42,6 +42,7 @@
 
   <PlayerDetailsCard
     v-if="open"
+    :player-id="open.player.id"
     :name="open.player.name?.trim() || 'Player'"
     :anchor="open.anchor"
     @hold="cancelClose"

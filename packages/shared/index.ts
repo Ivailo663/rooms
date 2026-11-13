@@ -229,9 +229,14 @@ export interface PlayerProfile {
   created_at: string;
 }
 
+// POST /user (ROLE-07, AUTH-23). Creating an account requires acceptTerms: true.
+export interface CreateUserRequest {
+  acceptTerms?: boolean;
+}
+
 // PATCH /user (PROF-21..24). Absent leaves a field unchanged; null clears it.
 export interface UpdateProfileRequest {
-  name: string;
+  name?: string;
   position?: PlayerPosition | null;
   city?: string | null;
   bio?: string | null;

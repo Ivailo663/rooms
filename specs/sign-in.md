@@ -45,6 +45,19 @@ Players sign in with Firebase, by email and password or with Facebook.
   once, on its next sign-in, before anything else. Once ticked, it's never
   asked again, for any account.
 - **AUTH-22** The account stores when the checkbox was ticked.
+- **AUTH-23** The server enforces it. `POST /user` with `acceptTerms: true`
+  creates the account, or records the tick on an existing account that has
+  none. Creating an account without it is 400 "Tick the box to continue", and
+  nothing is created. An existing account is returned unchanged either way
+  (ROLE-07).
+- **AUTH-25** Until an account has ticked the box, every endpoint except
+  `GET /user` and `POST /user` answers 403 "Tick the box to continue", and
+  nothing changes. A signed-in Firebase user with no account gets the same
+  answer from those endpoints.
+- **AUTH-24** (mirrored) After any sign-in, a signed-in Firebase user with no
+  account, or with an account that hasn't ticked the box, sees only the
+  checkbox screen until they tick it. On the sign-up form, the checkbox is
+  part of the form, so a new password user doesn't see it twice.
 
 ## Pages Facebook requires
 

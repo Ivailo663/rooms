@@ -23,7 +23,7 @@ Those types are the contract, so change them together with this table.
 
 | Method | Path | Who | Success | Spec |
 | --- | --- | --- | --- | --- |
-| POST | `/user` | any | `Account` | ROLE-07 |
+| POST | `/user` | any; body `{ acceptTerms?: boolean }` | `Account` | ROLE-07, AUTH-23 |
 | GET | `/user` | any | `Account \| null` | ROLE-07 |
 | PATCH | `/user` | any, own account only | `Account` | PROF-21..24 |
 | GET | `/players/:id` | any | `PlayerProfile` | PROF-20, PROF-31, PROF-32 |

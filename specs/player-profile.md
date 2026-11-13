@@ -31,8 +31,7 @@ player. It's one component, and it behaves the same everywhere.
   name, preferred position, city and "member since". Rating, games played and
   attendance join it with PROF-50..53.
 - **PROF-11** Everything except the name comes from the server for that
-  player. `[gap]` — there's no profile data yet, so the rating and the detail
-  rows are hardcoded placeholders, the same for every player.
+  player.
 
 ## The profile
 
@@ -55,6 +54,18 @@ Bulgaria. Every player has a profile, built in phases.
   client offers. Anything else is 400.
 - **PROF-25** The picture comes from Facebook only. Players without one show
   initials. Uploading a picture waits for PROF-60.
+- **PROF-26** The player's own avatar, in the user section of the sidebar
+  (where the user icon is today, collapsed or not), opens the `/profile`
+  page. It shows every PROF-20 field, and the ones PROF-21 allows are
+  editable.
+- **PROF-28** There's no save button. A text field (name, bio) saves once
+  typing stops for a moment; position and city save when picked. If the
+  server refuses, its message shows under that field, the field keeps what
+  was typed, and the next change tries again.
+- **PROF-29** Each player has a full, read-only profile page at
+  `/profiles/:id` showing every PROF-20 field (and later phases' data as they
+  ship). The player card ([PROF-10](#what-it-shows)) links to it with "View
+  profile". An unknown id shows "Player not found".
 
 ## Who sees a profile
 
@@ -91,18 +102,14 @@ Bulgaria. Every player has a profile, built in phases.
 
 ## Open questions
 
-1. **Endpoint shape.** Fetch one player by id when their card opens
-   (`GET /players/:id`, cached on the client), or everyone on a roster at once
-   (`GET /players?ids=…`)? *Proposal:* by id on open. It loads only the
-   profiles people actually look at, and the cache makes a second open
-   instant. Batch is worth it only if the card must show without a brief
-   loading state.
+1. ~~Endpoint shape.~~ Settled 2026-11-13: by id when the card opens, cached
+   (`GET /players/:id`, PROF-11).
 2. **Where the numbers come from.**
    - Rating: who rates whom, and when?
    - Games played: count only slots that went `live`?
    - Attendance: no-shows aren't recorded today.
    - Position: set by the player?
-   Rating, games played and attendance now wait on PROF-50..53. Position is
-   set by the player (PROF-21).
+     Rating, games played and attendance now wait on PROF-50..53. Position is
+     set by the player (PROF-21).
 3. ~~Who can see a profile.~~ Settled 2026-11-11: any signed-in user
    (PROF-31).

@@ -47,21 +47,42 @@ const claimByEmail = async (
     : findByUid(uid);
 };
 
-// ROLE-07, AUTH-01..03, AUTH-11, PROF-20.
-const createUser: RequestHandler = asyncHandler(async (_req, res) => {
+// AUTH-23: the first tick is the one recorded. Conditional on the column still
+// being empty, so a repeat or parallel POST never moves the timestamp.
+const recordTerms = async (account: Account): Promise<Account> => {
+  if (account.terms_accepted_at) {
+    return account;
+  }
+
+  await prisma.account.updateMany({
+    where: { id: account.id, terms_accepted_at: null },
+    data: { terms_accepted_at: new Date() },
+  });
+  return (
+    (await prisma.account.findUnique({ where: { id: account.id } })) ?? account
+  );
+};
+
+// ROLE-07, AUTH-01..03, AUTH-11, AUTH-23, PROF-20.
+const createUser: RequestHandler = asyncHandler(async (req, res) => {
   const token = (res.locals as AuthenticatedLocals).user;
   const { uid, email } = token;
+  const acceptTerms = req.body?.acceptTerms === true;
 
   const existing = await findByUid(uid);
   if (existing) {
-    return res.send(existing);
+    return res.send(acceptTerms ? await recordTerms(existing) : existing);
   }
 
   if (email && token.email_verified) {
     const claimed = await claimByEmail(uid, email);
     if (claimed) {
-      return res.send(claimed);
+      return res.send(acceptTerms ? await recordTerms(claimed) : claimed);
     }
+  }
+
+  if (!acceptTerms) {
+    throw createHttpError(400, "Tick the box to continue");
   }
 
   const tokenName = typeof token.name === "string" ? token.name.trim() : "";
@@ -79,6 +100,7 @@ const createUser: RequestHandler = asyncHandler(async (_req, res) => {
         email: email ?? null,
         picture_url: token.picture ?? null,
         created_at: new Date(firebaseUser.metadata.creationTime),
+        terms_accepted_at: new Date(),
       },
     });
     return res.send(account);
@@ -91,7 +113,7 @@ const createUser: RequestHandler = asyncHandler(async (_req, res) => {
     // unique here is the email, held by an account this caller can't claim.
     const raced = await findByUid(uid);
     if (raced) {
-      return res.send(raced);
+      return res.send(await recordTerms(raced));
     }
     throw createHttpError(409, "This email already belongs to another account");
   }

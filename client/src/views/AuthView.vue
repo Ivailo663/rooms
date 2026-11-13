@@ -56,12 +56,21 @@
               />
             </div>
 
+            <!-- AUTH-20/24: part of the form, so a new password user isn't
+                 asked again on the terms screen after the account exists. -->
+            <TermsCheckbox
+              v-if="!isLogin"
+              v-model="acceptTerms"
+              input-id="sign-up-terms"
+            />
+
             <Button
               :label="isLogin ? 'Sign in' : 'Create account'"
               :icon="
                 isLogin ? 'fa-solid fa-right-to-bracket' : 'fa-solid fa-user'
               "
               :loading="isLoading"
+              :disabled="!isLogin && !acceptTerms"
               class="w-full"
               @click="handleSubmit"
             />
@@ -88,6 +97,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { Button, Card, InputText, Password } from "primevue";
+import { useAuthStore } from "@/stores/auth";
+import TermsCheckbox from "@/components/TermsCheckbox.vue";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -98,6 +109,9 @@ const email = ref("");
 const password = ref("");
 const isLogin = ref(true);
 const isLoading = ref(false);
+const acceptTerms = ref(false);
+
+const authStore = useAuthStore();
 
 const auth = getAuth();
 const handleSubmit = async () => {
@@ -107,9 +121,12 @@ const handleSubmit = async () => {
     if (isLogin.value) {
       await signInWithEmailAndPassword(auth, email.value, password.value);
     } else {
+      if (!acceptTerms.value) return;
+      authStore.acceptTermsOnSignIn = true;
       await createUserWithEmailAndPassword(auth, email.value, password.value);
     }
   } catch (err) {
+    authStore.acceptTermsOnSignIn = false;
     console.error(err);
   } finally {
     isLoading.value = false;
