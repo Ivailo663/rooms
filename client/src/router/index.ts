@@ -21,9 +21,27 @@ const router = createRouter({
           meta: { requiresVenue: true },
         },
         {
+          // PROF-26: there's one profile page; this address is the player's
+          // own. On a hard refresh the account isn't loaded yet, so wait,
+          // which a `redirect` can't. The guard always leaves; the component
+          // is only there because a record needs one.
           path: "profile",
           name: "profile",
-          component: () => import("@/features/profile/ProfileView.vue"),
+          component: () => import("@/features/profile/PlayerProfileView.vue"),
+          beforeEnter: async () => {
+            const authStore = useAuthStore();
+            await authStore.ready;
+            const id = authStore.account?.id;
+            return id
+              ? { name: "player-profile", params: { id } }
+              : { name: "home" };
+          },
+        },
+        {
+          path: "profiles/:id",
+          name: "player-profile",
+          component: () => import("@/features/profile/PlayerProfileView.vue"),
+          props: (route) => ({ id: Number(route.params.id) }),
         },
       ],
     },

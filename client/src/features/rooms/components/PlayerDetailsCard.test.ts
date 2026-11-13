@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
+import { createMemoryHistory, createRouter } from "vue-router";
 import type { PlayerProfile } from "@football/shared";
 import { api } from "@/axios";
 import { queryClient as appQueryClient } from "@/queryClient";
@@ -19,6 +20,17 @@ const profile: PlayerProfile = {
 const card = () =>
   document.body.querySelector<HTMLElement>("[data-player-details-card]");
 
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [
+    {
+      path: "/profiles/:id",
+      name: "player-profile",
+      component: { template: "<div />" },
+    },
+  ],
+});
+
 let wrappers: VueWrapper[] = [];
 
 const mountCard = (queryClient = new QueryClient()) => {
@@ -28,7 +40,7 @@ const mountCard = (queryClient = new QueryClient()) => {
       name: "Ana Petrova",
       anchor: document.body,
     },
-    global: { plugins: [[VueQueryPlugin, { queryClient }]] },
+    global: { plugins: [router, [VueQueryPlugin, { queryClient }]] },
   });
   wrappers.push(wrapper);
   return wrapper;
@@ -103,6 +115,16 @@ describe("PlayerDetailsCard", () => {
 
     expect(get).toHaveBeenCalledTimes(1);
     expect(card()!.textContent).toContain("Varna");
+  });
+
+  it("PROF-29: links to the player's profile page with View profile", async () => {
+    vi.spyOn(api, "get").mockResolvedValue({ data: profile });
+    mountCard();
+    await flushPromises();
+
+    const link = card()!.querySelector("[data-view-profile]")!;
+    expect(link.textContent!.trim()).toBe("View profile");
+    expect(link.getAttribute("href")).toBe("/profiles/4");
   });
 
   it("PROF-32: never shows an email, even if one came back", async () => {

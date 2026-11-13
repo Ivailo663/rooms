@@ -6,7 +6,7 @@ import { Select } from "primevue";
 import { AxiosError, AxiosHeaders } from "axios";
 import type { Account } from "@football/shared";
 import { api } from "@/axios";
-import ProfileView from "./ProfileView.vue";
+import ProfileEditForm from "./ProfileEditForm.vue";
 
 const store = vi.hoisted(() => ({
   account: null as Account | null,
@@ -46,18 +46,12 @@ const refusal = (message: string) =>
 let wrapper: VueWrapper | undefined;
 
 const mountView = () => {
-  wrapper = mount(ProfileView, {
+  wrapper = mount(ProfileEditForm, {
     global: {
       plugins: [PrimeVue, [VueQueryPlugin, { queryClient: new QueryClient() }]],
     },
   });
   return wrapper;
-};
-
-// Typing stops: the debounce runs out and the save settles.
-const pause = async () => {
-  await vi.advanceTimersByTimeAsync(1000);
-  await flushPromises();
 };
 
 beforeEach(() => {
@@ -76,7 +70,6 @@ beforeEach(() => {
       disconnect() {}
     }
   );
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   store.account = { ...baseAccount };
   vi.spyOn(api, "get").mockResolvedValue({ data: ["Sofia", "Varna"] });
 });
@@ -84,7 +77,6 @@ beforeEach(() => {
 afterEach(() => {
   wrapper?.unmount();
   wrapper = undefined;
-  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -94,134 +86,119 @@ const patchAnswering = () =>
     data: { ...store.account, ...(body as object) },
   }));
 
-describe("ProfileView", () => {
-  it("PROF-26: shows every profile field, with member since read-only and no email", async () => {
+type Exposed = {
+  dirty: boolean;
+  valid: boolean;
+  save: () => Promise<boolean>;
+};
+const exposed = (w: VueWrapper) => w.vm as unknown as Exposed;
+
+describe("ProfileEditForm (the Edit dialog)", () => {
+  it("PROF-28: has the fields PROF-21 allows, and no email", async () => {
     const w = mountView();
     await flushPromises();
 
-    for (const field of ["name", "position", "city", "bio"]) {
-      expect(w.find(`[data-field="${field}"]`).exists()).toBe(true);
-    }
-    expect(w.find("[data-member-since]").text()).toBe("Member since Mar 2025");
-    expect(w.text()).toContain("AP");
+    const fields = w
+      .findAll("[data-field]")
+      .map((f) => f.attributes("data-field"));
+    expect(fields).toEqual(["name", "position", "city", "bio"]);
     expect(w.text()).not.toContain("ana@example.test");
   });
 
-  it("PROF-28: the name saves once typing stops, with no save button", async () => {
+  it("PROF-28: typing saves nothing; it only marks the form changed", async () => {
     const patch = patchAnswering();
     const w = mountView();
+    expect(exposed(w).dirty).toBe(false);
 
     await w.find("#profile-name").setValue("Ana P");
-    await vi.advanceTimersByTimeAsync(200);
-    await w.find("#profile-name").setValue("Ana Petrova-Ivanova");
-    expect(patch).not.toHaveBeenCalled();
+    await flushPromises();
 
-    await pause();
-    expect(patch).toHaveBeenCalledTimes(1);
-    expect(patch).toHaveBeenCalledWith("/user", {
-      name: "Ana Petrova-Ivanova",
-    });
-    expect(w.find('button[type="submit"]').exists()).toBe(false);
-    expect(w.find("[data-save-status]").text()).toBe("Saved");
+    expect(exposed(w).dirty).toBe(true);
+    expect(patch).not.toHaveBeenCalled();
   });
 
-  it("PROF-28: the bio saves once typing stops, sending the saved name with it", async () => {
+  it("PROF-28: typing back to the saved value isn't a change", async () => {
+    const w = mountView();
+    await w.find("#profile-name").setValue("Ana P");
+    await w.find("#profile-name").setValue("Ana Petrova");
+    expect(exposed(w).dirty).toBe(false);
+  });
+
+  it("PROF-28: saving sends only the changed fields, in one request", async () => {
     const patch = patchAnswering();
     const w = mountView();
+    await flushPromises();
 
     await w.find("#profile-bio").setValue("Left foot only");
-    await pause();
-
-    expect(patch).toHaveBeenCalledWith("/user", {
-      name: "Ana Petrova",
-      bio: "Left foot only",
-    });
-  });
-
-  it("PROF-28: position and city save as soon as they're picked", async () => {
-    const patch = patchAnswering();
-    const w = mountView();
-    await flushPromises();
-
-    const [position, city] = w.findAllComponents(Select);
+    const [position] = w.findAllComponents(Select);
     position!.vm.$emit("update:modelValue", "defender");
     await flushPromises();
-    city!.vm.$emit("update:modelValue", "Varna");
-    await flushPromises();
 
-    expect(patch).toHaveBeenNthCalledWith(1, "/user", {
-      name: "Ana Petrova",
+    expect(await exposed(w).save()).toBe(true);
+    expect(patch).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledWith("/user", {
+      bio: "Left foot only",
       position: "defender",
     });
-    expect(patch).toHaveBeenNthCalledWith(2, "/user", {
-      name: "Ana Petrova",
-      city: "Varna",
-    });
+    expect(store.account!.bio).toBe("Left foot only");
   });
 
-  it("PROF-28: a refusal shows the server's message under the field and keeps what was typed", async () => {
+  it("PROF-28: opening again starts from the saved values", async () => {
+    const first = mountView();
+    await first.find("#profile-name").setValue("Not saved");
+    first.unmount();
+
+    const again = mountView();
+    expect(
+      (again.find("#profile-name").element as HTMLInputElement).value
+    ).toBe("Ana Petrova");
+  });
+
+  it("PROF-76: a refusal keeps the dialog open, keeps what was typed and shows the server's message above the fields", async () => {
     vi.spyOn(api, "patch").mockRejectedValue(refusal("Name is taken"));
     const w = mountView();
 
     await w.find("#profile-name").setValue("Ana");
-    await pause();
+    expect(await exposed(w).save()).toBe(false);
+    await flushPromises();
 
-    expect(w.find('[data-error="name"]').text()).toBe("Name is taken");
+    expect(w.find("[data-server-error]").text()).toBe("Name is taken");
     expect((w.find("#profile-name").element as HTMLInputElement).value).toBe(
       "Ana"
     );
     expect(store.account!.name).toBe("Ana Petrova");
   });
 
-  it("PROF-28: the next change after a refusal tries again", async () => {
-    const patch = vi
-      .spyOn(api, "patch")
-      .mockRejectedValueOnce(refusal("Name is taken"))
-      .mockImplementation(async (_url, body) => ({
-        data: { ...store.account, ...(body as object) },
-      }));
-    const w = mountView();
-
-    await w.find("#profile-name").setValue("Ana");
-    await pause();
-    await w.find("#profile-name").setValue("Ana P.");
-    await pause();
-
-    expect(patch).toHaveBeenCalledTimes(2);
-    expect(w.find('[data-error="name"]').exists()).toBe(false);
-    expect(store.account!.name).toBe("Ana P.");
-  });
-
-  it("PROF-23: an empty or over-long name is caught before sending, without cutting the input", async () => {
+  it("PROF-23, PROF-76: an empty or over-long name shows its limit and can't be saved", async () => {
     const patch = patchAnswering();
     const w = mountView();
 
     await w.find("#profile-name").setValue("");
-    await pause();
     expect(w.find('[data-error="name"]').text()).toBe("Name is required");
+    expect(exposed(w).valid).toBe(false);
 
     const long = "a".repeat(55);
     await w.find("#profile-name").setValue(long);
-    await pause();
     expect(w.find('[data-error="name"]').text()).toBe(
       "Name must be at most 50 characters"
     );
     expect((w.find("#profile-name").element as HTMLInputElement).value).toBe(
       long
     );
+    expect(await exposed(w).save()).toBe(false);
     expect(patch).not.toHaveBeenCalled();
   });
 
-  it("PROF-23: an over-long bio is caught before sending", async () => {
+  it("PROF-23, PROF-76: an over-long bio shows its limit and can't be saved", async () => {
     const patch = patchAnswering();
     const w = mountView();
 
     await w.find("#profile-bio").setValue("b".repeat(301));
-    await pause();
 
     expect(w.find('[data-error="bio"]').text()).toBe(
       "Bio must be at most 300 characters"
     );
+    expect(await exposed(w).save()).toBe(false);
     expect(patch).not.toHaveBeenCalled();
   });
 });

@@ -306,7 +306,7 @@ test.describe("touch", () => {
     const b = (await strip.boundingBox())!;
     const y = b.y + b.height / 2;
     const before = await state(page);
-    // Rightward drag starting at the strip's left edge (inside the 28px edge zone).
+    // Rightward drag starting at the strip's left edge (the back-swipe zone, NAV-11).
     await drag(page, { x: b.x + 2, y }, { x: b.x + 250, y });
     const right = await state(page);
     // Leftward drag back.
@@ -320,9 +320,9 @@ test.describe("touch", () => {
     expect(left.winX).toBe(0);
   });
 
-  test("edge swipe outside the chips still opens the drawer", async ({ page }) => {
+  test("NAV-10: a right-edge swipe outside the chips still opens the drawer", async ({ page }) => {
     const vp = page.viewportSize()!;
-    await drag(page, { x: 4, y: vp.height - 120 }, { x: 200, y: vp.height - 120 });
+    await drag(page, { x: vp.width - 4, y: vp.height - 120 }, { x: vp.width - 200, y: vp.height - 120 });
     expect((await state(page)).drawer).toBe(true);
   });
 
