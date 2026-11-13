@@ -1,7 +1,12 @@
 import { useQuery, type UseQueryOptions } from "@tanstack/vue-query";
 import { computed, toValue, type MaybeRefOrGetter } from "vue";
+import { isAxiosError } from "axios";
 import type { PlayerProfile } from "@football/shared";
 import { getCities, getPlayer } from "../api";
+
+// PROF-29: the server's answer for an id with no player behind it.
+export const isNotFound = (error: unknown) =>
+  isAxiosError(error) && error.response?.status === 404;
 
 // PROF-11: fetched when a player's details card opens and cached per id, so
 // opening the same player again is instant.

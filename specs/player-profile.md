@@ -53,19 +53,66 @@ Bulgaria. Every player has a profile, built in phases.
   city (nothing outside Bulgaria, no "Other") that the server holds and the
   client offers. Anything else is 400.
 - **PROF-25** The picture comes from Facebook only. Players without one show
-  initials. Uploading a picture waits for PROF-60.
+  initials. Uploading a picture is not part of PROF-60.
 - **PROF-26** The player's own avatar, in the user section of the sidebar
-  (where the user icon is today, collapsed or not), opens the `/profile`
-  page. It shows every PROF-20 field, and the ones PROF-21 allows are
-  editable.
-- **PROF-28** There's no save button. A text field (name, bio) saves once
-  typing stops for a moment; position and city save when picked. If the
-  server refuses, its message shows under that field, the field keeps what
-  was typed, and the next change tries again.
-- **PROF-29** Each player has a full, read-only profile page at
-  `/profiles/:id` showing every PROF-20 field (and later phases' data as they
-  ship). The player card ([PROF-10](#what-it-shows)) links to it with "View
-  profile". An unknown id shows "Player not found".
+  (where the user icon is today, collapsed or not), opens their own page at
+  `/profiles/:id` (PROF-29), the same page everyone else sees. There's no
+  separate `/profile` page; that address opens the player's own page.
+- **PROF-28** Editing happens in a dialog opened by "Edit" on the player's own
+  page (PROF-74). It has the fields PROF-21 allows. As soon as any field
+  differs from what's saved, the dialog's quiet close button (✕) turns into a
+  bold "Save" text button in the primary colour, with no background,
+  appearing with a short pop;
+  pressing it saves the changed fields in one request and closes the dialog. Closing it any other way (✕ with nothing changed, tapping
+  outside, Escape) discards the changes, and opening it again shows the saved
+  values.
+- **PROF-76** A field over its limit (PROF-23) shows the limit under it, and
+  the tick can't be pressed. If the server refuses a save, the dialog stays
+  open, keeps what was typed, and shows the server's message above the
+  fields.
+- **PROF-29** Each player has a profile page at `/profiles/:id`. The player
+  card ([PROF-10](#what-it-shows)) links to it with "View profile". An
+  unknown id shows "Player not found".
+
+## The profile page
+
+A mobile-first page in the feel of Instagram or TikTok: the player's photos
+and clips come first, the details stay small.
+
+- **PROF-70** The top of the page is the player's picture (or initials,
+  PROF-25) in a 100 px circle, with their name under it. Under the name, one
+  line lists position, city and "member since", separated by commas, each with
+  an icon in front. Unset ones are left out. The bio, if any, sits below in
+  small text.
+- **PROF-72** Below that, one full-width grid with thin light lines between
+  the items holds all the player's photos and videos together, newest first,
+  three per row. There are no tabs. A video
+  shows a still frame and a play mark.
+- **PROF-73** Tapping an item opens it full screen. Swiping up or down moves
+  to the next or previous item in grid order. Videos play there with sound,
+  and a tap mutes or unmutes them. Closing returns to the same place in the
+  grid.
+- **PROF-74** A player's own page is the page everyone sees, plus two
+  buttons: "Edit" (opens the PROF-28 dialog) and "Add" (photo or video). Both
+  are always there, also when the grid is empty. The player can also delete
+  their own items.
+- **PROF-75** Nothing in the app requires or nags a player to upload. Their
+  own empty grid shows "Add your first photo or clip".
+  Someone else's empty grid shows "No posts yet".
+
+## Media
+
+- **PROF-60** A player uploads photos and videos to their own profile.
+  Photos: JPEG, PNG, WebP or HEIC. Videos: MP4 or MOV, up to 60 seconds.
+  There's no file size limit. Another file type, or a longer video, is
+  refused with a message saying why, and nothing is stored.
+- **PROF-62** Only the owner can add or delete their media. Anyone else's
+  attempt is refused (403), and nothing changes.
+- **PROF-63** Media is stored in Firebase Storage. Only signed-in users can
+  view it (PROF-31), the same as the profile.
+- **PROF-64** Deleting an item removes the file and its grid entry.
+  Deleting the account ([AUTH-30](sign-in.md)) deletes all of the player's
+  media.
 
 ## Who sees a profile
 
@@ -95,8 +142,10 @@ Bulgaria. Every player has a profile, built in phases.
 - **PROF-53** The ranklist resists friends rating each other up (for example
   by weighting ratings or requiring raters from different games).
   `[deferred]`
-- **PROF-60** A player uploads photos, videos and reels to their profile,
-  within size limits, and others can report them for removal. `[deferred]`
+- **PROF-65** Other players can report an item, and the owner of the app can
+  remove it. `[deferred]`
+- **PROF-66** An AI-generated video of the player, made from their picture.
+  `[deferred]`
 - **PROF-61** A player can be requested for a game, at the price they ask.
   Payment happens outside the app. `[deferred]`
 

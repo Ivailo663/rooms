@@ -62,6 +62,19 @@
           </dd>
         </div>
       </dl>
+
+      <!-- PROF-29. On touch, the tap that opened the card focused the avatar,
+           whose blur closes the card. Pressing this link would move focus and
+           close the card before the click lands, so the press keeps focus. -->
+      <RouterLink
+        :to="{ name: 'player-profile', params: { id: playerId } }"
+        class="!mt-3 flex w-full items-center justify-center rounded-lg bg-surface-50 !py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-surface-100"
+        data-view-profile
+        @mousedown.prevent
+        @click="emit('close')"
+      >
+        View profile
+      </RouterLink>
     </div>
   </Teleport>
 </template>

@@ -113,7 +113,7 @@
         <!-- PROF-26: your own avatar is the way to your profile. -->
         <router-link
           v-if="!collapsed"
-          :to="{ name: 'profile' }"
+          :to="ownProfile"
           aria-label="Your profile"
           class="flex items-center !gap-2 rounded-full border border-surface-200 bg-surface-50 !px-3 !py-1.5 transition-colors hover:border-primary-200 hover:bg-primary-50"
           exact-active-class="!border-primary-200 !bg-primary-50"
@@ -130,7 +130,7 @@
         </router-link>
         <router-link
           v-else
-          :to="{ name: 'profile' }"
+          :to="ownProfile"
           aria-label="Your profile"
           title="Your profile"
           class="flex justify-center rounded-full"
@@ -163,21 +163,22 @@
     </aside>
   </div>
 
-  <!-- Mobile drawer handle. A left-edge swipe is the real way in; this is the
-       hairline that makes it discoverable, so it's a grab pill rather than a
-       button — no card, border, shadow or icon to sit on top of the view. The
-       touch target around it is invisible and much larger than the line. -->
+  <!-- Mobile drawer handle (NAV-10). A right-edge swipe is the real way in;
+       this is the hairline that makes it discoverable, so it's a grab pill
+       rather than a button — no card, border, shadow or icon to sit on top of
+       the view. The touch target around it is invisible and much larger than
+       the line. -->
   <button
     v-if="isMobile && !expanded"
     type="button"
     aria-label="Open menu"
     aria-controls="app-sidebar"
     :aria-expanded="expanded"
-    class="group fixed left-0 top-1/2 z-40 flex h-16 w-6 -translate-y-1/2 cursor-pointer items-center justify-start border-none bg-transparent outline-none"
+    class="group fixed right-0 top-1/2 z-40 flex h-16 w-6 -translate-y-1/2 cursor-pointer items-center justify-end border-none bg-transparent outline-none"
     @click="openMenu"
   >
     <span
-      class="h-11 w-1 rounded-r-full bg-surface-400/60 transition-colors group-hover:bg-surface-400 group-focus-visible:bg-primary-400"
+      class="h-11 w-1 rounded-l-full bg-surface-400/60 transition-colors group-hover:bg-surface-400 group-focus-visible:bg-primary-400"
     />
   </button>
 </template>
@@ -199,6 +200,12 @@ import { useRoomView } from "@/composables/useRoomView";
 import { useCreateRoom } from "@/composables/useCreateRoom";
 import { useMenuExpanded } from "@/composables/useMenuExpanded";
 import { useSwipe } from "@/composables/useSwipe";
+import {
+  backSwipeCanStart,
+  drawerSwipeCanStart,
+  hasInAppHistory,
+  isStandalone,
+} from "@/composables/edgeGestures";
 import { RoomView } from "@/constants";
 import { signOut, getAuth } from "firebase/auth";
 import RoleGate from "./RoleGate.vue";
@@ -234,18 +241,24 @@ const openMenu = async () => {
   closeButton.value?.$el.focus();
 };
 
-// Swipe is the primary way in and out of the drawer on mobile: a drag from the
-// screen's left edge opens it, a leftward drag across the open drawer closes
-// it. Closed, only the edge counts, so the gesture can't fire from the middle
-// of a room list; open, the drawer's own width is the zone.
-const EDGE_ZONE = 28;
-const DRAWER_WIDTH = 288;
-
+// Swipe is the primary way in and out of the drawer on mobile (NAV-10): a
+// leftward drag from the right edge opens it, a rightward drag across it
+// closes it. The left edge is "back" (NAV-11), and only in an installed app:
+// a browser already does that itself. Both are wired here because they share
+// the screen, and back mustn't fire under the open drawer.
 useSwipe({
   enabled: isMobile,
-  canStart: ({ x }) => x <= (expanded.value ? DRAWER_WIDTH : EDGE_ZONE),
-  onSwipeRight: () => !expanded.value && openMenu(),
-  onSwipeLeft: () => (expanded.value = false),
+  canStart: ({ x }) =>
+    drawerSwipeCanStart(x, window.innerWidth, expanded.value),
+  onSwipeLeft: () => !expanded.value && openMenu(),
+  onSwipeRight: () => (expanded.value = false),
+});
+
+useSwipe({
+  enabled: () => !(isMobile.value && expanded.value),
+  canStart: ({ x }) =>
+    backSwipeCanStart(x) && isStandalone() && hasInAppHistory(),
+  onSwipeRight: () => router.back(),
 });
 
 onMounted(() => {
@@ -260,8 +273,8 @@ onBeforeUnmount(() => {
 const sidebarContainerClass = computed(() => {
   if (isMobile.value) {
     return [
-      "fixed inset-y-0 left-0 z-50 w-full",
-      expanded.value ? "translate-x-0" : "-translate-x-full invisible",
+      "fixed inset-y-0 right-0 z-50 w-full",
+      expanded.value ? "translate-x-0" : "translate-x-full invisible",
     ];
   }
   return expanded.value ? "w-72 !ml-4 !mr-2" : "w-16 !ml-4 !mr-2";
@@ -310,6 +323,12 @@ const items = computed(() =>
 );
 
 const avatarName = computed(() => authStore.account?.name ?? "");
+
+// PROF-26. Before the account has loaded, /profile gets there once it has.
+const ownProfile = computed(() => {
+  const id = authStore.account?.id;
+  return id ? { name: "player-profile", params: { id } } : { name: "profile" };
+});
 
 const isHomeRoute = computed(() => router.currentRoute.value.name === "home");
 
