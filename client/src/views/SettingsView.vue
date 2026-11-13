@@ -153,7 +153,10 @@
                       <span class="text-sm text-surface-700">
                         {{ option.name }}
                       </span>
-                      <span class="text-xs text-surface-400">
+                      <span
+                        v-if="option.email"
+                        class="text-xs text-surface-400"
+                      >
                         {{ option.email }}
                       </span>
                     </div>

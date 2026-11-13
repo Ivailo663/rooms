@@ -7,17 +7,27 @@ datasource db {
 }
 
 model Account {
-  id               Int              @id @default(autoincrement())
-  name             String           @db.VarChar(50)
-  playground_id    Int?
-  email            String           @unique(map: "unique_email") @db.VarChar(50)
-  role             AccountRole      @default(player)
-  tenantid         Int?
-  rooms            Room?                 @relation(fields: [playground_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  tenant           tenant?               @relation(fields: [tenantid], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_accounts_tenant")
-  timeslot_players TimeslotPlayer[]
-  tenant_accounts  TenantAccount[]
-  join_requests    TimeslotJoinRequest[]
+  id                Int                   @id @default(autoincrement())
+  name              String                @db.VarChar(50)
+  playground_id     Int?
+  email             String?               @unique(map: "unique_email") @db.VarChar(50)
+  role              AccountRole           @default(player)
+  tenantid          Int?
+  // AUTH-01/02: filled on each account's next sign-in.
+  firebase_uid      String?               @unique @db.VarChar(128)
+  // PROF-20..25
+  picture_url       String?
+  position          PlayerPosition?
+  city              String?               @db.VarChar(50)
+  bio               String?               @db.VarChar(300)
+  created_at        DateTime              @default(now()) @db.Timestamptz(6)
+  // AUTH-20..22: when the sign-up checkbox was ticked.
+  terms_accepted_at DateTime?             @db.Timestamptz(6)
+  rooms             Room?                 @relation(fields: [playground_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tenant            tenant?               @relation(fields: [tenantid], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_accounts_tenant")
+  timeslot_players  TimeslotPlayer[]
+  tenant_accounts   TenantAccount[]
+  join_requests     TimeslotJoinRequest[]
 
   @@map("accounts")
 }
@@ -38,22 +48,22 @@ model Room {
 }
 
 model RoomTimeslot {
-  id               Int              @id @default(autoincrement())
-  roomId           Int              @map("room_id")
-  label            String           @db.VarChar(5)
-  created_at       DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  id               Int                   @id @default(autoincrement())
+  roomId           Int                   @map("room_id")
+  label            String                @db.VarChar(5)
+  created_at       DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?             @default(now()) @db.Timestamptz(6)
   features         Json?
-  price            Decimal?         @db.Money
-  message          String?          @db.VarChar(250)
-  name             String           @db.VarChar(50)
+  price            Decimal?              @db.Money
+  message          String?               @db.VarChar(250)
+  name             String                @db.VarChar(50)
   min_players      Int?
   max_players      Int
-  day              String           @db.VarChar(2)
-  enabled          Boolean          @default(false)
-  order            Int              @default(0)
+  day              String                @db.VarChar(2)
+  enabled          Boolean               @default(false)
+  order            Int                   @default(0)
   start_time       Int
-  status           SlotStatus       @default(scheduled)
+  status           SlotStatus            @default(scheduled)
   room             Room                  @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_room_timeslots_room")
   timeslot_players TimeslotPlayer[]
   join_requests    TimeslotJoinRequest[]
@@ -70,8 +80,8 @@ model TimeslotJoinRequest {
   status        JoinRequestStatus @default(pending)
   resolved_at   DateTime?         @db.Timestamp(6)
   created_at    DateTime?         @default(now()) @db.Timestamp(6)
-  room_timeslot RoomTimeslot @relation(fields: [timeslotId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_timeslot_join_requests_timeslot")
-  account       Account      @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_timeslot_join_requests_account")
+  room_timeslot RoomTimeslot      @relation(fields: [timeslotId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_timeslot_join_requests_timeslot")
+  account       Account           @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_timeslot_join_requests_account")
 
   @@id([timeslotId, accountId])
   @@map("timeslot_join_requests")
@@ -128,4 +138,11 @@ enum AccountRole {
   superAdmin
   clientAdmin
   player
+}
+
+enum PlayerPosition {
+  goalkeeper
+  defender
+  midfielder
+  forward
 }

@@ -25,7 +25,7 @@ const createRoom = async (role: string) => {
   const next = vi.fn();
   await handlers.get("POST /rooms")!(
     { body: { name: "Pitch", description: "", price: 10 } } as never,
-    { locals: { user: { email: "a@b.c" } }, send: vi.fn() } as never,
+    { locals: { user: { uid: "uid-1" } }, send: vi.fn() } as never,
     next
   );
   return next.mock.calls[0]?.[0];
@@ -41,6 +41,13 @@ describe("POST /rooms", () => {
       message: "Your role can't do this",
     });
     expect(prisma.room.create).not.toHaveBeenCalled();
+  });
+
+  it("AUTH-01: the caller is looked up by Firebase uid", async () => {
+    await createRoom("clientAdmin");
+    expect(prisma.account.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { firebase_uid: "uid-1" } }),
+    );
   });
 
   it("ROLE-10: a clientAdmin can create a room", async () => {
@@ -62,7 +69,7 @@ describe("POST /rooms", () => {
       {
         body: { name: "Pitch", description: "", price: 10, creator_id: 99 },
       } as never,
-      { locals: { user: { email: "a@b.c" } }, send: vi.fn() } as never,
+      { locals: { user: { uid: "uid-1" } }, send: vi.fn() } as never,
       next
     );
 
@@ -82,7 +89,7 @@ describe("GET /rooms/hosted", () => {
     const next = vi.fn();
     await handlers.get("GET /rooms/hosted")!(
       { query: {} } as never,
-      { locals: { user: { email: "a@b.c" } }, send } as never,
+      { locals: { user: { uid: "uid-1" } }, send } as never,
       next
     );
     expect(next).not.toHaveBeenCalled();

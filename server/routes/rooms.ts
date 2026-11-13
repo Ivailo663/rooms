@@ -7,25 +7,13 @@ import type {
   PlayableRoomResponse,
   TenantSettings,
 } from "../../packages/shared/index.js";
-import { asyncHandler, createHttpError } from "../utils/http.js";
+import { asyncHandler } from "../utils/http.js";
 import { resolveCutoff } from "../slotRules.js";
 import { assertRole } from "../tenantAccess.js";
-
-const getCurrentAccount = async (email: string) => {
-  const account = await prisma.account.findUnique({
-    where: { email },
-    select: { id: true, role: true },
-  });
-
-  if (!account) {
-    throw createHttpError(404, "Account not found");
-  }
-
-  return account;
-};
+import { getCurrentAccount } from "../currentAccount.js";
 
 const createRoom: RequestHandler = asyncHandler(async (req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
   assertRole(account, "clientAdmin");
   const { name, description, price } = req.body as CreateRoomRequest;
 
@@ -51,7 +39,7 @@ const createRoom: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 const getHostedRooms: RequestHandler = asyncHandler(async (req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
   const day = typeof req.query.day === "string" ? req.query.day : undefined;
 
   const rooms = await prisma.room.findMany({
@@ -136,7 +124,7 @@ const getHostedRooms: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
   const day = typeof req.query.day === "string" ? req.query.day : undefined;
 
   const rooms = await prisma.room.findMany({

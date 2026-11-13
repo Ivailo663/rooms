@@ -1,6 +1,13 @@
 import { Prisma } from "@prisma/client";
+import type { PlayerPosition } from "@prisma/client";
 
-export type { Account, Room, RoomTimeslot, AccountRole } from "@prisma/client";
+export type {
+  Account,
+  Room,
+  RoomTimeslot,
+  AccountRole,
+  PlayerPosition,
+} from "@prisma/client";
 
 export interface GetRoomsParams {
   hosted: boolean;
@@ -72,9 +79,10 @@ export interface TimeslotResponse {
   start_time: number;
 }
 
+// AUTH-03: an account may have no email (a Facebook user who shares none).
 export interface TimeslotPlayerSummary {
   id: number;
-  email: string;
+  email: string | null;
   name: string;
 }
 
@@ -210,10 +218,29 @@ export interface TenantAccountSummary {
   blacklisted: boolean;
 }
 
+// GET /players/:id (PROF-20, PROF-32). Never carries the email.
+export interface PlayerProfile {
+  id: number;
+  name: string;
+  picture_url: string | null;
+  position: PlayerPosition | null;
+  city: string | null;
+  bio: string | null;
+  created_at: string;
+}
+
+// PATCH /user (PROF-21..24). Absent leaves a field unchanged; null clears it.
+export interface UpdateProfileRequest {
+  name: string;
+  position?: PlayerPosition | null;
+  city?: string | null;
+  bio?: string | null;
+}
+
 export interface AccountSearchResult {
   id: number;
   name: string;
-  email: string;
+  email: string | null;
 }
 
 export interface TenantSettingsResponse {

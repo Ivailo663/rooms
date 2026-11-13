@@ -52,7 +52,7 @@ const call = async (
   role: string = "clientAdmin"
 ) => {
   prisma.account.findUnique.mockResolvedValue({ id: callerId, name: "x", role });
-  const res = { locals: { user: { email: "a@b.c" } }, send: vi.fn() };
+  const res = { locals: { user: { uid: "uid-1" } }, send: vi.fn() };
   const next = vi.fn();
   await handlers.get(route)!(
     { params: { id: "5", accountId: "11" }, body: {} } as never,

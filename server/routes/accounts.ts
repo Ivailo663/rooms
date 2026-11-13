@@ -19,12 +19,22 @@ const searchAccounts: RequestHandler = asyncHandler(async (req, res) => {
 
   const accounts = await prisma.account.findMany({
     where: {
-      // The caller can never appear in their own results — you don't flag
-      // yourself for approval.
-      email: { not: res.locals.user.email, mode: "insensitive" },
-      OR: [
-        { name: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
+      AND: [
+        // The caller can never appear in their own results — you don't flag
+        // yourself for approval. `not` alone would also drop every account
+        // without a uid yet (SQL `<>` is never true against NULL).
+        {
+          OR: [
+            { firebase_uid: null },
+            { firebase_uid: { not: res.locals.user.uid } },
+          ],
+        },
+        {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { email: { contains: search, mode: "insensitive" } },
+          ],
+        },
       ],
     },
     select: { id: true, name: true, email: true },

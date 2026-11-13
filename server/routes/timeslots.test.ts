@@ -33,7 +33,7 @@ const update = async (body: object) => {
   const next = vi.fn();
   await handlers.get("PUT /timeslots")!(
     { body: { id: 5, ...body } } as never,
-    { locals: { user: { email: "a@b.c" } }, send: vi.fn() } as never,
+    { locals: { user: { uid: "uid-1" } }, send: vi.fn() } as never,
     next
   );
   return next.mock.calls[0]?.[0];
@@ -96,7 +96,7 @@ describe("GET /timeslots/enabled/days", () => {
 
     await handlers.get("GET /timeslots/enabled/days")!(
       { query: { room_id: "1" } } as never,
-      { locals: { user: { email: "a@b.c" } }, send } as never,
+      { locals: { user: { uid: "uid-1" } }, send } as never,
       next
     );
 
@@ -160,7 +160,7 @@ describe("ROLE-11: slot writes need clientAdmin and owning the room", () => {
     const next = vi.fn();
     await handlers.get(route)!(
       req as never,
-      { locals: { user: { email: "a@b.c" } }, send: vi.fn() } as never,
+      { locals: { user: { uid: "uid-1" } }, send: vi.fn() } as never,
       next
     );
     return next.mock.calls[0]?.[0];

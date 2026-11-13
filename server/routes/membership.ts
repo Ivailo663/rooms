@@ -26,6 +26,7 @@ import {
   resolveCutoff,
 } from "../slotRules.js";
 import { assertRole } from "../tenantAccess.js";
+import { getCurrentAccount } from "../currentAccount.js";
 
 export const JOIN_REQUEST_CREATED_EVENT = "join-request:created";
 export const JOIN_REQUEST_RESOLVED_EVENT = "join-request:resolved";
@@ -105,19 +106,6 @@ const emitRequestValidityChanged = async (
   }
 };
 
-const getCurrentAccount = async (email: string) => {
-  const account = await prisma.account.findUnique({
-    where: { email },
-    select: { id: true, name: true, role: true },
-  });
-
-  if (!account) {
-    throw createHttpError(404, "Account not found");
-  }
-
-  return account;
-};
-
 // Fixed week order for a stable API ordering; the client re-sorts relative to
 // "now" (next upcoming first) since that is a moving target.
 const DAY_ORDER = ["mo", "tu", "we", "th", "fr", "sa", "su"];
@@ -127,7 +115,7 @@ const DAY_ORDER = ["mo", "tu", "we", "th", "fr", "sa", "su"];
 // playable-rooms feed. Powers the player's "my game" hub, so the full roster
 // rides along.
 const getJoinedSlots: RequestHandler = asyncHandler(async (_req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
 
   const slots = await prisma.roomTimeslot.findMany({
     where: {
@@ -209,7 +197,7 @@ type JoinResult =
 
 const createJoinTimeslotHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
-    const account = await getCurrentAccount(res.locals.user.email);
+    const account = await getCurrentAccount(res.locals.user.uid);
     const timeslotId = toInteger(req.params.id, "id");
     const { joined_at } = (req.body ?? {}) as JoinTimeslotRequest;
     const joinedAt = toOptionalDate(joined_at, "joined_at");
@@ -426,7 +414,7 @@ const createJoinTimeslotHandler = (io: Server): RequestHandler =>
 
 const createLeaveTimeslotHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
-    const account = await getCurrentAccount(res.locals.user.email);
+    const account = await getCurrentAccount(res.locals.user.uid);
     const timeslotId = toInteger(req.params.id, "id");
 
     const timeslot = await prisma.roomTimeslot.findUnique({
@@ -518,7 +506,7 @@ const assertSlotOwner = async (timeslotId: number, accountId: number) => {
 
 const createApproveRequestHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
-    const account = await getCurrentAccount(res.locals.user.email);
+    const account = await getCurrentAccount(res.locals.user.uid);
     assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
     const accountId = toInteger(req.params.accountId, "accountId");
@@ -606,7 +594,7 @@ const createApproveRequestHandler = (io: Server): RequestHandler =>
 
 const createDenyRequestHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
-    const account = await getCurrentAccount(res.locals.user.email);
+    const account = await getCurrentAccount(res.locals.user.uid);
     assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
     const accountId = toInteger(req.params.accountId, "accountId");
@@ -644,7 +632,7 @@ const createDenyRequestHandler = (io: Server): RequestHandler =>
 // that became approvable again between render and click.
 const createAcknowledgeRequestHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
-    const account = await getCurrentAccount(res.locals.user.email);
+    const account = await getCurrentAccount(res.locals.user.uid);
     assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
     const accountId = toInteger(req.params.accountId, "accountId");
@@ -687,7 +675,7 @@ const createRedestributePlayersBetweenTimeslotHandler = (
   io: Server
 ): RequestHandler =>
   asyncHandler(async (req, res) => {
-    const account = await getCurrentAccount(res.locals.user.email);
+    const account = await getCurrentAccount(res.locals.user.uid);
     assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
 

@@ -15,6 +15,8 @@ import { registerTimeslotRoutes } from "./routes/timeslots.js";
 import { registerUserRoutes } from "./routes/users.js";
 import { registerTenantRoutes } from "./routes/tenants.js";
 import { registerAccountRoutes } from "./routes/accounts.js";
+import { registerPlayerRoutes } from "./routes/players.js";
+import { registerCityRoutes } from "./routes/cities.js";
 import type { AppError } from "./utils/http.js";
 import { startScheduler } from "./scheduler.js";
 import { createTimeslotWorker } from "./workers/timeslotWorker.js";
@@ -44,6 +46,8 @@ registerTimeslotRoutes(app);
 registerMembershipRoutes(app, io);
 registerTenantRoutes(app);
 registerAccountRoutes(app);
+registerPlayerRoutes(app);
+registerCityRoutes(app);
 
 createTimeslotWorker(io);
 

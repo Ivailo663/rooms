@@ -13,6 +13,7 @@ import { Prisma } from "@prisma/client";
 import { syncSlot } from "../scheduler.js";
 import { slotsClash } from "../slotRules.js";
 import { assertRole } from "../tenantAccess.js";
+import { getCurrentAccount } from "../currentAccount.js";
 
 const labelToStartTime = (label: string): number => {
   const [h, m] = label.split(":").map(Number);
@@ -102,26 +103,8 @@ const getRequiredDay = (value: unknown): string => {
   return day;
 };
 
-const getCurrentAccount = async (email: string) => {
-  const account = await prisma.account.findUnique({
-    where: {
-      email,
-    },
-    select: {
-      id: true,
-      role: true,
-    },
-  });
-
-  if (!account) {
-    throw createHttpError(404, "Account not found");
-  }
-
-  return account;
-};
-
 const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
   const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
   const day = getRequiredDay(req.query.day);
 
@@ -185,7 +168,7 @@ const getTimeslots: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
   const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
   const day = getRequiredDay(req.query.day);
 
@@ -252,7 +235,7 @@ const getEnabledTimeslots: RequestHandler = asyncHandler(async (req, res) => {
 
 const getEnabledTimeslotDaysAndFirstSlot: RequestHandler = asyncHandler(
   async (req, res) => {
-    const account = await getCurrentAccount(res.locals.user.email);
+    const account = await getCurrentAccount(res.locals.user.uid);
     const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
 
     const rows = await prisma.roomTimeslot.findMany({
@@ -301,7 +284,7 @@ const getEnabledTimeslotDaysAndFirstSlot: RequestHandler = asyncHandler(
 // only ever loads the selected day, so this is what lets the day switcher hint
 // that another day is waiting on the host.
 const getPendingRequestDays: RequestHandler = asyncHandler(async (req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
   const roomId = toInteger(getQueryValue(req.query.room_id), "room_id");
 
   const rows = await prisma.roomTimeslot.findMany({
@@ -322,7 +305,7 @@ const getPendingRequestDays: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
   assertRole(account, "clientAdmin");
   const body: CreateTimeslotRequest = req.body;
 
@@ -369,7 +352,7 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
   assertRole(account, "clientAdmin");
   const body: UpdateTimeslotRequest = req.body;
 
@@ -430,7 +413,7 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 const deleteTimeslot: RequestHandler = asyncHandler(async (req, res) => {
-  const account = await getCurrentAccount(res.locals.user.email);
+  const account = await getCurrentAccount(res.locals.user.uid);
   assertRole(account, "clientAdmin");
   const timeslotId = toInteger(getQueryValue(req.params.id), "id");
 
