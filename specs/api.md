@@ -25,6 +25,9 @@ Those types are the contract, so change them together with this table.
 | --- | --- | --- | --- | --- |
 | POST | `/user` | any | `Account` | ROLE-07 |
 | GET | `/user` | any | `Account \| null` | ROLE-07 |
+| PATCH | `/user` | any, own account only | `Account` | PROF-21..24 |
+| GET | `/players/:id` | any | `PlayerProfile` | PROF-20, PROF-31, PROF-32 |
+| GET | `/cities` | any | `string[]` | PROF-24 |
 | GET | `/accounts?search=` | any (should be admin) | `AccountSearchResult[]` | API-03 |
 | POST | `/rooms` | clientAdmin or above | `CreateRoomResponse` | SLOT-01, ROLE-10 |
 | GET | `/rooms/hosted?day=` | host | `HostedRoomResponse[]` | SLOT-03 |

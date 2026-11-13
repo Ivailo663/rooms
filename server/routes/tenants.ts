@@ -9,13 +9,16 @@ import { syncSlot } from "../scheduler.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { canManageTenant } from "../tenantAccess.js";
 
-// Runs after the 400 checks and before any lookup of the tenant itself, so a
-// clientAdmin probing another tenant's id gets the same 403 whether or not that
-// tenant exists.
-const assertManagesTenant = async (email: string | undefined, tenantId: number) => {
-  const account = email
+// Throws 403 unless the caller may manage this tenant (SET-09): a superAdmin,
+// or a clientAdmin whose own tenantid is this one.
+//
+// Every failure is the same 403, including "no account", so a caller trying
+// tenant ids can't tell which venues exist. Call it before loading the tenant.
+// That's also why it doesn't use getCurrentAccount, which answers 404.
+const assertManagesTenant = async (uid: string | undefined, tenantId: number) => {
+  const account = uid
     ? await prisma.account.findUnique({
-        where: { email },
+        where: { firebase_uid: uid },
         select: { role: true, tenantid: true },
       })
     : null;
@@ -32,7 +35,7 @@ const getTenantSettings: RequestHandler = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Tenant ID is required." });
   }
 
-  await assertManagesTenant(res.locals.user?.email, tenantId);
+  await assertManagesTenant(res.locals.user?.uid, tenantId);
 
   try {
     const tenant = await prisma.tenant.findUnique({
@@ -89,7 +92,7 @@ const updateTenantSettings: RequestHandler = asyncHandler(async (req, res) => {
       .json({ message: "Tenant ID and settings are required." });
   }
 
-  await assertManagesTenant(res.locals.user?.email, tenantId);
+  await assertManagesTenant(res.locals.user?.uid, tenantId);
 
   try {
     await prisma.tenant.update({
@@ -124,7 +127,7 @@ const updateTenantAccount: RequestHandler = asyncHandler(async (req, res) => {
       .json({ message: "Tenant ID and account ID are required." });
   }
 
-  await assertManagesTenant(res.locals.user?.email, tenantId);
+  await assertManagesTenant(res.locals.user?.uid, tenantId);
 
   try {
     const existing = await prisma.tenantAccount.findUnique({
