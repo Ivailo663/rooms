@@ -1,6 +1,18 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
+import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
 import SlotAvatars from "./SlotAvatars.vue";
+
+// The details card fetches the player's profile when it opens (PROF-11);
+// these tests are about opening and closing it, so the fetch never settles.
+vi.mock("@/features/profile/api", () => ({
+  getPlayer: () => new Promise(() => {}),
+}));
+
+const queryPlugin = (): [typeof VueQueryPlugin, { queryClient: QueryClient }] => [
+  VueQueryPlugin,
+  { queryClient: new QueryClient() },
+];
 
 const players = [
   { id: 1, name: "Ana Petrova" },
@@ -15,6 +27,7 @@ const mountAvatars = () => {
   wrapper = mount(SlotAvatars, {
     props: { players, currentUserId: 2 },
     attachTo: document.body,
+    global: { plugins: [queryPlugin()] },
   });
   return wrapper;
 };
@@ -61,7 +74,11 @@ describe("SlotAvatars details card", () => {
     const host = document.createElement("div");
     host.addEventListener("click", () => (tileTapped = true));
     document.body.appendChild(host);
-    wrapper = mount(SlotAvatars, { props: { players }, attachTo: host });
+    wrapper = mount(SlotAvatars, {
+      props: { players },
+      attachTo: host,
+      global: { plugins: [queryPlugin()] },
+    });
 
     await wrapper.find("button").trigger("click");
     expect(tileTapped).toBe(false);

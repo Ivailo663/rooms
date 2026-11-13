@@ -20,6 +20,11 @@ const router = createRouter({
           component: () => import("@/views/SettingsView.vue"),
           meta: { requiresVenue: true },
         },
+        {
+          path: "profile",
+          name: "profile",
+          component: () => import("@/features/profile/ProfileView.vue"),
+        },
       ],
     },
     {

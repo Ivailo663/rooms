@@ -1,7 +1,19 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
+import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
 import PlayersWidget from "./PlayersWidget.vue";
 import SlotAvatars from "../../player/SlotAvatars.vue";
+
+// The details card fetches the player's profile when it opens (PROF-11);
+// these tests are about opening and closing it, so the fetch never settles.
+vi.mock("@/features/profile/api", () => ({
+  getPlayer: () => new Promise(() => {}),
+}));
+
+const queryPlugin = (): [typeof VueQueryPlugin, { queryClient: QueryClient }] => [
+  VueQueryPlugin,
+  { queryClient: new QueryClient() },
+];
 
 vi.mock("@/stores/auth", () => ({ useAuthStore: () => ({ user: null }) }));
 
@@ -15,7 +27,11 @@ const card = () => document.body.querySelector("[data-player-details-card]");
 let wrapper: VueWrapper | undefined;
 
 const mountWidget = (props: InstanceType<typeof PlayersWidget>["$props"]) => {
-  wrapper = mount(PlayersWidget, { props, attachTo: document.body });
+  wrapper = mount(PlayersWidget, {
+    props,
+    attachTo: document.body,
+    global: { plugins: [queryPlugin()] },
+  });
   return wrapper;
 };
 

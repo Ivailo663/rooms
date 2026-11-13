@@ -75,6 +75,7 @@
 
       <PlayerDetailsCard
         v-if="open"
+        :player-id="open.player.id"
         :name="displayName(open.player)"
         :anchor="open.anchor"
         @hold="cancelClose"

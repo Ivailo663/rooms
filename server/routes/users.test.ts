@@ -50,6 +50,8 @@ const call = async (
   return { sent: send.mock.calls[0]?.[0], error: next.mock.calls[0]?.[0] };
 };
 
+const ACCEPT = { body: { acceptTerms: true } };
+
 const uniqueViolation = Object.assign(new Error("unique"), { code: "P2002" });
 
 beforeEach(() => {
@@ -112,11 +114,15 @@ describe("POST /user", () => {
   });
 
   it("AUTH-02: an unverified email claims nothing", async () => {
-    await call("POST /user", {
-      uid: "u1",
-      email: "ann@x.bg",
-      email_verified: false,
-    });
+    await call(
+      "POST /user",
+      {
+        uid: "u1",
+        email: "ann@x.bg",
+        email_verified: false,
+      },
+      ACCEPT,
+    );
 
     expect(prisma.account.findFirst).not.toHaveBeenCalled();
     expect(prisma.account.updateMany).not.toHaveBeenCalled();
@@ -126,11 +132,15 @@ describe("POST /user", () => {
   it("AUTH-02: an email whose account is linked to someone else is 409, not a second account", async () => {
     prisma.account.create.mockRejectedValue(uniqueViolation);
 
-    const { error } = await call("POST /user", {
-      uid: "u2",
-      email: "ann@x.bg",
-      email_verified: true,
-    });
+    const { error } = await call(
+      "POST /user",
+      {
+        uid: "u2",
+        email: "ann@x.bg",
+        email_verified: true,
+      },
+      ACCEPT,
+    );
 
     expect(error).toMatchObject({ status: 409 });
   });
@@ -142,18 +152,22 @@ describe("POST /user", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(other);
 
-    const { sent, error } = await call("POST /user", { uid: "u1" });
+    const { sent, error } = await call("POST /user", { uid: "u1" }, ACCEPT);
 
     expect(error).toBeUndefined();
     expect(sent).toBe(other);
   });
 
   it("ROLE-07: a new account is a player named after the email's local part", async () => {
-    const { sent } = await call("POST /user", {
-      uid: "u1",
-      email: "ivan.petrov@x.bg",
-      email_verified: false,
-    });
+    const { sent } = await call(
+      "POST /user",
+      {
+        uid: "u1",
+        email: "ivan.petrov@x.bg",
+        email_verified: false,
+      },
+      ACCEPT,
+    );
 
     const data = prisma.account.create.mock.calls[0][0].data;
     expect(data).not.toHaveProperty("role"); // the column defaults to player
@@ -167,13 +181,17 @@ describe("POST /user", () => {
   });
 
   it("AUTH-11: a Facebook sign-in takes the name and picture from the token", async () => {
-    await call("POST /user", {
-      uid: "fb1",
-      name: "Ivan Petrov",
-      picture: "https://graph.facebook.com/1/picture",
-      email: "ivan@x.bg",
-      email_verified: true,
-    });
+    await call(
+      "POST /user",
+      {
+        uid: "fb1",
+        name: "Ivan Petrov",
+        picture: "https://graph.facebook.com/1/picture",
+        email: "ivan@x.bg",
+        email_verified: true,
+      },
+      ACCEPT,
+    );
 
     expect(prisma.account.create.mock.calls[0][0].data).toMatchObject({
       name: "Ivan Petrov",
@@ -183,10 +201,14 @@ describe("POST /user", () => {
   });
 
   it("AUTH-03: a sign-in without an email still gets an account", async () => {
-    const { sent, error } = await call("POST /user", {
-      uid: "fb2",
-      name: "Maria",
-    });
+    const { sent, error } = await call(
+      "POST /user",
+      {
+        uid: "fb2",
+        name: "Maria",
+      },
+      ACCEPT,
+    );
 
     expect(error).toBeUndefined();
     expect(prisma.account.findFirst).not.toHaveBeenCalled();
@@ -198,12 +220,105 @@ describe("POST /user", () => {
   });
 
   it("PROF-20: member since is the Firebase account's creation time", async () => {
-    await call("POST /user", { uid: "u1", email: "a@x.bg" });
+    await call("POST /user", { uid: "u1", email: "a@x.bg" }, ACCEPT);
 
     expect(getUser).toHaveBeenCalledWith("u1");
     expect(prisma.account.create.mock.calls[0][0].data.created_at).toEqual(
       new Date(CREATED),
     );
+  });
+});
+
+describe("POST /user terms", () => {
+  it("AUTH-23: creating an account without acceptTerms is 400 and creates nothing", async () => {
+    for (const body of [{}, { acceptTerms: false }, { acceptTerms: "true" }]) {
+      const { error } = await call(
+        "POST /user",
+        { uid: "u1", email: "a@x.bg", email_verified: false },
+        { body },
+      );
+      expect(error).toMatchObject({
+        status: 400,
+        message: "Tick the box to continue",
+      });
+    }
+    expect(prisma.account.create).not.toHaveBeenCalled();
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
+  it("AUTH-23: a new account records when the box was ticked", async () => {
+    const before = Date.now();
+    await call("POST /user", { uid: "u1" }, ACCEPT);
+
+    const { terms_accepted_at } = prisma.account.create.mock.calls[0][0].data;
+    expect(terms_accepted_at).toBeInstanceOf(Date);
+    expect(terms_accepted_at.getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it("AUTH-23: an existing account without a tick gets one, conditionally", async () => {
+    const ticked = { id: 3, firebase_uid: "u1", terms_accepted_at: new Date() };
+    prisma.account.findUnique
+      .mockResolvedValueOnce({
+        id: 3,
+        firebase_uid: "u1",
+        terms_accepted_at: null,
+      })
+      .mockResolvedValueOnce(ticked);
+    prisma.account.updateMany.mockResolvedValue({ count: 1 });
+
+    const { sent } = await call("POST /user", { uid: "u1" }, ACCEPT);
+
+    expect(prisma.account.updateMany).toHaveBeenCalledWith({
+      where: { id: 3, terms_accepted_at: null },
+      data: { terms_accepted_at: expect.any(Date) },
+    });
+    expect(sent).toBe(ticked);
+    expect(prisma.account.create).not.toHaveBeenCalled();
+  });
+
+  it("AUTH-23: an existing tick is never moved", async () => {
+    const account = {
+      id: 3,
+      firebase_uid: "u1",
+      terms_accepted_at: new Date(0),
+    };
+    prisma.account.findUnique.mockResolvedValue(account);
+
+    const { sent } = await call("POST /user", { uid: "u1" }, ACCEPT);
+
+    expect(sent).toBe(account);
+    expect(prisma.account.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("AUTH-23: an existing account without acceptTerms is returned unchanged (ROLE-07)", async () => {
+    const account = { id: 3, firebase_uid: "u1", terms_accepted_at: null };
+    prisma.account.findUnique.mockResolvedValue(account);
+
+    const { sent, error } = await call("POST /user", { uid: "u1" });
+
+    expect(error).toBeUndefined();
+    expect(sent).toBe(account);
+    expect(prisma.account.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("AUTH-23: claiming by verified email doesn't need acceptTerms", async () => {
+    const claimed = { id: 4, firebase_uid: "u1", terms_accepted_at: null };
+    prisma.account.findFirst.mockResolvedValue({ id: 4 });
+    prisma.account.updateMany.mockResolvedValue({ count: 1 });
+    prisma.account.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(claimed);
+
+    const { sent, error } = await call("POST /user", {
+      uid: "u1",
+      email: "ann@x.bg",
+      email_verified: true,
+    });
+
+    expect(error).toBeUndefined();
+    expect(sent).toBe(claimed);
+    expect(prisma.account.updateMany).toHaveBeenCalledTimes(1); // the claim only
+    expect(prisma.account.create).not.toHaveBeenCalled();
   });
 });
 

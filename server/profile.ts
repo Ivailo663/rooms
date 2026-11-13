@@ -43,18 +43,22 @@ export const parseProfileUpdate = (body: unknown): UpdateProfileRequest => {
     typeof body === "object" && body !== null ? body : {}
   ) as Record<string, unknown>;
 
-  const name = typeof input.name === "string" ? input.name.trim() : "";
-  if (!name) {
-    throw createHttpError(400, "Name is required");
-  }
-  if (charLength(name) > NAME_MAX_LENGTH) {
-    throw createHttpError(
-      400,
-      `Name must be at most ${NAME_MAX_LENGTH} characters`,
-    );
-  }
+  const update: UpdateProfileRequest = {};
 
-  const update: UpdateProfileRequest = { name };
+  // Left out means unchanged; sent, it can't be empty (PROF-23).
+  if (input.name !== undefined) {
+    const name = typeof input.name === "string" ? input.name.trim() : "";
+    if (!name) {
+      throw createHttpError(400, "Name is required");
+    }
+    if (charLength(name) > NAME_MAX_LENGTH) {
+      throw createHttpError(
+        400,
+        `Name must be at most ${NAME_MAX_LENGTH} characters`,
+      );
+    }
+    update.name = name;
+  }
 
   const position = optionalString(input.position, "Position");
   if (position !== undefined) {

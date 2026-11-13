@@ -1,7 +1,19 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
+import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
 import type { TimeslotResponse } from "@football/shared";
 import SlotMonitor from "./SlotMonitor.vue";
+
+// The details card fetches the player's profile when it opens (PROF-11);
+// these tests are about opening and closing it, so the fetch never settles.
+vi.mock("@/features/profile/api", () => ({
+  getPlayer: () => new Promise(() => {}),
+}));
+
+const queryPlugin = (): [
+  typeof VueQueryPlugin,
+  { queryClient: QueryClient },
+] => [VueQueryPlugin, { queryClient: new QueryClient() }];
 
 vi.mock("primevue/useconfirm", () => ({ useConfirm: () => ({}) }));
 
@@ -56,7 +68,7 @@ const mountMonitor = () => {
   wrapper = mount(SlotMonitor, {
     props: { timeslot, enabled: true },
     attachTo: document.body,
-    global: { stubs: { SlotChat: true } },
+    global: { stubs: { SlotChat: true }, plugins: [queryPlugin()] },
   });
   return wrapper;
 };

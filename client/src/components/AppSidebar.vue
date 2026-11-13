@@ -1,11 +1,4 @@
 <template>
-  <!-- Mobile overlay -->
-  <div
-    v-if="isMobile && expanded"
-    class="fixed inset-0 z-40 bg-black/30"
-    @click="expanded = false"
-  />
-
   <!-- Sidebar -->
   <div
     class="shrink-0 transition-all duration-300 ease-in-out"
@@ -117,26 +110,37 @@
         class="flex flex-col border-t border-surface-100 !pt-4 w-full"
         :class="collapsed ? '!gap-1 items-center' : '!gap-2'"
       >
-        <div
+        <!-- PROF-26: your own avatar is the way to your profile. -->
+        <router-link
           v-if="!collapsed"
-          class="flex items-center !gap-2 rounded-full border border-surface-200 bg-surface-50 !px-3 !py-1.5"
+          :to="{ name: 'profile' }"
+          aria-label="Your profile"
+          class="flex items-center !gap-2 rounded-full border border-surface-200 bg-surface-50 !px-3 !py-1.5 transition-colors hover:border-primary-200 hover:bg-primary-50"
+          exact-active-class="!border-primary-200 !bg-primary-50"
+          @click="isMobile && (expanded = false)"
         >
-          <div
-            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600"
-          >
-            <i class="fa-solid fa-user" style="font-size: 0.6rem" />
-          </div>
+          <PlayerAvatar
+            :name="avatarName"
+            :picture-url="authStore.account?.picture_url"
+            class="h-5 w-5 text-[0.55rem]"
+          />
           <span class="truncate text-xs font-medium text-surface-600">
             {{ authStore?.user?.email }}
           </span>
-        </div>
-        <div v-else class="flex justify-center">
-          <div
-            class="flex h-7 w-7 items-center justify-center rounded-full bg-primary-100 text-primary-600"
-          >
-            <i class="fa-solid fa-user" style="font-size: 0.6rem" />
-          </div>
-        </div>
+        </router-link>
+        <router-link
+          v-else
+          :to="{ name: 'profile' }"
+          aria-label="Your profile"
+          title="Your profile"
+          class="flex justify-center rounded-full"
+        >
+          <PlayerAvatar
+            :name="avatarName"
+            :picture-url="authStore.account?.picture_url"
+            class="h-7 w-7 text-[0.6rem]"
+          />
+        </router-link>
         <Button
           icon="fa-solid fa-right-from-bracket"
           :label="collapsed ? undefined : 'Sign out'"
@@ -198,6 +202,7 @@ import { useSwipe } from "@/composables/useSwipe";
 import { RoomView } from "@/constants";
 import { signOut, getAuth } from "firebase/auth";
 import RoleGate from "./RoleGate.vue";
+import PlayerAvatar from "./PlayerAvatar.vue";
 
 const expanded = useMenuExpanded();
 
@@ -254,21 +259,27 @@ onBeforeUnmount(() => {
 
 const sidebarContainerClass = computed(() => {
   if (isMobile.value) {
-    return expanded.value ? "fixed inset-y-0 left-0 z-50 w-72" : "w-0";
+    return [
+      "fixed inset-y-0 left-0 z-50 w-full",
+      expanded.value ? "translate-x-0" : "-translate-x-full invisible",
+    ];
   }
   return expanded.value ? "w-72 !ml-4 !mr-2" : "w-16 !ml-4 !mr-2";
 });
 
 const sidebarClass = computed(() => {
   if (isMobile.value) {
-    return expanded.value
-      ? "h-full w-72 !p-3 opacity-100"
-      : "h-full w-0 !p-0 opacity-0 pointer-events-none";
+    return "h-full w-full !p-3";
   }
+  // Expanding swaps in the labelled layout at once while the card is still
+  // 64px wide, so without a floor every row rewraps on every frame of the
+  // width transition ("Create room" breaks onto two lines and shoves the rest
+  // down). Holding each row at its final width (w-72 less p-3 and the border)
+  // lets the card's overflow-hidden reveal it instead.
   return [
     "sticky top-4 rounded-xl h-[calc(100vh-2rem)] border",
     expanded.value
-      ? "w-72 !p-3 opacity-100"
+      ? "w-72 !p-3 opacity-100 *:min-w-[calc(18rem-1.5rem-2px)]"
       : "w-16 !p-2 opacity-100 items-center",
   ];
 });
@@ -297,6 +308,8 @@ const items = computed(() =>
     },
   ].filter((item) => item.visible)
 );
+
+const avatarName = computed(() => authStore.account?.name ?? "");
 
 const isHomeRoute = computed(() => router.currentRoute.value.name === "home");
 

@@ -9,6 +9,7 @@ import {
   AUTHENTICATED_PATHS,
   verifyFirebaseToken,
 } from "./middleware/verifyFirebaseToken.js";
+import { requireTermsAccepted } from "./middleware/requireTermsAccepted.js";
 import { registerMembershipRoutes } from "./routes/membership.js";
 import { registerRoomRoutes } from "./routes/rooms.js";
 import { registerTimeslotRoutes } from "./routes/timeslots.js";
@@ -38,7 +39,7 @@ const io = new Server(httpServer, {
   },
 });
 
-app.use(AUTHENTICATED_PATHS, verifyFirebaseToken);
+app.use(AUTHENTICATED_PATHS, verifyFirebaseToken, requireTermsAccepted);
 
 registerUserRoutes(app);
 registerRoomRoutes(app);

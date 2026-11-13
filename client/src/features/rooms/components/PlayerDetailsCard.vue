@@ -14,41 +14,51 @@
     >
       <!-- Picture, top middle -->
       <div class="flex justify-center">
-        <div
-          class="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white bg-primary-100 text-lg font-bold text-primary-600 shadow-sm"
-        >
-          {{ initials }}
-        </div>
+        <PlayerAvatar
+          :name="name"
+          :picture-url="profile?.picture_url"
+          class="h-16 w-16 border-2 border-white text-lg shadow-sm"
+        />
       </div>
 
-      <!-- Name + rating -->
-      <div class="!mt-2.5 text-center">
-        <p class="truncate text-sm font-semibold text-surface-900">
-          {{ name }}
-        </p>
-        <p
-          class="!mt-0.5 flex items-center justify-center !gap-1 text-xs font-semibold text-amber-500"
-        >
-          <i class="fa-solid fa-star" style="font-size: 0.6rem" />
-          {{ RATING.score }}
-          <span class="font-normal text-surface-400">
-            ({{ RATING.count }})
-          </span>
-        </p>
-      </div>
+      <p
+        class="!mt-2.5 truncate text-center text-sm font-semibold text-surface-900"
+      >
+        {{ name }}
+      </p>
 
-      <!-- Placeholder detail rows — shape stays, values get wired up later. -->
-      <dl class="!mt-3 flex flex-col !gap-1.5 border-t border-surface-100 !pt-3">
+      <!-- PROF-10/11: the rows keep their height while loading, so the card
+           doesn't grow under the pointer once the profile arrives. -->
+      <p
+        v-if="isError"
+        class="!mt-3 border-t border-surface-100 !pt-3 text-center text-[11px] text-surface-400"
+        data-details-error
+      >
+        Couldn't load this player's details.
+      </p>
+      <dl
+        v-else
+        class="!mt-3 flex flex-col !gap-1.5 border-t border-surface-100 !pt-3"
+        :aria-busy="isPending"
+      >
         <div
-          v-for="detail in DETAILS"
+          v-for="detail in details"
           :key="detail.label"
           class="flex items-center justify-between !gap-2"
         >
           <dt class="text-[11px] text-surface-400">
             {{ detail.label }}
           </dt>
-          <dd class="truncate text-[11px] font-medium text-surface-700">
-            {{ detail.value }}
+          <dd
+            v-if="isPending"
+            class="h-3 w-14 animate-pulse rounded bg-surface-100"
+          />
+          <dd
+            v-else
+            class="truncate text-[11px] font-medium"
+            :class="detail.value ? 'text-surface-700' : 'text-surface-300'"
+          >
+            {{ detail.value ?? "Not set" }}
           </dd>
         </div>
       </dl>
@@ -58,11 +68,17 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import PlayerAvatar from "@/components/PlayerAvatar.vue";
+import { useGetPlayer } from "@/features/profile/composables/queries";
+import {
+  memberSince,
+  positionLabel,
+} from "@/features/profile/composables/profileRules";
 
 const props = defineProps<{
-  // Only the name comes in: the rest of the profile has no source yet, so
-  // there is nothing for an id to fetch. When a player-details endpoint
-  // exists, this takes the player's id and queries by it instead.
+  playerId: number;
+  // The roster already knows the name, so it shows at once; everything else
+  // comes from the player's profile (PROF-11).
   name: string;
   // The avatar the card points at — read for its position only.
   anchor: HTMLElement;
@@ -74,14 +90,21 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-// Hardcoded until players carry a picture, rating and profile of their own.
-const RATING = { score: "4.6", count: 23 };
-const DETAILS = [
-  { label: "Position", value: "Midfielder" },
-  { label: "Games played", value: "24" },
-  { label: "Attendance", value: "92%" },
-  { label: "Member since", value: "Mar 2025" },
-];
+const {
+  data: profile,
+  isPending,
+  isError,
+} = useGetPlayer(() => props.playerId);
+
+// PROF-10. Never the email (PROF-32): the profile doesn't carry one.
+const details = computed(() => [
+  { label: "Position", value: positionLabel(profile.value?.position ?? null) },
+  { label: "City", value: profile.value?.city ?? null },
+  {
+    label: "Member since",
+    value: profile.value ? memberSince(profile.value.created_at) : null,
+  },
+]);
 
 // Gap between avatar and card, and the margin kept to the viewport edges.
 const GAP = 10;
@@ -89,16 +112,6 @@ const MARGIN = 8;
 
 const cardEl = ref<HTMLElement | null>(null);
 const pos = ref<{ top: number; left: number } | null>(null);
-
-const initials = computed(
-  () =>
-    props.name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "?"
-);
 
 // Hidden rather than unmounted while unplaced: the card has to be in the DOM to
 // be measured, and a visible one would flash at the top-left corner first.
@@ -148,5 +161,8 @@ onBeforeUnmount(() => {
 
 // Moving between two avatars reuses this card, so it has to re-place itself —
 // after the new name has rendered, since that is what sets the card's height.
-watch([() => props.anchor, () => props.name], place, { flush: "post" });
+// A failed load swaps the rows for one line, which changes it too.
+watch([() => props.anchor, () => props.name, isError], place, {
+  flush: "post",
+});
 </script>
