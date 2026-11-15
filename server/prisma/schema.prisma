@@ -28,6 +28,7 @@ model Account {
   timeslot_players  TimeslotPlayer[]
   tenant_accounts   TenantAccount[]
   join_requests     TimeslotJoinRequest[]
+  media             Media[]
 
   @@map("accounts")
 }
@@ -119,6 +120,27 @@ model TenantAccount {
 
   @@id([tenantId, accountId])
   @@map("tenant_accounts")
+}
+
+// PROF-60..67. Files live in Firebase Storage under players/<uid>/; a row is
+// the grid entry. path is unique so one file can't become two grid entries,
+// which would let deleting one break the other.
+model Media {
+  id          Int       @id @default(autoincrement())
+  accountId   Int       @map("account_id")
+  kind        MediaKind
+  path        String    @unique
+  poster_path String?
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_media_account")
+
+  @@index([accountId, created_at])
+  @@map("media")
+}
+
+enum MediaKind {
+  photo
+  video
 }
 
 enum JoinRequestStatus {

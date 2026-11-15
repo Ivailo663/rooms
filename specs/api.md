@@ -27,6 +27,9 @@ Those types are the contract, so change them together with this table.
 | GET | `/user` | any | `Account \| null` | ROLE-07 |
 | PATCH | `/user` | any, own account only | `Account` | PROF-21..24 |
 | GET | `/players/:id` | any | `PlayerProfile` | PROF-20, PROF-31, PROF-32 |
+| GET | `/players/:id/media` | any | `MediaItem[]`, newest first | PROF-72, PROF-63 |
+| POST | `/media` | any, own folder only; body `{ kind, path, posterPath? }` | `MediaItem` | PROF-60, PROF-62, PROF-67 |
+| DELETE | `/media/:id` | the item's owner | 204 | PROF-62, PROF-64 |
 | GET | `/cities` | any | `string[]` | PROF-24 |
 | GET | `/accounts?search=` | any (should be admin) | `AccountSearchResult[]` | API-03 |
 | POST | `/rooms` | clientAdmin or above | `CreateRoomResponse` | SLOT-01, ROLE-10 |

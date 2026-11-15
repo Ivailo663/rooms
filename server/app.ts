@@ -18,6 +18,7 @@ import { registerTenantRoutes } from "./routes/tenants.js";
 import { registerAccountRoutes } from "./routes/accounts.js";
 import { registerPlayerRoutes } from "./routes/players.js";
 import { registerCityRoutes } from "./routes/cities.js";
+import { registerMediaRoutes } from "./routes/media.js";
 import type { AppError } from "./utils/http.js";
 import { startScheduler } from "./scheduler.js";
 import { createTimeslotWorker } from "./workers/timeslotWorker.js";
@@ -49,6 +50,7 @@ registerTenantRoutes(app);
 registerAccountRoutes(app);
 registerPlayerRoutes(app);
 registerCityRoutes(app);
+registerMediaRoutes(app);
 
 createTimeslotWorker(io);
 

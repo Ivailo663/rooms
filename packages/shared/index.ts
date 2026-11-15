@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import type { PlayerPosition } from "@prisma/client";
+import type { MediaKind, PlayerPosition } from "@prisma/client";
 
 export type {
   Account,
@@ -7,6 +7,7 @@ export type {
   RoomTimeslot,
   AccountRole,
   PlayerPosition,
+  MediaKind,
 } from "@prisma/client";
 
 export interface GetRoomsParams {
@@ -240,6 +241,25 @@ export interface UpdateProfileRequest {
   position?: PlayerPosition | null;
   city?: string | null;
   bio?: string | null;
+}
+
+// GET /players/:id/media, POST /media (PROF-60..67). Paths are Firebase
+// Storage object paths under players/<uid>/; the client resolves them with the
+// Storage SDK while signed in (PROF-63).
+export interface MediaItem {
+  id: number;
+  kind: MediaKind;
+  path: string;
+  poster_path: string | null;
+  created_at: string;
+}
+
+// POST /media. posterPath is the small picture the grid loads (PROF-72): the
+// 400 px copy of a photo or a still frame of a video, in the same folder.
+export interface CreateMediaRequest {
+  kind: MediaKind;
+  path: string;
+  posterPath?: string;
 }
 
 export interface AccountSearchResult {

@@ -97,27 +97,32 @@
               data-edit-profile
               @click="editing = true"
             />
-            <!-- Uploads arrive with PROF-60. A disabled button swallows
-                 pointer events, so the hint sits on the wrapper, and is
-                 spelled out for touch screens, where nothing hovers. -->
-            <span title="Coming soon" class="flex">
-              <Button
-                label="Add"
-                icon="fa-solid fa-plus"
-                size="small"
-                severity="secondary"
-                disabled
-                fluid
-                aria-describedby="profile-add-soon"
-                data-add-media
-              />
-            </span>
-            <span
-              id="profile-add-soon"
-              class="col-start-2 text-[11px] text-surface-300"
+            <Button
+              label="Add"
+              icon="fa-solid fa-plus"
+              size="small"
+              severity="secondary"
+              data-add-media
+              @click="picker?.click()"
+            />
+            <!-- PROF-60: photos only in this step. -->
+            <input
+              ref="picker"
+              type="file"
+              :accept="PHOTO_ACCEPT"
+              multiple
+              class="hidden"
+              data-media-picker
+              @change="onPick"
+            />
+            <p
+              v-if="refusal"
+              role="alert"
+              class="col-span-2 text-xs text-red-600"
+              data-media-refusal
             >
-              Coming soon
-            </span>
+              {{ refusal }}
+            </p>
           </div>
         </template>
         <template v-else>
@@ -126,25 +131,13 @@
         </template>
       </header>
 
-      <!-- PROF-72: full-bleed on phones, so it runs edge to edge under the
-           header like a feed does. Media fills it in a later step; for now
-           every grid is empty (PROF-75). -->
-      <section
+      <MediaGrid
         v-if="profile"
-        aria-label="Posts"
-        class="!-mx-4 !mt-6 border-t border-surface-200 sm:!mx-0"
-        data-profile-grid
-      >
-        <div class="flex flex-col items-center !gap-3 !px-4 !py-14 text-center">
-          <i
-            class="fa-solid fa-camera text-2xl text-surface-200"
-            aria-hidden="true"
-          />
-          <p class="text-sm text-surface-400">
-            {{ isOwn ? "Add your first photo or clip" : "No posts yet" }}
-          </p>
-        </div>
-      </section>
+        :player-id="id"
+        :own="isOwn"
+        :uploads="uploads"
+        @dismiss="dismiss"
+      />
     </template>
 
     <!-- PROF-28. A sheet from the bottom on phones, where the keyboard and
@@ -212,9 +205,12 @@ import { Button, Dialog } from "primevue";
 import BackButton from "@/components/BackButton.vue";
 import PlayerAvatar from "@/components/PlayerAvatar.vue";
 import ProfileEditForm from "./components/ProfileEditForm.vue";
+import MediaGrid from "./components/MediaGrid.vue";
 import { useAuthStore } from "@/stores/auth";
 import { isNotFound, useGetPlayer } from "./composables/queries";
 import { memberSince, positionLabel } from "./composables/profileRules";
+import { PHOTO_ACCEPT } from "./composables/mediaRules";
+import { useMediaUploads } from "./composables/useMediaUploads";
 
 const props = defineProps<{ id: number }>();
 
@@ -249,6 +245,17 @@ const saveAndClose = async () => {
   if (await editForm.value?.save()) editing.value = false;
 };
 const isPhone = useMediaQuery("(max-width: 639px)");
+
+const { uploads, refusal, add, dismiss } = useMediaUploads(() => props.id);
+const picker = useTemplateRef<HTMLInputElement>("picker");
+
+// Cleared after reading, so picking the same file again still fires change.
+const onPick = () => {
+  const input = picker.value;
+  if (!input?.files) return;
+  add(Array.from(input.files));
+  input.value = "";
+};
 
 // PROF-70: the small line under the name. Unset fields drop out rather than
 // reading "Not set", which on someone's page is just noise.
