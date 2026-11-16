@@ -13,7 +13,7 @@
           ? 'right-2 top-[max(0.5rem,env(safe-area-inset-top))] h-12 w-12'
           : 'right-0 top-0 h-10 w-10'
       "
-      aria-label="Delete photo"
+      :aria-label="`Delete ${mediaNoun(item.kind)}`"
       data-delete-media
       @click="confirming = true"
     >
@@ -36,7 +36,7 @@
     <div
       v-else
       role="group"
-      aria-label="Delete this photo?"
+      :aria-label="`Delete this ${mediaNoun(item.kind)}?`"
       class="absolute inset-0 flex flex-col items-center justify-center !gap-1.5 bg-black/65 !p-2 text-center"
       data-confirm-delete
       @keydown.escape.stop="confirming = false"
@@ -70,6 +70,7 @@ import { computed, nextTick, ref, useTemplateRef, watch } from "vue";
 import { Button } from "primevue";
 import type { MediaItem } from "@football/shared";
 import { useDeleteMedia } from "../composables/queries";
+import { mediaNoun } from "../composables/mediaRules";
 
 const props = withDefaults(
   defineProps<{

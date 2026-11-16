@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  afterEach,
+  beforeEach,
+  type Mock,
+} from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
 import {
@@ -44,6 +52,20 @@ const shrunk = () => ({
 });
 vi.mock("@/firebase", () => ({ auth: { currentUser: { uid: "fb-ana" } } }));
 
+// Reading a clip has its own test (readClip.test.ts); here a picked clip runs
+// 12 seconds and its still is 50 bytes.
+const clips = vi.hoisted(() => ({ openClip: vi.fn() }));
+vi.mock("./composables/readClip", () => clips);
+const close = vi.fn();
+const opened = (
+  duration = 12,
+  poster: Blob | null = new Blob(["p".repeat(50)])
+) => ({
+  duration,
+  poster: vi.fn(async () => poster),
+  close,
+});
+
 const profile: PlayerProfile = {
   id: 4,
   name: "Ana Petrova",
@@ -59,6 +81,14 @@ const photo = (id: number): MediaItem => ({
   kind: "photo",
   path: `players/fb-ana/${id}.jpg`,
   poster_path: null,
+  created_at: new Date(2026, 10, id).toISOString(),
+});
+
+const clip = (id: number): MediaItem => ({
+  id,
+  kind: "video",
+  path: `players/fb-ana/${id}.mov`,
+  poster_path: `players/fb-ana/${id}-small.jpg`,
   created_at: new Date(2026, 10, id).toISOString(),
 });
 
@@ -140,7 +170,10 @@ beforeEach(async () => {
   URL.createObjectURL = () => "blob:preview";
   URL.revokeObjectURL = () => {};
   storage.uploadFile.mockReset();
+  storage.getMediaUrl.mockClear();
   shrink.shrinkPhoto.mockReset().mockImplementation(async () => shrunk());
+  clips.openClip.mockReset().mockImplementation(async () => opened());
+  close.mockReset();
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 });
 
@@ -368,7 +401,7 @@ describe("PlayerProfileView", () => {
       await flushPromises();
     };
 
-    it("PROF-60: Add opens the file picker, which offers photos", async () => {
+    it("PROF-60: Add opens the file picker, which offers photos and clips", async () => {
       store.account = { id: 4 } as Account;
       mockGet();
 
@@ -381,6 +414,7 @@ describe("PlayerProfileView", () => {
 
       expect(click).toHaveBeenCalled();
       expect(picker.attributes("accept")).toContain("image/heic");
+      expect(picker.attributes("accept")).toContain("video/quicktime");
     });
 
     it("PROF-72: the grid shows every item's small copy in the server's order, three per row, lazily", async () => {
@@ -417,7 +451,7 @@ describe("PlayerProfileView", () => {
       await pick(view, [new File(["x"], "funny.gif", { type: "image/gif" })]);
 
       expect(view.find("[data-media-refusal]").text()).toContain(
-        "JPEG, PNG, WebP or HEIC"
+        "JPEG, PNG, WebP or HEIC photo, or an MP4 or MOV clip"
       );
       expect(storage.uploadFile).not.toHaveBeenCalled();
       expect(post).not.toHaveBeenCalled();
@@ -488,6 +522,113 @@ describe("PlayerProfileView", () => {
       });
       expect(view.find("[data-pending-upload]").exists()).toBe(false);
       expect(view.findAll("[data-media-tile]")).toHaveLength(2);
+    });
+
+    it("PROF-67: a clip goes up as it is, with its still beside it, then to the server; its tile shows the still and a play mark", async () => {
+      store.account = { id: 4 } as Account;
+      let media: MediaItem[] = [];
+      mockGet(() => media);
+      storage.uploadFile.mockResolvedValue(undefined);
+      const post = vi.spyOn(api, "post").mockImplementation(async () => {
+        media = [clip(9)];
+        return { data: clip(9) };
+      });
+      let finishRead: () => void = () => {};
+      clips.openClip.mockImplementation(
+        () => new Promise((resolve) => (finishRead = () => resolve(opened())))
+      );
+
+      const view = mountView();
+      await flushPromises();
+      const original = new File(["m".repeat(950)], "IMG_1.MOV", { type: "" });
+      await pick(view, [original]);
+
+      // While the clip is read, its tile is already there, marked as a clip.
+      const pending = view.find("[data-pending-upload]");
+      expect(
+        pending.find('[role="progressbar"]').attributes("aria-label")
+      ).toBe("Uploading clip");
+      expect(pending.find(".fa-play").exists()).toBe(true);
+
+      finishRead();
+      await flushPromises();
+
+      expect(clips.openClip).toHaveBeenCalledWith(original);
+      expect(shrink.shrinkPhoto).not.toHaveBeenCalled();
+      const calls = storage.uploadFile.mock.calls;
+      const [path, file, type] = calls[0]!;
+      const [posterPath, still, stillType] = calls[1]!;
+      expect(path).toMatch(/^players\/fb-ana\/[\w-]+\.mov$/);
+      expect(file).toBe(original);
+      expect(type).toBe("video/quicktime");
+      expect(posterPath).toBe(path.replace(/\.mov$/, "-small.jpg"));
+      expect([still.size, stillType]).toEqual([50, "image/jpeg"]);
+      expect(close).toHaveBeenCalled();
+      expect(post).toHaveBeenCalledWith("/media", {
+        kind: "video",
+        path,
+        posterPath,
+      });
+
+      const tile = view.find("[data-media-tile]");
+      expect(tile.find("img").attributes("src")).toBe(
+        "https://cdn.test/players/fb-ana/9-small.jpg"
+      );
+      expect(tile.find("[data-play-mark]").exists()).toBe(true);
+      expect(tile.find("[data-open-media]").attributes("aria-label")).toBe(
+        "Open clip"
+      );
+      // PROF-72: the grid loads only the still, never the clip.
+      expect(storage.getMediaUrl).not.toHaveBeenCalledWith(
+        "players/fb-ana/9.mov"
+      );
+    });
+
+    it("PROF-60: a clip over 30 seconds is refused with the reason, and nothing is uploaded", async () => {
+      store.account = { id: 4 } as Account;
+      mockGet();
+      const post = vi.spyOn(api, "post");
+      const tooLong = opened(42);
+      clips.openClip.mockResolvedValue(tooLong);
+
+      const view = mountView();
+      await flushPromises();
+      await pick(view, [new File(["x"], "match.mp4", { type: "video/mp4" })]);
+
+      expect(view.find("[data-media-refusal]").text()).toBe(
+        '"match.mp4" is longer than 30 seconds. Trim it and try again.'
+      );
+      expect(tooLong.poster).not.toHaveBeenCalled();
+      expect(close).toHaveBeenCalled();
+      expect(storage.uploadFile).not.toHaveBeenCalled();
+      expect(post).not.toHaveBeenCalled();
+      expect(view.find("[data-pending-upload]").exists()).toBe(false);
+    });
+
+    it("PROF-60: a clip this device can't read, or can't take a still from, is refused with the reason", async () => {
+      store.account = { id: 4 } as Account;
+      mockGet();
+      const post = vi.spyOn(api, "post");
+      clips.openClip.mockResolvedValueOnce(null);
+      clips.openClip.mockResolvedValueOnce(opened(12, null));
+
+      const view = mountView();
+      await flushPromises();
+      await pick(view, [
+        new File(["x"], "IMG_2.mov", { type: "video/quicktime" }),
+      ]);
+      expect(view.find("[data-media-refusal]").text()).toBe(
+        '"IMG_2.mov" can\'t be played on this device. Try an MP4.'
+      );
+
+      await pick(view, [
+        new File(["x"], "IMG_3.mov", { type: "video/quicktime" }),
+      ]);
+      expect(view.find("[data-media-refusal]").text()).toBe(
+        '"IMG_3.mov" can\'t be played on this device. Try an MP4.'
+      );
+      expect(storage.uploadFile).not.toHaveBeenCalled();
+      expect(post).not.toHaveBeenCalled();
     });
 
     it("PROF-60: a photo this device can't decode is refused with the reason, and nothing is uploaded", async () => {
@@ -783,6 +924,153 @@ describe("PlayerProfileView", () => {
 
       expect(viewer()).not.toBeNull();
       expect(document.querySelector("[data-delete-media]")).toBeNull();
+    });
+
+    describe("clips", () => {
+      // jsdom plays nothing; play and pause are recorded per element, and a
+      // play that goes through leaves the element playing.
+      let play: Mock<(el: HTMLMediaElement) => Promise<void>>;
+      let pause: Mock<(el: HTMLMediaElement) => void>;
+      const setPaused = (el: HTMLMediaElement, value: boolean) =>
+        Object.defineProperty(el, "paused", { value, configurable: true });
+      beforeEach(() => {
+        play = vi.fn(async () => {});
+        pause = vi.fn();
+        vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(
+          async function (this: HTMLMediaElement) {
+            await play(this);
+            setPaused(this, false);
+          }
+        );
+        vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(
+          function (this: HTMLMediaElement) {
+            pause(this);
+            setPaused(this, true);
+          }
+        );
+      });
+      const clipIn = (nth: number) =>
+        slides()[nth]!.querySelector<HTMLVideoElement>("[data-clip]");
+      const tap = async () => {
+        document.querySelector<HTMLElement>("[data-toggle-mute]")!.click();
+        await flushPromises();
+      };
+
+      it("PROF-73: an opened clip plays with sound, looping and inline, over its still; the next one only reads ahead", async () => {
+        store.account = { id: 7 } as Account;
+        mockGet(() => [photo(3), clip(2), clip(1)]);
+
+        const view = mountView();
+        await flushPromises();
+        await open(view, 1);
+
+        const shown = clipIn(1)!;
+        expect(shown.getAttribute("src")).toBe(
+          "https://cdn.test/players/fb-ana/2.mov"
+        );
+        expect(shown.loop).toBe(true);
+        expect(shown.hasAttribute("playsinline")).toBe(true);
+        expect(shown.preload).toBe("auto");
+        expect(play).toHaveBeenCalledTimes(1);
+        expect(play).toHaveBeenCalledWith(shown);
+        expect(shown.muted).toBe(false);
+        expect(document.querySelector("[data-muted]")).toBeNull();
+
+        // The still shows until the clip is actually playing.
+        const still = slides()[1]!.querySelector("[data-small-copy]")!;
+        expect(still.getAttribute("src")).toBe(
+          "https://cdn.test/players/fb-ana/2-small.jpg"
+        );
+        expect(shown.classList).toContain("opacity-0");
+        shown.dispatchEvent(new Event("playing"));
+        await flushPromises();
+        expect(shown.classList).toContain("opacity-100");
+        expect(still.classList).toContain("opacity-0");
+
+        expect(clipIn(2)!.preload).toBe("metadata");
+        expect(slides()[0]!.querySelector("[data-toggle-mute]")).toBeNull();
+      });
+
+      it("PROF-73: swiping away stops the clip and rewinds it; the next one plays once the feed rests", async () => {
+        store.account = { id: 7 } as Account;
+        mockGet(() => [clip(2), clip(1)]);
+
+        const view = mountView();
+        await flushPromises();
+        await open(view, 0);
+        const first = clipIn(0)!;
+        first.currentTime = 5;
+        play.mockClear();
+
+        const feed = viewer()!;
+        Object.defineProperty(feed, "clientHeight", { value: 800 });
+        feed.scrollTop = 800;
+        feed.dispatchEvent(new Event("scroll"));
+        await flushPromises();
+
+        expect(pause).toHaveBeenCalledWith(first);
+        expect(first.currentTime).toBe(0);
+        expect(play).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(200);
+        await flushPromises();
+        expect(play).toHaveBeenCalledWith(clipIn(1));
+      });
+
+      it("PROF-73: a tap mutes or unmutes, flashing the new state, and muting holds for the next clip", async () => {
+        store.account = { id: 7 } as Account;
+        mockGet(() => [clip(2), clip(1)]);
+
+        const view = mountView();
+        await flushPromises();
+        await open(view, 0);
+
+        await tap();
+        expect(clipIn(0)!.muted).toBe(true);
+        expect(
+          document
+            .querySelector("[data-toggle-mute]")!
+            .getAttribute("aria-label")
+        ).toBe("Unmute");
+        expect(document.querySelector("[data-muted]")).not.toBeNull();
+        expect(
+          document.querySelector("[data-mute-flash] .fa-volume-xmark")
+        ).not.toBeNull();
+        await vi.advanceTimersByTimeAsync(700);
+        expect(document.querySelector("[data-mute-flash]")).toBeNull();
+
+        await swipeTo(1);
+        expect(play).toHaveBeenLastCalledWith(clipIn(1));
+        expect(clipIn(1)!.muted).toBe(true);
+
+        await tap();
+        expect(clipIn(1)!.muted).toBe(false);
+        expect(document.querySelector("[data-muted]")).toBeNull();
+        expect(
+          document.querySelector("[data-mute-flash] .fa-volume-high")
+        ).not.toBeNull();
+      });
+
+      it("PROF-73: where the browser won't start a clip with sound, it plays muted and says so, and a tap unmutes", async () => {
+        store.account = { id: 7 } as Account;
+        mockGet(() => [clip(1)]);
+        play.mockImplementation(async (el: HTMLMediaElement) => {
+          if (!el.muted) throw new DOMException("gesture", "NotAllowedError");
+        });
+
+        const view = mountView();
+        await flushPromises();
+        await open(view, 0);
+
+        const shown = clipIn(0)!;
+        expect(play).toHaveBeenCalledTimes(2);
+        expect(shown.muted).toBe(true);
+        expect(document.querySelector("[data-muted]")).not.toBeNull();
+
+        await tap();
+        expect(shown.muted).toBe(false);
+        expect(document.querySelector("[data-muted]")).toBeNull();
+      });
     });
 
     it("NAV-10: a swipe in the viewer never reaches the drawer, but the left edge's back (NAV-11) does", async () => {

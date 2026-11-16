@@ -50,6 +50,11 @@
           class="h-full w-full object-cover"
           :class="{ 'opacity-40': upload.error }"
         />
+        <i
+          v-if="upload.kind === 'video'"
+          class="fa-solid fa-play absolute left-2 top-2 text-xs text-white drop-shadow-[0_1px_2px_rgb(0_0_0/0.6)]"
+          aria-hidden="true"
+        />
         <div
           v-if="upload.error"
           class="absolute inset-0 flex flex-col items-center justify-center !gap-1 bg-black/55 !p-2 text-center"
@@ -70,7 +75,7 @@
           v-else
           class="absolute inset-x-2 bottom-2 h-1 overflow-hidden rounded-full bg-white/50"
           role="progressbar"
-          aria-label="Uploading photo"
+          :aria-label="`Uploading ${mediaNoun(upload.kind)}`"
           aria-valuemin="0"
           aria-valuemax="100"
           :aria-valuenow="Math.round(upload.progress * 100)"
@@ -119,6 +124,7 @@ import MediaTile from "./MediaTile.vue";
 import MediaViewer from "./MediaViewer.vue";
 import { useGetPlayerMedia } from "../composables/queries";
 import type { PendingUpload } from "../composables/useMediaUploads";
+import { mediaNoun } from "../composables/mediaRules";
 
 const props = defineProps<{
   playerId: number;

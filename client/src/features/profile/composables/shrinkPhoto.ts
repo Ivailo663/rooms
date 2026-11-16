@@ -81,6 +81,16 @@ const toJpeg = (canvas: HTMLCanvasElement): Promise<Blob> =>
     )
   );
 
+// PROF-72: the grid's copy of anything drawable, a photo or a clip's frame.
+export const smallJpeg = (
+  source: CanvasImageSource,
+  width: number,
+  height: number
+): Promise<Blob> => {
+  const size = fitWithin(width, height, SMALL_SIDE);
+  return toJpeg(draw(source, size.width, size.height));
+};
+
 // PROF-60: the two JPEGs uploaded for a picked photo, or null when the
 // browser can't decode it. The small copy is drawn from the full one: a
 // 4000px original squeezed straight to 400px drops pixels and shimmers,
@@ -92,9 +102,10 @@ export const shrinkPhoto = async (file: Blob): Promise<ShrunkPhoto | null> => {
   try {
     const fullSize = fitWithin(width, height, FULL_SIDE);
     const full = draw(decoded.source, fullSize.width, fullSize.height);
-    const smallSize = fitWithin(width, height, SMALL_SIDE);
-    const small = draw(full, smallSize.width, smallSize.height);
-    return { full: await toJpeg(full), small: await toJpeg(small) };
+    return {
+      full: await toJpeg(full),
+      small: await smallJpeg(full, width, height),
+    };
   } finally {
     decoded.release();
   }
