@@ -110,8 +110,9 @@ and clips come first, the details stay small.
 - **PROF-60** A player uploads photos and videos to their own profile.
   Photos: JPEG, PNG, WebP or HEIC. Videos: MP4 or MOV, up to 30 seconds
   (60 once clips are compressed in the native app).
-  There's no file size limit. Another file type, or a longer video, is
-  refused with a message saying why, and nothing is stored. Before upload,
+  A video is at most 100 MB; photos have no size limit, since they're
+  shrunk. Another file type, a longer video or a bigger one is refused with
+  a message saying why, and nothing is stored. Before upload,
   the app shrinks a photo to at most 1600 px on its longest side and saves
   it as JPEG (HEIC included), and also makes a 400 px copy for the grid.
 - **PROF-62** Only the owner can add or delete their media. Anyone else's
@@ -180,3 +181,6 @@ and clips come first, the details stay small.
    you've played with, players from the same city, the newest uploads, or the
    best rated once ratings exist (PROF-50). Does going back return to the
    profile you started from, or step back one player at a time?
+   *Proposal (2026-11-16):* wait until the app is online with real content;
+   start with a fixed order (played with you, then same city, then newest),
+   and learn from what people watch only once there are users to learn from.

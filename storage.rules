@@ -1,15 +1,17 @@
 rules_version = '2';
 
 // PROF-63: only signed-in users see media. PROF-60/62/67: a player writes
-// only into their own folder, and only photo and video types. No size limit.
+// only into their own folder, and only photo and video types; a clip is at
+// most 100 MB.
 service firebase.storage {
   match /b/{bucket}/o {
     match /players/{uid}/{file} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
         && request.auth.uid == uid
-        && request.resource.contentType.matches(
-          'image/(jpeg|png|webp|heic)|video/(mp4|quicktime)');
+        && (request.resource.contentType.matches('image/(jpeg|png|webp|heic)')
+          || (request.resource.contentType.matches('video/(mp4|quicktime)')
+            && request.resource.size <= 100 * 1024 * 1024));
       // Deleting goes through the server (PROF-64), which uses the Admin SDK.
       allow update, delete: if false;
     }
