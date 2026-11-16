@@ -105,11 +105,11 @@
               data-add-media
               @click="picker?.click()"
             />
-            <!-- PROF-60: photos only in this step. -->
+            <!-- PROF-60: photos and clips. -->
             <input
               ref="picker"
               type="file"
-              :accept="PHOTO_ACCEPT"
+              :accept="MEDIA_ACCEPT"
               multiple
               class="hidden"
               data-media-picker
@@ -209,7 +209,7 @@ import MediaGrid from "./components/MediaGrid.vue";
 import { useAuthStore } from "@/stores/auth";
 import { isNotFound, useGetPlayer } from "./composables/queries";
 import { memberSince, positionLabel } from "./composables/profileRules";
-import { PHOTO_ACCEPT } from "./composables/mediaRules";
+import { MEDIA_ACCEPT } from "./composables/mediaRules";
 import { useMediaUploads } from "./composables/useMediaUploads";
 
 const props = defineProps<{ id: number }>();

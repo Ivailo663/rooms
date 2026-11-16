@@ -6,7 +6,7 @@
     modal
     :draggable="false"
     class="!m-0 !h-dvh !max-h-none !w-screen !max-w-none !rounded-none !border-0 !bg-black !shadow-none"
-    :pt="{ root: { 'aria-label': 'Photos' } }"
+    :pt="{ root: { 'aria-label': 'Posts' } }"
     @update:visible="(visible) => !visible && close()"
     @after-hide="emit('hidden', current?.id)"
   >
@@ -22,7 +22,7 @@
         <div
           ref="scroller"
           tabindex="0"
-          aria-label="Swipe up or down for the next or previous photo"
+          aria-label="Swipe up or down for the next or previous post"
           class="h-full w-full snap-y snap-mandatory overflow-y-auto overscroll-contain outline-none [scrollbar-width:none]"
           data-media-feed
           @scroll.passive="onScroll"
@@ -32,11 +32,46 @@
             :key="item.id"
             :item="item"
             :near="Math.abs(i - index) <= 1"
+            :active="i === index && i === settledIndex"
+            :muted="muted"
             :label="`${i + 1} of ${items.length}`"
+            @toggle-mute="toggleMute"
+            @sound-blocked="muted = true"
           />
         </div>
 
         <p class="sr-only" aria-live="polite">{{ position }}</p>
+
+        <!-- PROF-73: the sound state of the clip on screen. A tap flashes
+             the new state in the middle; muted also stays in the corner, so
+             a clip the browser started silently says why it's quiet. -->
+        <template v-if="current?.kind === 'video'">
+          <Transition
+            leave-active-class="transition duration-300"
+            leave-to-class="opacity-0 scale-90"
+          >
+            <span
+              v-if="flash"
+              :key="flash"
+              class="pointer-events-none absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white"
+              aria-hidden="true"
+              data-mute-flash
+            >
+              <i
+                class="fa-solid text-2xl"
+                :class="muted ? 'fa-volume-xmark' : 'fa-volume-high'"
+              />
+            </span>
+          </Transition>
+          <span
+            v-if="muted"
+            class="pointer-events-none absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white"
+            data-muted
+          >
+            <i class="fa-solid fa-volume-xmark text-sm" aria-hidden="true" />
+            <span class="sr-only">Muted</span>
+          </span>
+        </template>
 
         <button
           type="button"
@@ -95,14 +130,32 @@ const position = computed(() =>
   props.items.length ? `${index.value + 1} of ${props.items.length}` : ""
 );
 
+// Where the feed last came to rest. A clip plays only there, so it doesn't
+// start mid-swipe, and stops as soon as the swipe carries it away.
+const settledIndex = ref(0);
+
 // Reported once the scroll has rested, not on every frame: it ends up in the
 // URL, and browsers throttle history updates.
 let settleTimer: ReturnType<typeof setTimeout> | undefined;
 const settleSoon = () => {
   clearTimeout(settleTimer);
   settleTimer = setTimeout(() => {
-    if (props.open && current.value) emit("settle", current.value.id);
+    if (!props.open || !current.value) return;
+    settledIndex.value = index.value;
+    emit("settle", current.value.id);
   }, 150);
+};
+
+// PROF-73: clips play with sound; muting holds for the next clip too, as it
+// does in any feed, until the viewer closes.
+const muted = ref(false);
+const flash = ref(0);
+let flashTimer: ReturnType<typeof setTimeout> | undefined;
+const toggleMute = () => {
+  muted.value = !muted.value;
+  clearTimeout(flashTimer);
+  flash.value++;
+  flashTimer = setTimeout(() => (flash.value = 0), 700);
 };
 
 // Closing drops a pending report, so it can't put ?media back afterwards.
@@ -120,7 +173,8 @@ watch(
     const start = props.items.findIndex((item) => item.id === props.startId);
     // A link to an item that's gone: nothing to show.
     if (start === -1) return close();
-    index.value = start;
+    index.value = settledIndex.value = start;
+    muted.value = false;
   },
   { immediate: true }
 );
@@ -163,5 +217,8 @@ const guardEdges = (event: TouchEvent) => {
   if (touch && !backSwipeCanStart(touch.clientX)) event.stopPropagation();
 };
 
-onBeforeUnmount(() => clearTimeout(settleTimer));
+onBeforeUnmount(() => {
+  clearTimeout(settleTimer);
+  clearTimeout(flashTimer);
+});
 </script>

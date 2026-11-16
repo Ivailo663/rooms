@@ -108,7 +108,8 @@ and clips come first, the details stay small.
 ## Media
 
 - **PROF-60** A player uploads photos and videos to their own profile.
-  Photos: JPEG, PNG, WebP or HEIC. Videos: MP4 or MOV, up to 60 seconds.
+  Photos: JPEG, PNG, WebP or HEIC. Videos: MP4 or MOV, up to 30 seconds
+  (60 once clips are compressed in the native app).
   There's no file size limit. Another file type, or a longer video, is
   refused with a message saying why, and nothing is stored. Before upload,
   the app shrinks a photo to at most 1600 px on its longest side and saves

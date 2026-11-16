@@ -10,7 +10,7 @@
     <RouterLink
       :to="{ query: { ...route.query, media: item.id } }"
       class="block h-full w-full"
-      aria-label="Open photo"
+      :aria-label="`Open ${mediaNoun(item.kind)}`"
       data-open-media
     >
       <!-- The square holds its place while the URL resolves and the image
@@ -36,6 +36,14 @@
         />
         <span class="sr-only">Photo couldn't be shown</span>
       </span>
+      <!-- PROF-72: a clip is its still frame plus this mark, top left, as
+           the delete button holds the other corner on your own tiles. -->
+      <i
+        v-if="item.kind === 'video'"
+        class="fa-solid fa-play absolute left-2 top-2 text-xs text-white drop-shadow-[0_1px_2px_rgb(0_0_0/0.6)]"
+        aria-hidden="true"
+        data-play-mark
+      />
     </RouterLink>
 
     <MediaDelete v-if="own" :item="item" :player-id="playerId" />
@@ -49,6 +57,7 @@ import { useIntersectionObserver } from "@vueuse/core";
 import type { MediaItem } from "@football/shared";
 import MediaDelete from "./MediaDelete.vue";
 import { useMediaUrl } from "../composables/queries";
+import { mediaNoun } from "../composables/mediaRules";
 
 const props = defineProps<{
   item: MediaItem;

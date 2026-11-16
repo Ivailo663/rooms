@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 import {
-  PHOTO_ACCEPT,
+  MEDIA_ACCEPT,
+  clipTooLong,
+  clipType,
   isPhoto,
+  isTooLong,
   mediaPaths,
-  photoRefusal,
+  mediaRefusal,
+  unreadableClip,
   unreadablePhoto,
   uploadErrorMessage,
 } from "./mediaRules";
@@ -31,26 +35,60 @@ describe("media rules", () => {
     expect(isPhoto(file("clip.mp4", "video/mp4"))).toBe(false);
   });
 
-  it("PROF-60: a refusal says why", () => {
-    expect(photoRefusal(file("a.gif", "image/gif"))).toBe(
-      '"a.gif" isn\'t a photo the app takes. Use JPEG, PNG, WebP or HEIC.'
+  it("PROF-60: MP4 and MOV clips are taken, stored with their own type", () => {
+    expect(clipType(file("a.mp4", "video/mp4"))).toBe("video/mp4");
+    expect(clipType(file("IMG_1.MOV", "video/quicktime"))).toBe(
+      "video/quicktime"
     );
-    expect(photoRefusal(file("clip.mov", "video/quicktime"))).toContain(
-      "pick a photo"
+  });
+
+  it("PROF-60: a clip the browser gives no type is known by its name", () => {
+    expect(clipType(file("IMG_1.MOV", ""))).toBe("video/quicktime");
+    expect(clipType(file("clip.mp4", ""))).toBe("video/mp4");
+  });
+
+  it("PROF-60: other video types aren't clips the app takes", () => {
+    expect(clipType(file("a.webm", "video/webm"))).toBeNull();
+    expect(clipType(file("a.mov", "video/x-matroska"))).toBeNull();
+    expect(clipType(file("a.jpg", "image/jpeg"))).toBeNull();
+    expect(clipType(file("notes", ""))).toBeNull();
+  });
+
+  it("PROF-60: a clip runs up to 30 seconds, as the phone rounds it", () => {
+    expect(isTooLong(12)).toBe(false);
+    expect(isTooLong(30)).toBe(false);
+    expect(isTooLong(30.4)).toBe(false);
+    expect(isTooLong(30.6)).toBe(true);
+    expect(isTooLong(61)).toBe(true);
+  });
+
+  it("PROF-60: a refusal says why", () => {
+    expect(mediaRefusal({ name: "a.gif" })).toBe(
+      '"a.gif" isn\'t a file the app takes. Use a JPEG, PNG, WebP or HEIC photo, or an MP4 or MOV clip.'
+    );
+    expect(clipTooLong({ name: "match.mov" })).toBe(
+      '"match.mov" is longer than 30 seconds. Trim it and try again.'
     );
     expect(unreadablePhoto({ name: "IMG_1.heic" })).toBe(
       '"IMG_1.heic" can\'t be opened on this device. Try a JPEG or PNG.'
     );
+    expect(unreadableClip({ name: "IMG_2.mov" })).toBe(
+      '"IMG_2.mov" can\'t be played on this device. Try an MP4.'
+    );
   });
 
-  it("PROF-60: the picker offers the photo types, plus HEIC by name", () => {
-    expect(PHOTO_ACCEPT.split(",")).toEqual([
+  it("PROF-60: the picker offers the photo and clip types, plus HEIC and MOV by name", () => {
+    expect(MEDIA_ACCEPT.split(",")).toEqual([
       "image/jpeg",
       "image/png",
       "image/webp",
       "image/heic",
       ".heic",
       ".heif",
+      "video/mp4",
+      "video/quicktime",
+      ".mp4",
+      ".mov",
     ]);
   });
 
@@ -59,6 +97,16 @@ describe("media rules", () => {
       path: "players/fb-uid/abc.jpg",
       posterPath: "players/fb-uid/abc-small.jpg",
     });
+  });
+
+  it("PROF-67/72: a clip keeps its own extension, with its still beside it", () => {
+    expect(mediaPaths("fb-uid", "abc", "video/quicktime")).toEqual({
+      path: "players/fb-uid/abc.mov",
+      posterPath: "players/fb-uid/abc-small.jpg",
+    });
+    expect(mediaPaths("fb-uid", "abc", "video/mp4").path).toBe(
+      "players/fb-uid/abc.mp4"
+    );
   });
 
   it("PROF-67: the server's reason is shown as it is; anything else asks to try again", () => {
