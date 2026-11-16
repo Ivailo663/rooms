@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 import {
   MEDIA_ACCEPT,
+  clipTooBig,
   clipTooLong,
+  isTooBig,
   clipType,
   isPhoto,
   isTooLong,
@@ -60,6 +62,15 @@ describe("media rules", () => {
     expect(isTooLong(30.4)).toBe(false);
     expect(isTooLong(30.6)).toBe(true);
     expect(isTooLong(61)).toBe(true);
+  });
+
+  it("PROF-60: a clip is at most 100 MB", () => {
+    const mb = 1024 * 1024;
+    expect(isTooBig({ size: 100 * mb })).toBe(false);
+    expect(isTooBig({ size: 100 * mb + 1 })).toBe(true);
+    expect(clipTooBig({ name: "match.mov" })).toBe(
+      '"match.mov" is bigger than 100 MB. Record at a lower quality (1080p) and try again.'
+    );
   });
 
   it("PROF-60: a refusal says why", () => {

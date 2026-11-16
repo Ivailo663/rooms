@@ -21,6 +21,10 @@ const VIDEO_TYPES: Record<string, string> = {
 // clip is uploaded at full camera quality, so it's kept short.
 export const MAX_CLIP_SECONDS = 30;
 
+// PROF-60: clips aren't compressed in the browser, so a 4K one is capped by
+// size as well. storage.rules holds the same number.
+export const MAX_CLIP_MB = 100;
+
 // For the file picker; the extensions let a HEIC or MOV file be picked where
 // the browser doesn't know its type.
 export const MEDIA_ACCEPT = [
@@ -62,6 +66,12 @@ export const mediaRefusal = (file: Pick<File, "name">): string =>
 
 export const clipTooLong = (file: Pick<File, "name">): string =>
   `"${file.name}" is longer than ${MAX_CLIP_SECONDS} seconds. Trim it and try again.`;
+
+export const isTooBig = (file: Pick<File, "size">): boolean =>
+  file.size > MAX_CLIP_MB * 1024 * 1024;
+
+export const clipTooBig = (file: Pick<File, "name">): string =>
+  `"${file.name}" is bigger than ${MAX_CLIP_MB} MB. Record at a lower quality (1080p) and try again.`;
 
 // PROF-60: a file of an accepted type that this browser can't decode (HEIC
 // outside Safari, a MOV codec it lacks) is refused rather than sent as it is.

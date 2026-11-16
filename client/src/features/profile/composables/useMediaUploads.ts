@@ -5,7 +5,9 @@ import { auth } from "@/firebase";
 import { createMedia } from "../api";
 import { uploadFile } from "../api/storage";
 import {
+  clipTooBig,
   clipTooLong,
+  isTooBig,
   clipType,
   isPhoto,
   isTooLong,
@@ -44,6 +46,7 @@ const prepareClip = async (
   file: File,
   contentType: string
 ): Promise<Prepared | string> => {
+  if (isTooBig(file)) return clipTooBig(file);
   const clip = await openClip(file);
   if (!clip) return unreadableClip(file);
   try {
