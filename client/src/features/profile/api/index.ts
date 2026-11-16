@@ -1,6 +1,8 @@
 import { api } from "@/axios";
 import type {
   Account,
+  CreateMediaRequest,
+  MediaItem,
   PlayerProfile,
   UpdateProfileRequest,
 } from "@football/shared";
@@ -23,4 +25,22 @@ export const updateProfile = async (
   const { data } = await api.patch<Account>("/user", update);
 
   return data;
+};
+
+export const getPlayerMedia = async (id: number): Promise<MediaItem[]> => {
+  const { data } = await api.get<MediaItem[]>(`/players/${id}/media`);
+
+  return data;
+};
+
+export const createMedia = async (
+  request: CreateMediaRequest
+): Promise<MediaItem> => {
+  const { data } = await api.post<MediaItem>("/media", request);
+
+  return data;
+};
+
+export const deleteMedia = async (id: number): Promise<void> => {
+  await api.delete(`/media/${id}`);
 };

@@ -58,6 +58,7 @@ Each criterion is one bullet that starts with a bold id:
 | CARD | [ui/playable-room-card.md](ui/playable-room-card.md) | Player browse card |
 | HCARD | [ui/hosted-room-card.md](ui/hosted-room-card.md) | Host dashboard room card |
 | NAV | [ui/navigation.md](ui/navigation.md) | Sidebar and mobile drawer |
+| APP | [native-app.md](native-app.md) | iOS and Android apps built with Capacitor |
 
 Terms used everywhere are defined in [glossary.md](glossary.md). What the
 product is for, and what's out of scope, is in [product.md](product.md). New

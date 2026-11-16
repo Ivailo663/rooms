@@ -24,9 +24,9 @@ lives on the right.
   desktop sidebar stays on the left.
 - **NAV-11** A swipe from the left edge towards the right goes back to the
   previous page. In a mobile browser, the browser's own back gesture does
-  this and the app adds nothing, so a swipe never goes back twice. Installed
-  as an app (standalone), where there's no browser gesture, the app does it.
-  With nothing to go back to, nothing happens.
+  this and the app adds nothing, so a swipe never goes back twice. In the
+  native app, where there's no browser gesture, the app does it
+  ([APP-11](../native-app.md)). With nothing to go back to, nothing happens.
 - **NAV-12** A page reached from another page (today: a player's profile,
   `/profiles/:id`) shows a small back arrow at the top left, floating over
   the page, never a bar. It goes back to the previous page, or home when the

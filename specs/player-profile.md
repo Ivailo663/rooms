@@ -86,16 +86,21 @@ and clips come first, the details stay small.
   small text.
 - **PROF-72** Below that, one full-width grid with thin light lines between
   the items holds all the player's photos and videos together, newest first,
-  three per row. There are no tabs. A video
-  shows a still frame and a play mark.
+  three per row. There are no tabs. Each tile loads only the small copy
+  (PROF-60). A video shows a still frame and a play mark.
 - **PROF-73** Tapping an item opens it full screen. Swiping up or down moves
   to the next or previous item in grid order. Videos play there with sound,
   and a tap mutes or unmutes them. Closing returns to the same place in the
-  grid.
+  grid. Going back (NAV-11, or the browser's back) closes the viewer instead
+  of leaving the profile.
 - **PROF-74** A player's own page is the page everyone sees, plus two
   buttons: "Edit" (opens the PROF-28 dialog) and "Add" (photo or video). Both
   are always there, also when the grid is empty. The player can also delete
   their own items.
+- **PROF-77** When the viewer reaches the last item of a player, swiping on
+  carries into other players' photos and clips, without end. Each item shows
+  whose it is, and tapping the name opens that player's profile. `[deferred]`
+  (see open questions)
 - **PROF-75** Nothing in the app requires or nags a player to upload. Their
   own empty grid shows "Add your first photo or clip".
   Someone else's empty grid shows "No posts yet".
@@ -105,14 +110,22 @@ and clips come first, the details stay small.
 - **PROF-60** A player uploads photos and videos to their own profile.
   Photos: JPEG, PNG, WebP or HEIC. Videos: MP4 or MOV, up to 60 seconds.
   There's no file size limit. Another file type, or a longer video, is
-  refused with a message saying why, and nothing is stored.
+  refused with a message saying why, and nothing is stored. Before upload,
+  the app shrinks a photo to at most 1600 px on its longest side and saves
+  it as JPEG (HEIC included), and also makes a 400 px copy for the grid.
 - **PROF-62** Only the owner can add or delete their media. Anyone else's
   attempt is refused (403), and nothing changes.
 - **PROF-63** Media is stored in Firebase Storage. Only signed-in users can
-  view it (PROF-31), the same as the profile.
+  find it in the app (PROF-31), the same as the profile. Each file is shown
+  through a link that can't be guessed; a link that someone copies out of
+  the app opens for anyone who has it, so videos can stream.
 - **PROF-64** Deleting an item removes the file and its grid entry.
   Deleting the account ([AUTH-30](sign-in.md)) deletes all of the player's
   media.
+- **PROF-67** The app sends the file straight to storage, into the player's
+  own folder (`players/<uid>/`), then asks the server to add it to the grid.
+  The server adds it only if the file is in the caller's own folder (403
+  otherwise) and is really there (400 "Upload the file first" otherwise).
 
 ## Who sees a profile
 
@@ -162,3 +175,7 @@ and clips come first, the details stay small.
      set by the player (PROF-21).
 3. ~~Who can see a profile.~~ Settled 2026-11-11: any signed-in user
    (PROF-31).
+4. **Which players come next in the viewer (PROF-77)?** Options: players
+   you've played with, players from the same city, the newest uploads, or the
+   best rated once ratings exist (PROF-50). Does going back return to the
+   profile you started from, or step back one player at a time?

@@ -12,6 +12,7 @@ export const AUTHENTICATED_PATHS = [
   "/tenants",
   "/players",
   "/cities",
+  "/media",
 ];
 
 // Plain express types in the signature: before this runs, `res.locals.user` is
