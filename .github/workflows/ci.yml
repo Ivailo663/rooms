@@ -16,7 +16,11 @@ jobs:
           cache: npm
       - run: npm ci
       # Unit tests import @prisma/client types, so the client must be generated.
+      # prisma.config.ts requires DATABASE_URL to exist, but generate never
+      # connects, so a dummy one keeps the real database out of CI.
       - run: npm run prisma:generate -w server
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       - run: npm run spec:check
       - run: npm test
       # Both workspaces. Tests run through esbuild and never type-check, so
