@@ -4,6 +4,8 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import PrimeVue from "primevue/config";
 import AppSidebar from "./AppSidebar.vue";
 import { useMenuExpanded } from "@/composables/useMenuExpanded";
+import { useRoomView } from "@/composables/useRoomView";
+import { RoomView } from "@/constants";
 
 const store = vi.hoisted(() => ({
   user: { email: "ana@example.test" },
@@ -22,7 +24,7 @@ vi.mock("firebase/auth", () => ({ getAuth: () => ({}), signOut: vi.fn() }));
 
 const Blank = { template: "<div />" };
 
-const mountSidebar = async (expanded: boolean) => {
+const mountSidebar = async (expanded: boolean, { showRoleGated = false } = {}) => {
   useMenuExpanded().value = expanded;
   const router = createRouter({
     history: createMemoryHistory(),
@@ -36,7 +38,9 @@ const mountSidebar = async (expanded: boolean) => {
   const wrapper = mount(AppSidebar, {
     global: {
       plugins: [router, PrimeVue],
-      stubs: { RoleGate: true },
+      stubs: {
+        RoleGate: showRoleGated ? { template: "<div><slot /></div>" } : true,
+      },
       mocks: { $cap: { rooms: { create: "rooms.create" } } },
     },
   });
@@ -96,10 +100,16 @@ const swipe = (fromX: number, toX: number, y = 300) => {
 
 const PHONE = 390;
 
+// useIsPhone asks for "(max-width: 767.9px)"; the swipe edges still measure
+// against innerWidth.
 const onPhone = (standalone = false) => {
   vi.stubGlobal("innerWidth", PHONE);
   vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: standalone && query === "(display-mode: standalone)",
+    matches:
+      query.startsWith("(max-width") ||
+      (standalone && query === "(display-mode: standalone)"),
+    addEventListener: () => {},
+    removeEventListener: () => {},
   }));
 };
 
@@ -164,6 +174,40 @@ describe("AppSidebar phone gestures", () => {
     swipe(window.innerWidth - 4, 200);
     await flushPromises();
     expect(useMenuExpanded().value).toBe(false);
+    wrapper.unmount();
+  });
+
+  it.each(["Host", "Play"])(
+    "NAV-14: on a phone, picking %s switches the view and closes the drawer",
+    async (label) => {
+      onPhone();
+      const roomView = useRoomView();
+      roomView.value = label === "Host" ? RoomView.Play : RoomView.Host;
+      const { wrapper } = await mountSidebar(true, { showRoleGated: true });
+
+      const option = wrapper.findAll("button").find((b) => b.text() === label)!;
+      await option.trigger("click");
+      await flushPromises();
+
+      expect(roomView.value).toBe(
+        label === "Host" ? RoomView.Host : RoomView.Play
+      );
+      expect(useMenuExpanded().value).toBe(false);
+      wrapper.unmount();
+    }
+  );
+
+  it("NAV-14: on desktop, picking a view leaves the sidebar open", async () => {
+    const roomView = useRoomView();
+    roomView.value = RoomView.Host;
+    const { wrapper } = await mountSidebar(true, { showRoleGated: true });
+
+    const play = wrapper.findAll("button").find((b) => b.text() === "Play")!;
+    await play.trigger("click");
+    await flushPromises();
+
+    expect(roomView.value).toBe(RoomView.Play);
+    expect(useMenuExpanded().value).toBe(true);
     wrapper.unmount();
   });
 
