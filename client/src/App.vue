@@ -12,7 +12,10 @@
   <!-- AUTH-24: nothing else renders until the sign-up box is ticked. -->
   <TermsGate v-else-if="authStore.needsTerms" />
 
-  <div v-else class="flex min-h-screen bg-gradient-to-b from-slate-50 via-sky-50/40 to-emerald-50/30">
+  <div
+    v-else
+    class="flex min-h-screen bg-gradient-to-b from-slate-50 via-sky-50/40 to-emerald-50/30"
+  >
     <AppSidebar v-if="authStore.user" />
 
     <!-- Main content -->
@@ -32,8 +35,7 @@
       content: { class: '!px-5 !py-3' },
       message: { class: '!text-sm !leading-relaxed !text-surface-500' },
       footer: {
-        class:
-          '!px-5 !pb-5 !pt-3 !border-none !gap-2 flex !justify-end',
+        class: '!px-5 !pb-5 !pt-3 !border-none !gap-2 flex !justify-end',
       },
     }"
   />
@@ -48,20 +50,24 @@ import AppSidebar from "./components/AppSidebar.vue";
 import TermsGate from "./components/TermsGate.vue";
 import { useJoinRequestSync } from "./features/rooms/composables/useJoinRequestSync";
 import { useRoomView } from "./composables/useRoomView";
-import { useMenuExpanded } from "./composables/useMenuExpanded";
-import { RoomView } from "./constants";
+import {
+  menuStartsOpen,
+  useMenuExpanded,
+} from "./composables/useMenuExpanded";
+import { useIsPhone } from "./composables/useIsPhone";
 
 const authStore = useAuthStore();
 
-// Play mode is a focused, "in the game" surface — start with the sidebar
-// collapsed there and expanded in Host. Manual toggles still stick until the
-// view changes again.
+// Play mode is a focused, "in the game" surface — on desktop the sidebar starts
+// collapsed there and expanded in Host; on a phone the drawer starts closed.
+// Manual toggles still stick until the view changes again.
 const roomView = useRoomView();
 const menuExpanded = useMenuExpanded();
-menuExpanded.value = roomView.value !== RoomView.Play;
+const isPhone = useIsPhone();
+menuExpanded.value = menuStartsOpen(roomView.value, isPhone.value);
 
 watch(roomView, (view) => {
-  menuExpanded.value = view !== RoomView.Play;
+  menuExpanded.value = menuStartsOpen(view, isPhone.value);
 });
 
 // App-wide realtime sync for join-request events.

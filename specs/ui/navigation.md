@@ -9,9 +9,12 @@ The main view stays bare and navigation lives in a drawer
 - **NAV-01** On desktop, the sidebar starts expanded in Host view and
   collapsed in Play view. A manual toggle sticks until the view changes.
 - **NAV-02** On a phone, the navigation drawer starts closed in every view,
-  Host included, and opens only when the user opens it. `[gap]` — Host view
-  opens it on every page load, and its overlay blocks every tap until it's
-  closed.
+  Host included, and opens only when the user opens it. Switching between
+  Host and Play doesn't open it either.
+
+- **NAV-14** On a phone, picking "Host" or "Play" in the drawer switches the
+  view and closes the drawer, as tapping a page link does. On desktop the
+  sidebar stays as it is.
 
 ## Phone gestures
 

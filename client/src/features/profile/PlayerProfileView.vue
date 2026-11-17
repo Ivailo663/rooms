@@ -200,7 +200,7 @@
 
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from "vue";
-import { useMediaQuery } from "@vueuse/core";
+import { useIsPhone } from "@/composables/useIsPhone";
 import { Button, Dialog } from "primevue";
 import BackButton from "@/components/BackButton.vue";
 import PlayerAvatar from "@/components/PlayerAvatar.vue";
@@ -244,7 +244,7 @@ const editForm =
 const saveAndClose = async () => {
   if (await editForm.value?.save()) editing.value = false;
 };
-const isPhone = useMediaQuery("(max-width: 639px)");
+const isPhone = useIsPhone();
 
 const { uploads, refusal, add, dismiss } = useMediaUploads(() => props.id);
 const picker = useTemplateRef<HTMLInputElement>("picker");

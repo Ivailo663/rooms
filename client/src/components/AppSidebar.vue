@@ -82,7 +82,7 @@
             option-label="label"
             option-value="value"
             fluid
-            @update:model-value="(val) => (roomView = val)"
+            @update:model-value="pickView"
           />
           <Button
             v-else
@@ -185,14 +185,7 @@
 
 <script setup lang="ts">
 import { RouterLink, useRouter } from "vue-router";
-import {
-  computed,
-  nextTick,
-  onMounted,
-  onBeforeUnmount,
-  ref,
-  useTemplateRef,
-} from "vue";
+import { computed, nextTick, useTemplateRef } from "vue";
 import { Button, SelectButton } from "primevue";
 import { useAuthStore } from "@/stores/auth";
 import { useRoleStore } from "@/stores/role";
@@ -206,6 +199,7 @@ import {
   hasInAppHistory,
   isStandalone,
 } from "@/composables/edgeGestures";
+import { useIsPhone } from "@/composables/useIsPhone";
 import { RoomView } from "@/constants";
 import { signOut, getAuth } from "firebase/auth";
 import RoleGate from "./RoleGate.vue";
@@ -222,12 +216,7 @@ const roomView = useRoomView();
 const createRoomVisible = useCreateRoom();
 const showCreateButton = computed(() => roomView.value === RoomView.Host);
 
-const MOBILE_BREAKPOINT = 768;
-const isMobile = ref(false);
-
-const checkMobile = () => {
-  isMobile.value = window.innerWidth < MOBILE_BREAKPOINT;
-};
+const isMobile = useIsPhone();
 
 const collapsed = computed(() => !isMobile.value && !expanded.value);
 
@@ -261,15 +250,6 @@ useSwipe({
   onSwipeRight: () => router.back(),
 });
 
-onMounted(() => {
-  checkMobile();
-  window.addEventListener("resize", checkMobile);
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener("resize", checkMobile);
-});
-
 const sidebarContainerClass = computed(() => {
   if (isMobile.value) {
     return [
@@ -301,6 +281,12 @@ const viewOptions = [
   { label: "Host", value: RoomView.Host },
   { label: "Play", value: RoomView.Play },
 ];
+
+// NAV-14: on a phone the drawer covers the view that was just picked.
+const pickView = (view: RoomView) => {
+  roomView.value = view;
+  if (isMobile.value) expanded.value = false;
+};
 
 // Each entry says who it's for; the sidebar shows only the visible ones.
 // Settings is for someone who manages a venue (SET-10), since for anyone else
