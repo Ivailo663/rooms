@@ -33,9 +33,15 @@ const httpServer = app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
 
+// APP-03: the web app's addresses, comma-separated (CLIENT_ORIGINS on Render);
+// locally the Vite dev server.
+const clientOrigins = process.env.CLIENT_ORIGINS?.split(",").map((o) =>
+  o.trim()
+) ?? ["http://localhost:5173"];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: clientOrigins,
     methods: ["GET", "POST"],
   },
 });

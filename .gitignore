@@ -33,3 +33,6 @@ playwright/.cache/
 
 # claude code: personal settings stay local
 .claude/settings.local.json
+
+# firebase
+firebase-debug.log

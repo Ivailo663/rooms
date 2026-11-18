@@ -1,8 +1,12 @@
 import axios, { isAxiosError } from 'axios'
 import { getAuth } from 'firebase/auth'
 
+// APP-02: the server's address comes from the build (VITE_API_URL, set in the
+// deploy workflows), never from the code. Without it, the local dev server.
+export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+
 export const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: API_URL,
 })
 
 api.interceptors.request.use(async (config) => {
