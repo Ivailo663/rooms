@@ -16,6 +16,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bullmq": "^5.78.1",
     "cors": "^2.8.5",
@@ -23,9 +24,12 @@
     "firebase-admin": "^13.7.0",
     "nodemon": "^3.1.14",
     "pg": "^8.16.3",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "prisma": "^7.8.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.14"

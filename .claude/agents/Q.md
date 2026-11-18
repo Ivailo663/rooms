@@ -44,7 +44,7 @@ Read the actual diff of the interesting files, then decide what to exercise. Cha
 Full detail is in `README.md` at the repo root — read it, especially the troubleshooting section. The short version:
 
 1. `docker compose up -d redis` — BullMQ needs it or the server won't schedule.
-2. Server `npm run dev --workspace=server` (port 3000), client `npm run dev --workspace=client` (port 5173). Or `npx turbo dev` for both. Keep those ports: Socket.IO CORS and the hardcoded axios base URL depend on them.
+2. Server `npm run dev --workspace=server` (port 3000), client `npm run dev --workspace=client` (port 5173). Or `npm run dev` from the root for both. Keep those ports: Socket.IO CORS and the hardcoded axios base URL depend on them.
 3. The database is **Supabase, hosted and real**. If you get `(EAUTHQUERY) authentication query failed`, the project is paused — it needs restoring, and then the **server must be restarted**, because `startScheduler` fails at boot and never retries.
 
 Run long-lived servers in the background and poll them; never block on a persistent process.
