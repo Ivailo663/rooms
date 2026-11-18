@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /Users/ig10/Documents/Dev_Projects/rooms/client/src && cat features/profile/api/index.ts features/profile/composables/queries.ts features/profile/composables/profileRules.ts components/PlayerAvatar.vue features/rooms/components/PlayerDetailsCard.vue && grep -n \"PlayerProfile\\\\|interface Player\\\\b\\\\|PlayerResponse\" -A20 ../../packages/shared/index.ts | head -60)",
+      "Read(//Users/ig10/Documents/packages/shared/**)",
+      "Bash(cd /Users/ig10/.claude/agents/context && sed -i '' 's/stubbed \\(see `ProfileView.test.ts`\\)/stubbed \\(see `ProfileEditForm.test.ts`\\)/' F.md && sed -n 148p F.md)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(npx -y firebase-tools deploy --only storage --project playgrounds-c9391)",
+      "Bash(firebase deploy *)",
+      "Bash(ls -la /Users/ig10/.config/configstore/ /Users/ig10/.config | head -20)",
+      "Read(//Users/ig10/.config/configstore/**)",
+      "Bash(grep -n 'vi.spyOn\\(api, \"get\"\\).mockResolvedValue\\({ data: profile }\\)' PlayerProfileView.test.ts)",
+      "Bash(lsof -iTCP:5173 -iTCP:3000 -sTCP:LISTEN)",
+      "Bash(python3 -c ' *)",
+      "Bash(node /private/tmp/claude-501/-Users-ig10-Documents-Dev-Projects-rooms/26bda4d0-e4b2-4ef2-8830-99374c4d2e26/scratchpad/viewer.mjs /private/tmp/claude-501/-Users-ig10-Documents-Dev-Projects-rooms/26bda4d0-e4b2-4ef2-8830-99374c4d2e26/scratchpad/shots)",
+      "Bash(sed -n '/^## Open questions/,$p' specs/player-profile.md)",
+      "Bash(ls .claude/agents/ ~/.claude/agents/ 2>&1; head -12 .claude/agents/F.md 2>/dev/null; grep -rn \"^model:\\\\|^effort:\" .claude/agents ~/.claude/agents 2>/dev/null; cat ~/.claude/settings.json 2>/dev/null | grep -i model)",
+      "Read(//Users/ig10/.claude/**)",
+      "Bash(npm uninstall *)"
+    ],
+    "additionalDirectories": [
+      "/Users/ig10/.claude/agents/context",
+      "/Users/ig10/Documents/Dev_Projects/rooms/specs"
+    ]
+  }
+}

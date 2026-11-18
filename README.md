@@ -39,7 +39,7 @@ npm run prisma:generate --workspace=server
 docker compose up -d redis
 
 # 4a. start both apps at once
-npx turbo dev
+npm run dev
 
 # 4b. ...or in two terminals
 npm run dev --workspace=server   # http://localhost:3000

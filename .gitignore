@@ -19,7 +19,6 @@ serviceAccountKey.json
 .next/
 .nuxt/
 .out/
-.turbo/
 
 .DS_Store
 Thumbs.db
