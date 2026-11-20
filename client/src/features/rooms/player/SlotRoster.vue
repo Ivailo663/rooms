@@ -20,9 +20,6 @@
       :players="players"
       :current-user-id="currentUserId"
     />
-    <p v-else class="!m-0 !mt-3 text-sm text-surface-400">
-      No one's in yet — be the first.
-    </p>
   </div>
 </template>
 

@@ -52,10 +52,14 @@
             <i class="fa-solid fa-circle-check" style="font-size: 0.6rem" />
             You're in
           </span>
-          <span class="text-sm tabular-nums text-surface-400">
-            {{ primaryGame.players.length }}/{{ primaryGame.max_players }}
-            players
-          </span>
+          <button
+            type="button"
+            class="flex items-center !gap-1.5 rounded-lg border-none bg-transparent !px-2 !py-1.5 !-mr-2 text-sm text-surface-400 transition-colors hover:bg-surface-50 hover:text-surface-600 active:bg-surface-100 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-surface-200"
+            @click="emit('browse')"
+          >
+            Find another game
+            <i class="fa-solid fa-arrow-right" style="font-size: 0.6rem" />
+          </button>
         </div>
 
         <!-- Center: anticipation / live -->
@@ -172,45 +176,16 @@
           </span>
         </div>
 
-        <!-- Actions -->
-        <div class="!mt-5 flex flex-col items-center !gap-3">
-          <p
-            v-if="!leavability.canLeave"
-            class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400"
-          >
-            <i
-              :class="`fa-solid ${leavability.icon}`"
-              style="font-size: 0.65rem"
-            />
-            {{ leavability.label }}
-          </p>
-          <button
-            v-else
-            type="button"
-            class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-200 bg-white !py-3 text-sm font-medium text-surface-500 transition-all hover:border-surface-300 hover:text-surface-700 cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="leaveMutation.isPending.value"
-            @click="handleLeave"
-          >
-            <i
-              :class="
-                leaveMutation.isPending.value
-                  ? 'fa-solid fa-spinner fa-spin'
-                  : 'fa-solid fa-right-from-bracket'
-              "
-              style="font-size: 0.65rem"
-            />
-            Leave game
-          </button>
-
-          <button
-            type="button"
-            class="cursor-pointer border-none bg-transparent text-sm text-surface-400 transition-colors hover:text-surface-600 outline-none"
-            @click="emit('browse')"
-          >
-            Find another game
-            <i class="fa-solid fa-arrow-right" style="font-size: 0.6rem" />
-          </button>
-        </div>
+        <!-- Leave, or why not, alone under the roster: the facts are already
+             in large type above. -->
+        <SlotFooter
+          class="!mt-5 border-t border-surface-100 !pt-4"
+          :state="leavability.canLeave ? 'leave' : 'status'"
+          :label="leavability.label"
+          :icon="leavability.icon"
+          :pending="leaveMutation.isPending.value"
+          @leave="handleLeave"
+        />
       </div>
     </div>
   </div>
@@ -238,6 +213,7 @@ import {
   elapsedMinutes,
 } from "../composables/gameTime";
 import SlotRoster from "./SlotRoster.vue";
+import SlotFooter from "./SlotFooter.vue";
 
 const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";

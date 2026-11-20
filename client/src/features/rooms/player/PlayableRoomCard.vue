@@ -18,7 +18,9 @@
     </span>
 
     <div
+      ref="cardEl"
       class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-white transition-shadow"
+      :data-header-step="step"
       :class="
         hasJoinedSlot
           ? 'room-card--joined border-emerald-200'
@@ -28,160 +30,83 @@
       <!-- Soft wash bleeding down from the top edge — the card's only mood
          lighting, tinted emerald once the user holds a seat here. -->
       <div
-        class="pointer-events-none absolute inset-x-0 top-0 h-40"
+        class="pointer-events-none absolute inset-0"
         :class="hasJoinedSlot ? 'card-glow--joined' : 'card-glow'"
       />
+      <!-- A fine pattern of tiny footballs, clear under the header (CARD-07). -->
+      <div
+        class="card-pattern pointer-events-none absolute inset-0"
+        aria-hidden="true"
+      />
 
-      <div class="relative flex min-h-0 flex-1 flex-col !p-6 sm:!p-7">
-        <!-- Identity -->
-        <div class="flex shrink-0 flex-col !mb-5">
+      <div
+        class="relative flex min-h-0 flex-1 flex-col !p-6 sm:!p-7"
+        data-card-body
+      >
+        <!-- Identity. It gives way before the picker does: shrinkable and
+             clipped, so if the steps ever misjudge, the header loses a line
+             instead of the picker overlapping the header (CARD-06). -->
+        <div
+          class="flex min-h-0 shrink flex-col overflow-hidden !mb-3 *:shrink-0"
+          data-header
+        >
           <h2
-            class="truncate text-2xl font-bold leading-tight tracking-tight text-surface-900"
+            class="truncate text-xl font-bold leading-tight tracking-tight text-surface-900 sm:text-2xl"
           >
             {{ room.name }}
           </h2>
           <span
-            class="!mt-1 flex items-center !gap-1.5 text-sm text-surface-400"
+            class="!mt-0.5 flex items-center !gap-1.5 text-xs text-surface-400"
           >
-            <i class="fa-solid fa-location-dot" style="font-size: 0.55rem" />
+            <i class="fa-solid fa-location-dot" style="font-size: 0.5rem" />
             <span class="truncate">
               {{ room.address || "Location not set" }}
             </span>
           </span>
 
           <p
-            v-if="room.description"
-            class="!mb-0 !mt-3 text-sm text-surface-600 line-clamp-2"
+            v-if="room.description && step !== 'tight'"
+            class="!mb-0 !mt-2 text-sm text-surface-600"
+            :class="step === 'compact' ? 'line-clamp-1' : 'line-clamp-2'"
           >
             {{ room.description }}
           </p>
-
-          <div
-            v-if="features.length || selectedSlot?.price"
-            class="!mt-3 flex flex-wrap items-center !gap-2"
-          >
-            <span
-              v-for="feature in features"
-              :key="feature"
-              class="inline-flex items-center !gap-1.5 rounded-full bg-surface-100 !px-3 !py-1.5 text-xs font-medium text-surface-600"
-            >
-              <i
-                :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
-                style="font-size: 0.5rem"
-              />
-              {{ feature }}
-            </span>
-            <span
-              v-if="selectedSlot?.price"
-              class="!ml-auto inline-flex items-center rounded-full bg-emerald-50 !px-3 !py-1.5 text-xs font-bold text-emerald-700"
-            >
-              {{ selectedSlot.price }}€
-            </span>
-          </div>
         </div>
 
         <template v-if="hasSlots">
           <!-- Slot picker: takes all the height between the identity block and
-               Join, so the tiles — each carrying its own slot's roster — grow
-               into it. No panel — a border would box in the tiles' depth. -->
-          <div class="flex min-h-0 flex-1 flex-col">
+               the card's bottom padding, so the tiles — each carrying its own
+               slot's roster and the join/leave action — grow into it. No
+               panel — a border would box in the tiles' depth. -->
+          <div
+            class="relative flex flex-1 flex-col"
+            :style="{ minHeight: `${pickerFloor}px` }"
+          >
             <SlotCarousel
-              class="min-h-[10rem] flex-1"
+              class="relative min-h-0 flex-1"
               :timeslots="room.timeslots"
               :markers="slotMarkers"
               :initial-index="initialSlotIndex"
               :current-user-id="currentUserId"
+              :action="selectedSlot ? tileAction : undefined"
+              :pending="actionPending"
+              :price="price"
               @select="handleSlotSelect"
+              @join="handleJoin"
+              @leave="handleLeave"
             />
             <p
-              v-if="selectedSlot?.message"
-              class="!mb-0 !mt-1 shrink-0 text-sm italic text-surface-400 line-clamp-2"
+              v-if="showDenial"
+              class="!mb-0 !mt-1 shrink-0 text-center text-xs italic text-surface-400 line-clamp-1"
             >
-              "{{ selectedSlot.message }}"
+              "{{ room.deniedMessage }}"
             </p>
-          </div>
-
-          <div class="shrink-0 !mt-4" :class="{ '!mt-auto': !selectedSlot }">
-            <button
-              v-if="isCurrentUserInSlot && !leavability.canLeave"
-              class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400 outline-none cursor-not-allowed"
-              disabled
+            <p
+              v-else-if="showMessage"
+              class="!mb-0 !mt-1 shrink-0 text-sm italic text-surface-400 line-clamp-1"
             >
-              <i
-                :class="`fa-solid ${leavability.icon}`"
-                style="font-size: 0.65rem"
-              />
-              {{ leavability.label }}
-            </button>
-            <button
-              v-else-if="isCurrentUserInSlot"
-              class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-200 bg-white !py-3 text-sm font-medium text-surface-500 transition-all hover:border-surface-300 hover:text-surface-700 cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="leaveMutation.isPending.value"
-              @click="handleLeave"
-            >
-              <i
-                :class="
-                  leaveMutation.isPending.value
-                    ? 'fa-solid fa-spinner fa-spin'
-                    : 'fa-solid fa-right-from-bracket'
-                "
-                style="font-size: 0.65rem"
-              />
-              Leave game
-            </button>
-            <button
-              v-else-if="isAwaitingApproval"
-              class="flex w-full items-center justify-center !gap-2 rounded-xl border border-amber-100 bg-amber-50 !py-3 text-sm font-medium text-amber-600 outline-none cursor-not-allowed"
-              disabled
-            >
-              <i class="fa-solid fa-user-clock" style="font-size: 0.65rem" />
-              Awaiting approval
-            </button>
-            <div v-else-if="isDeclined">
-              <button
-                class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400 outline-none cursor-not-allowed"
-                disabled
-              >
-                <i
-                  class="fa-solid fa-circle-xmark"
-                  style="font-size: 0.65rem"
-                />
-                Not accepted for this slot
-              </button>
-              <p
-                v-if="room.deniedMessage"
-                class="!mt-2 text-center text-xs italic text-surface-400"
-              >
-                "{{ room.deniedMessage }}"
-              </p>
-            </div>
-            <button
-              v-else-if="!joinability.joinable"
-              class="flex w-full items-center justify-center !gap-2 rounded-xl border border-surface-100 bg-surface-50 !py-3 text-sm font-medium text-surface-400 outline-none cursor-not-allowed"
-              disabled
-            >
-              <i
-                :class="`fa-solid ${joinability.icon}`"
-                style="font-size: 0.65rem"
-              />
-              {{ joinability.label }}
-            </button>
-            <button
-              v-else
-              class="join-button flex w-full items-center justify-center !gap-2 rounded-xl border-none bg-emerald-600 !py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-700 cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="joinMutation.isPending.value"
-              @click="handleJoin"
-            >
-              <i
-                :class="
-                  joinMutation.isPending.value
-                    ? 'fa-solid fa-spinner fa-spin'
-                    : 'fa-solid fa-right-to-bracket'
-                "
-                style="font-size: 0.65rem"
-              />
-              Join game
-            </button>
+              "{{ selectedSlot?.message }}"
+            </p>
           </div>
         </template>
 
@@ -201,6 +126,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useElementSize } from "@vueuse/core";
 import {
   useGetJoinedSlots,
   useJoinTimeslot,
@@ -216,19 +142,16 @@ import {
 } from "../composables/slotJoinability";
 import { useAuthStore } from "@/stores/auth";
 import type { PlayableRoomResponse } from "@football/shared";
-import SlotCarousel, { type SlotMarker } from "./SlotCarousel.vue";
+import { headerStep } from "../composables/headerStep";
+import { PICKER_FLOOR, PICKER_NOTE } from "../composables/slotTileStep";
+import SlotCarousel, {
+  type SlotMarker,
+  type TileAction,
+} from "./SlotCarousel.vue";
 
 type Slot = PlayableRoomResponse["timeslots"][number];
 
 const props = defineProps<{ room: PlayableRoomResponse }>();
-
-const featureIconMap: Record<string, string> = {
-  ball: "fa-futbol",
-  showers: "fa-shower",
-  parking: "fa-square-parking",
-  lights: "fa-sun",
-  water: "fa-bottle-water",
-};
 
 const authStore = useAuthStore();
 const joinMutation = useJoinTimeslot();
@@ -247,6 +170,13 @@ const heldSlots = computed(() =>
   (joinedSlots.value ?? []).filter((slot) => slot.membership === "joined")
 );
 
+// The card's own height, not the screen's, picks how much header it can afford
+// (CARD-05): the deck sizes cards, and the header steps down to leave the picker
+// its floor.
+const cardEl = ref<HTMLElement | null>(null);
+const { height: cardHeight } = useElementSize(cardEl);
+const step = computed(() => headerStep(cardHeight.value));
+
 const selectedIndex = ref(0);
 
 const hasSlots = computed(() => props.room.timeslots.length > 0);
@@ -255,10 +185,18 @@ const selectedSlot = computed<Slot | undefined>(
   () => props.room.timeslots[selectedIndex.value]
 );
 
-const features = computed(() =>
-  Array.isArray(selectedSlot.value?.features)
-    ? (selectedSlot.value.features as string[])
-    : []
+const showMessage = computed(
+  () => !!selectedSlot.value?.message && step.value !== "tight"
+);
+
+const showDenial = computed(
+  () => tileAction.value.state === "declined" && !!props.room.deniedMessage
+);
+
+// Either note takes a line under the strip, so the picker's floor grows by it.
+const hasNote = computed(() => showMessage.value || showDenial.value);
+const pickerFloor = computed(
+  () => PICKER_FLOOR + (hasNote.value ? PICKER_NOTE : 0)
 );
 
 const handleSlotSelect = (index: number) => {
@@ -334,6 +272,31 @@ const leavability = computed<Leavability>(() => {
   return getSlotLeavability(slot, props.room.lateJoinCutoff, now.value);
 });
 
+// One state for the slot tile's action line: a seat held wins, then a request
+// in flight, then a denial, then the join gates.
+const tileAction = computed<TileAction>(() => {
+  if (isCurrentUserInSlot.value) {
+    const { canLeave, label, icon } = leavability.value;
+    return canLeave ? { state: "leave" } : { state: "status", label, icon };
+  }
+  if (isAwaitingApproval.value) return { state: "awaiting" };
+  if (isDeclined.value) return { state: "declined" };
+  const { joinable, label, icon } = joinability.value;
+  return joinable ? { state: "join" } : { state: "status", label, icon };
+});
+
+const actionPending = computed(
+  () =>
+    (tileAction.value.state === "join" && joinMutation.isPending.value) ||
+    (tileAction.value.state === "leave" && leaveMutation.isPending.value)
+);
+
+const price = computed(() => {
+  const slot = selectedSlot.value;
+  if (!slot) return "";
+  return slot.price ? `${slot.price}€` : "";
+});
+
 const handleJoin = () => {
   if (!selectedSlot.value) return;
   joinMutation.mutate(selectedSlot.value.id, {
@@ -367,24 +330,54 @@ const handleLeave = () => {
 }
 
 /* A cool halo bleeding down from the top edge, turning emerald once the user
-   holds a seat — the same language as the match hub. */
+   holds a seat — the same language as the match hub. It reaches down behind
+   the slot picker, strongest there. */
 .card-glow {
-  background: radial-gradient(
-    120% 100% at 50% 0%,
-    rgba(99, 102, 241, 0.08) 0%,
-    transparent 70%
-  );
+  background:
+    radial-gradient(
+      140% 75% at 70% 0%,
+      rgba(99, 102, 241, 0.1) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      120% 70% at 30% 85%,
+      rgba(99, 102, 241, 0.14) 0%,
+      transparent 70%
+    );
 }
 
 .card-glow--joined {
-  background: radial-gradient(
-    120% 100% at 50% 0%,
-    rgba(16, 185, 129, 0.16) 0%,
-    transparent 72%
-  );
+  background:
+    radial-gradient(
+      140% 75% at 50% 0%,
+      rgba(16, 185, 129, 0.16) 0%,
+      transparent 72%
+    ),
+    radial-gradient(
+      120% 70% at 30% 85%,
+      rgba(16, 185, 129, 0.18) 0%,
+      transparent 70%
+    );
 }
 
-.join-button {
-  box-shadow: 0 6px 16px -8px rgba(16, 185, 129, 0.7);
+/* Tiny black-and-white footballs tiled over the card, staggered every other
+   row. Quiet enough to read text over. */
+.card-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Cdefs%3E%3CclipPath id=%22c%22%3E%3Ccircle r=%224.2%22/%3E%3C/clipPath%3E%3Cg id=%22b%22%3E%3Ccircle r=%224.2%22 fill=%22%23fff%22/%3E%3Cg fill=%22%23000%22 clip-path=%22url%28%23c%29%22%3E%3Cpolygon points=%220.00,-1.60 1.52,-0.49 0.94,1.29 -0.94,1.29 -1.52,-0.49%22/%3E%3Cpolygon points=%220.00,5.83 -1.47,4.76 -0.91,3.03 0.91,3.03 1.47,4.76%22/%3E%3Cpolygon points=%22-5.55,1.80 -4.99,0.07 -3.16,0.07 -2.60,1.80 -4.07,2.87%22/%3E%3Cpolygon points=%22-3.43,-4.72 -1.61,-4.72 -1.04,-2.99 -2.52,-1.92 -3.99,-2.99%22/%3E%3Cpolygon points=%223.43,-4.72 3.99,-2.99 2.52,-1.92 1.04,-2.99 1.61,-4.72%22/%3E%3Cpolygon points=%225.55,1.80 4.07,2.87 2.60,1.80 3.16,0.07 4.99,0.07%22/%3E%3C/g%3E%3Ccircle r=%224.2%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%220.55%22/%3E%3C/g%3E%3C/defs%3E%3Cuse href=%22%23b%22 x=%228%22 y=%228%22/%3E%3Cuse href=%22%23b%22 x=%2228%22 y=%2228%22/%3E%3C/svg%3E");
+  background-size: 40px 40px;
+  opacity: 0.13;
+  /* Clear under the header, full strength from the slot down. */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 14%,
+    #000 34%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 14%,
+    #000 34%
+  );
 }
 </style>

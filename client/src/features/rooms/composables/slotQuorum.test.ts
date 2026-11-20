@@ -33,7 +33,11 @@ describe("hasGathered", () => {
 describe("slotPlayerInfo", () => {
   it("LIFE-03: re-checks the minimum for a scheduled slot", () => {
     const slot = { players: roster(3), min_players: 4, max_players: 10 };
-    expect(slotPlayerInfo(slot)).toEqual({ count: 3, max: 10, gathered: false });
+    expect(slotPlayerInfo(slot)).toEqual({
+      count: 3,
+      max: 10,
+      gathered: false,
+    });
     expect(slotPlayerInfo({ ...slot, min_players: 3 }).gathered).toBe(true);
   });
 

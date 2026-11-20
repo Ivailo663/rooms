@@ -4,7 +4,11 @@ import { isSlotFailedNow, isSlotLiveNow } from "./isSlotLiveNow";
 
 // Monday 26 Oct 2026; the slot runs 18:00–19:00 on Mondays.
 const at = (h: number, m: number, date = 26) => new Date(2026, 9, date, h, m);
-const slot = (status: SlotStatus) => ({ status, day: "mo", start_time: 18 * 60 });
+const slot = (status: SlotStatus) => ({
+  status,
+  day: "mo",
+  start_time: 18 * 60,
+});
 
 describe.each([
   ["live", isSlotLiveNow],

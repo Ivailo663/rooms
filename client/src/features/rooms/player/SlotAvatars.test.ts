@@ -9,10 +9,10 @@ vi.mock("@/features/profile/api", () => ({
   getPlayer: () => new Promise(() => {}),
 }));
 
-const queryPlugin = (): [typeof VueQueryPlugin, { queryClient: QueryClient }] => [
-  VueQueryPlugin,
-  { queryClient: new QueryClient() },
-];
+const queryPlugin = (): [
+  typeof VueQueryPlugin,
+  { queryClient: QueryClient },
+] => [VueQueryPlugin, { queryClient: new QueryClient() }];
 
 const players = [
   { id: 1, name: "Ana Petrova" },
@@ -44,7 +44,9 @@ describe("SlotAvatars details card", () => {
       "You",
       "Ana Petrova",
     ]);
-    expect(buttons.every((b) => b.attributes("title") === undefined)).toBe(true);
+    expect(buttons.every((b) => b.attributes("title") === undefined)).toBe(
+      true
+    );
   });
 
   it("PROF-05: tapping an avatar opens that player's card, tapping outside closes it", async () => {
@@ -66,7 +68,9 @@ describe("SlotAvatars details card", () => {
     await ana!.trigger("click");
     await me!.trigger("click");
     expect(card()?.textContent).toContain("Boris");
-    expect(document.body.querySelectorAll("[data-player-details-card]")).toHaveLength(1);
+    expect(
+      document.body.querySelectorAll("[data-player-details-card]")
+    ).toHaveLength(1);
   });
 
   it("CARD-12: a tap on an avatar doesn't reach the tile around it", async () => {
