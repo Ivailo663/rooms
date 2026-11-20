@@ -88,5 +88,10 @@ onBeforeUnmount(() =>
 .deck-item {
   scroll-snap-align: start;
   height: calc(100% - 3rem);
+  /* The least a card can be and still hold a tight header, the picker's floor
+     and a declined slot's note under it (338px, see headerStep). On a screen
+     shorter than that the card keeps this height and the deck scrolls to its
+     bottom rather than the parts overlapping (CARD-06). */
+  min-height: 21.25rem;
 }
 </style>

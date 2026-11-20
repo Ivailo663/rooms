@@ -59,9 +59,9 @@ describe("getSlotJoinability", () => {
     "MEM-03: a %s slot is no-game",
     (status) => {
       expect(getSlotJoinability(slot({ status }), room, OPEN).reason).toBe(
-        "no-game",
+        "no-game"
       );
-    },
+    }
   );
 
   it("MEM-04: a live slot is blocked when allowJoinOnLive is false", () => {
@@ -70,7 +70,11 @@ describe("getSlotJoinability", () => {
   });
 
   it("MEM-04: a live slot is joinable when allowJoinOnLive is true, lock window notwithstanding", () => {
-    const r = getSlotJoinability(slot({ status: "live" }), liveRoom, at(18, 10));
+    const r = getSlotJoinability(
+      slot({ status: "live" }),
+      liveRoom,
+      at(18, 10)
+    );
     expect(r).toEqual({ joinable: true });
   });
 
@@ -78,9 +82,12 @@ describe("getSlotJoinability", () => {
   // policy, full), and the server does so. The client returns joinable as soon
   // as allowJoinOnLive is true. Flip to `it` once the client is fixed.
   it.fails("MEM-04: a permitted live join still hits the clash gate", () => {
-    const r = getSlotJoinability(slot({ status: "live" }), liveRoom, at(18, 10), [
-      held({ start_time: START + 30 }),
-    ]);
+    const r = getSlotJoinability(
+      slot({ status: "live" }),
+      liveRoom,
+      at(18, 10),
+      [held({ start_time: START + 30 })]
+    );
     expect(r.reason).toBe("clash");
   });
 
@@ -88,7 +95,7 @@ describe("getSlotJoinability", () => {
     const r = getSlotJoinability(
       slot({ status: "live", players: players(10) }),
       liveRoom,
-      at(18, 10),
+      at(18, 10)
     );
     expect(r.reason).toBe("full");
   });
@@ -127,7 +134,7 @@ describe("getSlotJoinability", () => {
       const r = getSlotJoinability(
         slot(),
         { ...room, lateJoinCutoff: 60 },
-        at(17, 0),
+        at(17, 0)
       );
       expect(r.reason).toBe("closed");
     });
@@ -164,7 +171,7 @@ describe("getSlotJoinability", () => {
     const r = getSlotJoinability(slot({ players: players(10) }), room, OPEN);
     expect(r).toMatchObject({ joinable: false, reason: "full" });
     expect(
-      getSlotJoinability(slot({ players: players(9) }), room, OPEN).joinable,
+      getSlotJoinability(slot({ players: players(9) }), room, OPEN).joinable
     ).toBe(true);
   });
 
@@ -175,14 +182,14 @@ describe("getSlotJoinability", () => {
     it("MEM-03: no-game wins over the lock window, a clash and a full roster", () => {
       const s = slot({ status: "failed", players: full });
       expect(getSlotJoinability(s, room, at(18, 10), clashing).reason).toBe(
-        "no-game",
+        "no-game"
       );
     });
 
     it("MEM-04: a blocked live join wins over a clash and a full roster", () => {
       const s = slot({ status: "live", players: full });
       expect(getSlotJoinability(s, room, at(18, 10), clashing).reason).toBe(
-        "live",
+        "live"
       );
     });
 
@@ -192,9 +199,9 @@ describe("getSlotJoinability", () => {
     });
 
     it("MEM-05: a clash inside the lock window reports closed", () => {
-      expect(getSlotJoinability(slot(), room, at(17, 50), clashing).reason).toBe(
-        "closed",
-      );
+      expect(
+        getSlotJoinability(slot(), room, at(17, 50), clashing).reason
+      ).toBe("closed");
     });
 
     it("MEM-06: a clash on a full slot reports clash, not full", () => {
@@ -225,38 +232,38 @@ describe("getSlotLeavability", () => {
   });
 
   it("MEM-12: leaving stays closed through a live game", () => {
-    expect(getSlotLeavability(joined("live"), CUTOFF, at(18, 30))).toMatchObject(
-      { canLeave: false, label: "Game in progress" },
-    );
+    expect(
+      getSlotLeavability(joined("live"), CUTOFF, at(18, 30))
+    ).toMatchObject({ canLeave: false, label: "Game in progress" });
   });
 
   it.each(["failed", "redistributed"] as SlotStatus[])(
     "MEM-12: leaving stays closed after a %s verdict",
     (status) => {
-      expect(getSlotLeavability(joined(status), CUTOFF, at(17, 50)).canLeave).toBe(
-        false,
-      );
-      expect(getSlotLeavability(joined(status), CUTOFF, at(18, 30)).canLeave).toBe(
-        false,
-      );
-    },
+      expect(
+        getSlotLeavability(joined(status), CUTOFF, at(17, 50)).canLeave
+      ).toBe(false);
+      expect(
+        getSlotLeavability(joined(status), CUTOFF, at(18, 30)).canLeave
+      ).toBe(false);
+    }
   );
 
   it("MEM-12: a failed slot during its hour says there is no game", () => {
     expect(getSlotLeavability(joined("failed"), CUTOFF, at(18, 30)).label).toBe(
-      "No game this round",
+      "No game this round"
     );
   });
 
   it("MEM-12: leaving reopens at start+60 (exclusive)", () => {
     expect(getSlotLeavability(joined("live"), CUTOFF, at(19, 0)).canLeave).toBe(
-      true,
+      true
     );
   });
 
   it("MEM-12: the same clock time on another weekday is open", () => {
     expect(getSlotLeavability(joined(), CUTOFF, at(17, 50, TUE)).canLeave).toBe(
-      true,
+      true
     );
   });
 });

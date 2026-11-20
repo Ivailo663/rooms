@@ -2,20 +2,30 @@
   <ul
     ref="row"
     v-bind="$attrs"
-    class="!m-0 flex list-none overflow-hidden !pl-2"
+    class="pointer-events-none !m-0 flex list-none overflow-hidden !py-[2px]"
+    :style="{ paddingLeft: `${overlap + 2}px` }"
   >
-    <li v-for="entry in visibleEntries" :key="entry.id" class="!-ml-2 shrink-0">
-      <!-- click.stop: in the slot picker a tap on a neighbour tile slides it
-           in, and a tap meant for an avatar must not do that as well. -->
+    <li
+      v-for="entry in visibleEntries"
+      :key="entry.id"
+      class="shrink-0"
+      :style="{ marginLeft: `-${overlap}px` }"
+    >
+      <!-- The row ignores pointers so a press between circles reaches whatever
+           is behind it (the slot picker's hold button); the circles take
+           their own. click.stop: a tap on a neighbour tile slides it in, and
+           a tap meant for an avatar must not do that as well. -->
       <button
         type="button"
-        class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-none !p-0 text-xs font-semibold ring-2 ring-white outline-none focus-visible:ring-emerald-500"
+        class="pointer-events-auto flex cursor-pointer items-center justify-center rounded-full border-none !p-0 font-semibold ring-2 ring-white outline-none focus-visible:ring-emerald-500"
         :class="
           entry.isMe
             ? 'bg-emerald-100 text-emerald-700'
             : 'bg-surface-100 text-surface-600'
         "
+        :style="circleStyle"
         :aria-label="entry.label"
+        :tabindex="focusable ? undefined : -1"
         @mouseenter="show(entry.player, $event)"
         @mouseleave="scheduleClose"
         @focus="show(entry.player, $event)"
@@ -33,7 +43,8 @@
     </li>
     <li
       v-if="hiddenCount"
-      class="!-ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-surface-500 ring-2 ring-white"
+      class="flex shrink-0 items-center justify-center rounded-full bg-white font-semibold text-surface-500 ring-2 ring-white"
+      :style="[circleStyle, { marginLeft: `-${overlap}px` }]"
       :aria-label="`${hiddenCount} more players`"
     >
       <span aria-hidden="true">+{{ hiddenCount }}</span>
@@ -61,14 +72,30 @@ import { usePlayerDetails } from "../composables/usePlayerDetails";
 // row explicitly.
 defineOptions({ inheritAttrs: false });
 
-const props = defineProps<{
-  players: PlayerSummary[];
-  currentUserId?: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    players: PlayerSummary[];
+    currentUserId?: number;
+    // Circle diameter in px; tiles shrink it when they get little height.
+    size?: number;
+    // Most avatars shown before the "+N" circle, even if more would fit.
+    max?: number;
+    // False takes the avatars out of the Tab order; they still take taps.
+    focusable?: boolean;
+  }>(),
+  { currentUserId: undefined, size: 32, max: undefined, focusable: true }
+);
 
-// Avatars are 32px wide and overlap by 8px, so each one after the first
-// advances the row by 24px; the row's left padding absorbs the first overlap.
-const AVATAR_STEP = 24;
+// Circles overlap by a quarter of their width, so each one after the first
+// advances the row by three quarters; the row's left padding absorbs the first
+// overlap.
+const overlap = computed(() => props.size / 4);
+const step = computed(() => props.size - overlap.value);
+const circleStyle = computed(() => ({
+  width: `${props.size}px`,
+  height: `${props.size}px`,
+  fontSize: `${Math.max(10, Math.round(props.size * 0.375))}px`,
+}));
 
 const row = useTemplateRef<HTMLElement>("row");
 const { width: rowWidth } = useElementSize(row);
@@ -93,20 +120,25 @@ const entries = computed(() => {
   return [...all.filter((e) => e.isMe), ...all.filter((e) => !e.isMe)];
 });
 
-// One row, never wrapping: whatever doesn't fit at the measured width folds
-// into a final "+N" circle, which takes the last visible slot itself. Before
-// the first measurement everything renders and the row's overflow clips it.
+// One row, never wrapping: whatever doesn't fit at the measured width, or
+// exceeds `max`, folds into a final "+N" circle, which takes a slot itself
+// (so `max` avatars plus "+N" when there are more than `max`). Before the
+// first measurement everything renders and the row's overflow clips it.
 const capacity = computed(() =>
   rowWidth.value
-    ? Math.max(1, Math.floor(rowWidth.value / AVATAR_STEP))
+    ? Math.max(1, Math.floor(rowWidth.value / step.value))
     : Infinity
 );
 
-const visibleEntries = computed(() =>
-  entries.value.length > capacity.value
-    ? entries.value.slice(0, capacity.value - 1)
-    : entries.value
-);
+const visibleEntries = computed(() => {
+  const total = entries.value.length;
+  const shown = Math.min(total, props.max ?? total);
+  const needsMore = shown < total;
+  if (shown + (needsMore ? 1 : 0) <= capacity.value) {
+    return entries.value.slice(0, shown);
+  }
+  return entries.value.slice(0, capacity.value - 1);
+});
 
 const hiddenCount = computed(
   () => entries.value.length - visibleEntries.value.length
