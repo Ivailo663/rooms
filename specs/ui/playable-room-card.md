@@ -86,16 +86,18 @@ Status: in progress on `rooms-restructure-and-mobile-pass`.
 
 ## Roster (SlotRoster + SlotAvatars, shared with MyGameHub)
 
-- **CARD-20** One roster component is used in both PlayableRoomCard and
-  MyGameHub, and it looks the same in both. It's one flat section, with no
-  panel, no flip and no teams view.
+- **CARD-20** The avatar row (`SlotAvatars`) is shared by the slot picker
+  tiles, the My games roster (`SlotRoster`) and the host's players widget, and
+  the avatars look and behave the same in all three. What surrounds the row is
+  each surface's own. The roster is one flat section, with no panel, no flip
+  and no teams view.
 - **CARD-21** In a slot picker tile the count reads "N / M players"; in the My
   games roster the header reads "Roster". Both have "N spots left" or "Full
   squad" on the right ([spotsLeft.ts](../../client/src/features/rooms/composables/spotsLeft.ts)).
   Screen readers hear the tile's count as "N of M players".
-- **CARD-22** The roster shows one row of circle avatars for joined players
-  only, with no open-seat placeholders. The current user comes first, in
-  emerald. When the avatars don't fit, the row ends with a "+N" circle.
+- **CARD-22** The avatar row draws one circle per joined player and nothing for
+  an open seat. The current user comes first, in emerald. When the avatars
+  don't fit, the row ends with a "+N" circle.
 - **CARD-23** Each avatar has an `aria-label` with the player's name ("You" for
   the current user). There's no `title` tooltip, because the details card
   (CARD-24) replaces it.
@@ -103,6 +105,24 @@ Status: in progress on `rooms-restructure-and-mobile-pass`.
   card, in the slot picker tiles and in the My games roster alike. It
   behaves the same as in the host's players widget
   ([PROF-01..05](../player-profile.md)). The "+N" circle isn't a button.
+- **CARD-25** In the My games roster, open seats are drawn after the avatars as
+  dashed rings, one per seat however many there are. A ring is an avatar's
+  diameter and overlaps its neighbour by the same quarter of that diameter, and
+  carries the same white halo, so taken and open seats stack into one unbroken
+  strip rather than reading as two kinds of thing set apart. A full squad draws
+  none. How full the game is reads from the strip and CARD-21's label, and
+  there is no progress bar. A game with one player and eleven gaps is the case
+  this has to serve best, not an edge case.
+- **CARD-26** The rings never cost the roster an avatar. They wrap onto further
+  lines when the row runs out, and a squad too wide to share a line with them
+  keeps the line to itself and folds to "+N" exactly as it would alone. Who is
+  in outranks how many gaps are left, which the label states anyway. Every line
+  starts at the same left edge, the first and the wrapped ones alike, flush with
+  the "Roster" header above: the strip is a block of seats, not a ragged one.
+- **CARD-27** The rings aren't buttons and carry no label: the seat count
+  reaches a screen reader through CARD-21 alone, so they never repeat it. The
+  slot picker tiles are unaffected — they keep the seat bar (CARD-15) and draw
+  no open-seat rings.
 
 ## Slot action (in the tile; MyGameHub keeps a footer)
 
@@ -137,9 +157,16 @@ Status: in progress on `rooms-restructure-and-mobile-pass`.
   hold-to-leave on red text.
 - **CARD-36** In MyGameHub, the leave action or its status sits alone and
   centred under the roster, with no slot facts beside it, because the hub
-  already shows them in large type. "Find another game" moves to the top
-  row of the hub, opposite the status pill, and replaces the "N/M players"
-  count there (the roster header already shows it).
+  already shows them in large type. The way back to the deck ("More") sits in
+  the card's top-right corner and carries no "N/M players" count, which the
+  roster header already shows.
+- **CARD-37** The hub's status pill ("You're in", "Game off") straddles the
+  card's top edge exactly as CARD-03's does, and nothing clips it: the card
+  keeps its own clipping for the rounded glow, so the pill hangs outside the
+  card rather than inside it, and the hub reserves that overhang at the top of
+  its own space so a full-height card can't push the pill under the view's
+  edge. Raising it by z-index alone doesn't count — a clip isn't a stacking
+  question.
 
 ## Out of scope for this pass
 

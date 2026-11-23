@@ -1,10 +1,13 @@
 <template>
-  <div class="flex h-full w-full flex-col items-center justify-center !gap-3">
+  <!-- The top padding is the status pill's overhang: it hangs half its height
+       above the card, and at full card height that half would fall outside the
+       view, which clips it (CARD-37). The hub reserves the room itself rather
+       than relying on whatever padding the view around it happens to have. -->
+  <div
+    class="flex h-full w-full flex-col items-center justify-around !gap-3 !pt-4"
+  >
     <!-- Multi-game switcher -->
-    <div
-      v-if="orderedGames.length > 1"
-      class="flex items-center !gap-1.5 !mb-5"
-    >
+    <div v-if="orderedGames.length > 1" class="flex items-center !gap-1.5">
       <button
         v-for="game in orderedGames"
         :key="game.timeslotId"
@@ -21,171 +24,187 @@
       </button>
     </div>
 
-    <!-- Matchday card -->
+    <!-- Matchday card. The shell exists only to be unclipped: the pill
+         straddles the card's top edge (CARD-03), and the card itself has to
+         keep overflow-hidden to round off its glow, which would otherwise cut
+         the pill in half — no z-index can lift anything out of a clip. The
+         size constraints live here so the card can stretch to fill them and
+         give its scroller a height to work with. -->
     <div
       v-if="primaryGame"
-      class="hub-card relative w-full max-w-2xl max-h-full overflow-hidden rounded-3xl border bg-white"
-      :class="
-        isLive ? 'hub-card--live border-emerald-200' : 'border-surface-200/70'
-      "
+      class="relative flex max-h-full min-h-0 w-full max-w-2xl"
     >
-      <!-- Emerald wash from the top: the accent carries the moment, not darkness -->
-      <div
-        class="pointer-events-none absolute inset-x-0 top-0 h-56"
-        :class="isLive ? 'hub-glow-live' : 'hub-glow'"
-      />
+      <span
+        v-if="isFailed"
+        class="absolute left-1/2 top-0 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center !gap-2 whitespace-nowrap rounded-full bg-rose-50 !px-2 !py-0.5 text-[0.6rem] text-xs font-bold uppercase tracking-widest text-rose-600"
+      >
+        <i class="fa-solid fa-circle-xmark" style="font-size: 0.6rem" />
+        Game off
+      </span>
+      <span
+        v-else
+        class="absolute left-1/2 top-0 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center !gap-2 whitespace-nowrap rounded-full bg-emerald-50 !px-2 !py-0.5 text-[0.6rem] text-xs font-bold uppercase tracking-widest text-emerald-600"
+      >
+        <i class="fa-solid fa-circle-check" style="font-size: 0.6rem" />
+        You're in
+      </span>
 
-      <div class="relative flex h-full flex-col overflow-y-auto !p-7 sm:!p-8">
-        <!-- Top row -->
-        <div class="flex items-center justify-between">
-          <span
-            v-if="isFailed"
-            class="inline-flex items-center !gap-2 rounded-full bg-rose-50 !px-3 !py-1.5 text-xs font-bold uppercase tracking-widest text-rose-600"
-          >
-            <i class="fa-solid fa-circle-xmark" style="font-size: 0.6rem" />
-            Game off
-          </span>
-          <span
-            v-else
-            class="inline-flex items-center !gap-2 rounded-full bg-emerald-50 !px-3 !py-1.5 text-xs font-bold uppercase tracking-widest text-emerald-600"
-          >
-            <i class="fa-solid fa-circle-check" style="font-size: 0.6rem" />
-            You're in
-          </span>
+      <div
+        class="hub-card relative w-full overflow-hidden rounded-3xl border bg-white"
+        :class="
+          isLive ? 'hub-card--live border-emerald-200' : 'border-surface-200/70'
+        "
+      >
+        <!-- Emerald wash from the top: the accent carries the moment, not darkness -->
+        <div
+          class="pointer-events-none absolute inset-x-0 top-0 h-56"
+          :class="isLive ? 'hub-glow-live' : 'hub-glow'"
+        />
+
+        <div class="flex h-full flex-col overflow-y-auto !p-3 sm:!p-8">
+          <!-- Top row -->
+
           <button
             type="button"
-            class="flex items-center !gap-1.5 rounded-lg border-none bg-transparent !px-2 !py-1.5 !-mr-2 text-sm text-surface-400 transition-colors hover:bg-surface-50 hover:text-surface-600 active:bg-surface-100 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-surface-200"
+            class="absolute top-[10px] right-[15px] flex items-center !gap-1.5 rounded-lg border-none !px-2 !py-1.5 !-mr-2 text-sm text-surface-400 hover:bg-surface-50 active:bg-surface-100 cursor-pointer"
             @click="emit('browse')"
           >
-            Find another game
+            More
             <i class="fa-solid fa-arrow-right" style="font-size: 0.6rem" />
           </button>
-        </div>
 
-        <!-- Center: anticipation / live -->
-        <div class="flex flex-col items-center !gap-1 !pt-8 !pb-2 text-center">
-          <template v-if="isFailed">
-            <span
-              class="text-xs font-bold uppercase tracking-[0.3em] text-rose-500"
-            >
-              Not enough players
-            </span>
-            <span class="!mt-2 text-4xl font-bold text-surface-900 sm:text-5xl">
-              Game's off
-            </span>
-            <span class="!mt-1 text-sm text-surface-400">
-              This slot didn't reach the minimum this week, so it won't run
-            </span>
-          </template>
-
-          <template v-else-if="isLive">
-            <span
-              class="flex items-center !gap-3 text-xs font-bold uppercase tracking-[0.3em] text-emerald-600"
-            >
-              <span class="relative flex h-2 w-2">
-                <span
-                  class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
-                />
-                <span
-                  class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"
-                />
-              </span>
-              Live
-            </span>
-            <span
-              class="!mt-2 text-6xl font-bold tabular-nums text-emerald-600 sm:text-7xl"
-            >
-              {{ elapsed }}'
-            </span>
-            <span class="!mt-1 text-sm text-surface-400">
-              Game on — kicked off at {{ primaryGame.label }}
-            </span>
-          </template>
-
-          <template v-else>
-            <span
-              class="text-xs font-bold uppercase tracking-[0.3em] text-surface-400"
-            >
-              Kicks off in
-            </span>
-            <span
-              class="!mt-2 text-6xl font-bold tabular-nums text-surface-900 sm:text-7xl"
-            >
-              {{ countdown }}
-            </span>
-            <span class="!mt-1 text-sm text-surface-400">
-              {{ dayDisplay(primaryGame, now) }} at {{ primaryGame.label }}
-            </span>
-          </template>
-
-          <div class="!mt-6 flex flex-col items-center !gap-1">
-            <h2 class="text-2xl font-bold leading-tight text-surface-900">
-              {{ primaryGame.roomName }}
-            </h2>
-            <span class="flex items-center !gap-1.5 text-sm text-surface-400">
-              <i class="fa-solid fa-location-dot" style="font-size: 0.55rem" />
-              {{ primaryGame.address || "Location not set" }}
-            </span>
-          </div>
-
-          <!-- Features + price: a compact, legible chip row -->
+          <!-- Center: anticipation / live -->
           <div
-            v-if="features.length || primaryGame.price"
-            class="!mt-3 flex flex-wrap items-center justify-center !gap-2"
+            class="flex flex-col items-center !gap-1 !pt-2 !pb-2 text-center"
+          >
+            <template v-if="isFailed">
+              <span
+                class="text-xs font-bold uppercase tracking-[0.3em] text-rose-500"
+              >
+                Not enough players
+              </span>
+              <span
+                class="!mt-2 text-4xl font-bold text-surface-900 sm:text-5xl"
+              >
+                Game's off
+              </span>
+              <span class="!mt-1 text-sm text-surface-400">
+                This slot didn't reach the minimum this week, so it won't run
+              </span>
+            </template>
+
+            <template v-else-if="isLive">
+              <span
+                class="flex items-center !gap-3 text-xs font-bold uppercase tracking-[0.3em] text-emerald-600"
+              >
+                <span class="relative flex h-2 w-2">
+                  <span
+                    class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
+                  />
+                  <span
+                    class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"
+                  />
+                </span>
+                Live
+              </span>
+              <span
+                class="!mt-2 text-6xl font-bold tabular-nums text-emerald-600 sm:text-7xl"
+              >
+                {{ elapsed }}'
+              </span>
+              <span class="!mt-1 text-sm text-surface-400">
+                Game on — kicked off at {{ primaryGame.label }}
+              </span>
+            </template>
+
+            <template v-else>
+              <span
+                class="text-xs font-bold uppercase tracking-[0.3em] text-surface-400"
+              >
+                Kicks off in
+              </span>
+              <span
+                class="!mt-2 text-4xl font-bold tabular-nums text-surface-900 sm:text-7xl"
+              >
+                {{ countdown }}
+              </span>
+              <span class="!mt-1 text-sm text-surface-400">
+                {{ dayDisplay(primaryGame, now) }} at {{ primaryGame.label }}
+              </span>
+            </template>
+
+            <div class="!mt-6 flex flex-col items-center !gap-1">
+              <h2 class="text-1xl font-bold leading-tight text-surface-900">
+                {{ primaryGame.roomName }}
+              </h2>
+              <span class="flex items-center !gap-1.5 text-xs text-surface-400">
+                <i
+                  class="fa-solid fa-location-dot"
+                  style="font-size: 0.55rem"
+                />
+                {{ primaryGame.address || "Location not set" }}
+              </span>
+            </div>
+
+            <!-- Features + price: a compact, legible chip row -->
+            <div
+              v-if="features.length || primaryGame.price"
+              class="!mt-3 flex flex-wrap items-center justify-center !gap-2"
+            >
+              <span
+                v-for="feature in features"
+                :key="feature"
+                class="inline-flex items-center !gap-1.5 rounded-full bg-surface-100 !px-3 !py-1.5 text-xs font-medium text-surface-600"
+              >
+                <i
+                  :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
+                  style="font-size: 0.5rem"
+                />
+                {{ feature }}
+              </span>
+              <span
+                v-if="primaryGame.price"
+                class="inline-flex items-center !gap-1 rounded-full bg-emerald-50 !px-3 !py-1.5 text-xs font-bold text-emerald-700"
+              >
+                {{ primaryGame.price }}€
+              </span>
+            </div>
+          </div>
+
+          <SlotRoster
+            class="!mt-4 sm:!mt-6"
+            :players="primaryGame.players"
+            :max-players="primaryGame.max_players"
+            :current-user-id="currentUserId"
+          />
+
+          <!-- Pending requests elsewhere -->
+          <div
+            v-if="pendingSlots.length"
+            class="!mt-3 flex flex-col !gap-1.5 rounded-2xl border border-amber-100 bg-amber-50/60 !px-4 !py-3"
           >
             <span
-              v-for="feature in features"
-              :key="feature"
-              class="inline-flex items-center !gap-1.5 rounded-full bg-surface-100 !px-3 !py-1.5 text-xs font-medium text-surface-600"
+              v-for="slot in pendingSlots"
+              :key="slot.timeslotId"
+              class="flex items-center !gap-2 text-xs text-amber-700"
             >
-              <i
-                :class="['fa-solid', featureIconMap[feature] ?? 'fa-circle']"
-                style="font-size: 0.5rem"
-              />
-              {{ feature }}
-            </span>
-            <span
-              v-if="primaryGame.price"
-              class="inline-flex items-center !gap-1 rounded-full bg-emerald-50 !px-3 !py-1.5 text-xs font-bold text-emerald-700"
-            >
-              {{ primaryGame.price }}€
+              <i class="fa-solid fa-user-clock" style="font-size: 0.6rem" />
+              {{ slot.roomName }} · {{ shortDay(slot, now) }} {{ slot.label }} —
+              awaiting approval
             </span>
           </div>
+
+          <!-- Leave, or why not, alone under the roster: the facts are already
+               in large type above. -->
+          <SlotFooter
+            class="border-surface-100"
+            :state="leavability.canLeave ? 'leave' : 'status'"
+            :label="leavability.label"
+            :icon="leavability.icon"
+            :pending="leaveMutation.isPending.value"
+            @leave="handleLeave"
+          />
         </div>
-
-        <SlotRoster
-          class="!mt-6"
-          :players="primaryGame.players"
-          :max-players="primaryGame.max_players"
-          :current-user-id="currentUserId"
-        />
-
-        <!-- Pending requests elsewhere -->
-        <div
-          v-if="pendingSlots.length"
-          class="!mt-3 flex flex-col !gap-1.5 rounded-2xl border border-amber-100 bg-amber-50/60 !px-4 !py-3"
-        >
-          <span
-            v-for="slot in pendingSlots"
-            :key="slot.timeslotId"
-            class="flex items-center !gap-2 text-xs text-amber-700"
-          >
-            <i class="fa-solid fa-user-clock" style="font-size: 0.6rem" />
-            {{ slot.roomName }} · {{ shortDay(slot, now) }} {{ slot.label }} —
-            awaiting approval
-          </span>
-        </div>
-
-        <!-- Leave, or why not, alone under the roster: the facts are already
-             in large type above. -->
-        <SlotFooter
-          class="!mt-5 border-t border-surface-100 !pt-4"
-          :state="leavability.canLeave ? 'leave' : 'status'"
-          :label="leavability.label"
-          :icon="leavability.icon"
-          :pending="leaveMutation.isPending.value"
-          @leave="handleLeave"
-        />
       </div>
     </div>
   </div>

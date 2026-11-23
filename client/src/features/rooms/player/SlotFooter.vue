@@ -6,7 +6,7 @@
     <template v-if="state === 'leave'">
       <button
         type="button"
-        class="leave-button relative inline-flex min-h-11 cursor-pointer items-center justify-center overflow-hidden rounded-full border-none bg-transparent !px-4 !py-2.5 text-sm font-semibold text-rose-500 outline-none focus-visible:ring-2 focus-visible:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-50"
+        class="leave-button relative inline-flex min-h-11 cursor-pointer items-center justify-center overflow-hidden rounded-full border-none bg-transparent !px-4 text-sm font-semibold text-rose-500 outline-none focus-visible:ring-2 focus-visible:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-50"
         :class="{ 'leave-button--holding': hold.holding.value }"
         aria-label="Leave game"
         :aria-describedby="descriptionId"
