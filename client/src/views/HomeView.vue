@@ -2,11 +2,7 @@
   <main class="flex flex-col h-full overflow-hidden">
     <Transition name="mode-switch" mode="out-in">
       <!-- In the game: the match hub owns the view -->
-      <div
-        v-if="showHub"
-        key="hub"
-        class="flex-1 min-h-0 w-full !py-6 sm:!px-6"
-      >
+      <div v-if="showHub" key="hub" class="flex-1 min-h-0 w-full sm:!px-6">
         <MyGameHub @browse="browseGames" />
       </div>
 
