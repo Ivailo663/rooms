@@ -28,10 +28,12 @@
     />
   </div>
 
-  <div v-else class="flex flex-col !gap-4">
-    <RoomSettingsBar />
-    <div class="grid grid-cols-1 !gap-4 lg:grid-cols-2 items-start">
-      <HostedRoomCard v-for="room in rooms" :key="room.id" :room="room" />
+  <div v-else class="flex h-full flex-col !gap-4">
+    <RoomSettingsBar class="shrink-0" />
+    <div class="min-h-0 flex-1 overflow-y-auto !pb-6">
+      <div class="grid grid-cols-1 items-start !gap-4 lg:grid-cols-2">
+        <HostedRoomCard v-for="room in rooms" :key="room.id" :room="room" />
+      </div>
     </div>
   </div>
 </template>

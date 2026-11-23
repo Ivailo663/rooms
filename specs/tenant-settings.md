@@ -36,15 +36,18 @@ Code: [server/routes/tenants.ts](../server/routes/tenants.ts),
   Anyone else gets 403 "You do not manage this venue", and nothing changes.
   The tenant is `:tenantId` for the GET, and the body's `tenantId` for the two
   POSTs. An unknown tenant is 403 for a clientAdmin, and only a superAdmin can
-  get its 404. ([ROLE-05](tenancy-and-roles.md))
+  get its 404. ([ROLE-05](tenancy-and-roles.md)) This check is the server's
+  alone: the Settings page doesn't repeat it, because SET-10 keeps anyone it
+  would refuse off the page.
 - **SET-10** (mirrored) Settings exists only for callers SET-09 lets in: a
   `clientAdmin` with a `tenantid`, or a `superAdmin`. Anyone else doesn't see
   the Settings entry in the sidebar, and opening `/settings` directly sends
   them home.
 - **SET-11** The Settings page loads and saves the caller's own tenant
   (`accounts.tenantid` from `/user`), never a hardcoded id. Nothing shows while
-  the account or the settings are loading. If the server still answers 403, or
-  a superAdmin has no tenant, the page says "You don't manage a venue".
+  the account or the settings are loading. The page doesn't look at the
+  caller's role or handle a 403 itself; there is no "You don't manage a venue"
+  state.
 - **SET-07** The `default*` fields are never enforced. A slot's own columns
   win ([SLOT-16](timeslot-management.md)).
 - **SET-08** Settings player search lists accounts within the tenant.

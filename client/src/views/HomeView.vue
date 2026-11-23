@@ -1,8 +1,5 @@
 <template>
-  <main
-    class="flex flex-col h-full"
-    :class="isHostedRooms ? 'overflow-y-auto' : 'overflow-hidden'"
-  >
+  <main class="flex flex-col h-full overflow-hidden">
     <Transition name="mode-switch" mode="out-in">
       <!-- In the game: the match hub owns the view -->
       <div
@@ -20,10 +17,7 @@
           <RoomsHeader v-model:search="search" />
         </div>
 
-        <div
-          class="w-full sm:!px-6"
-          :class="isHostedRooms ? '' : 'flex-1 min-h-0'"
-        >
+        <div class="w-full flex-1 min-h-0 sm:!px-6">
           <HostedRooms v-if="isHostedRooms" />
           <PlayableRooms v-else :search="search" />
         </div>

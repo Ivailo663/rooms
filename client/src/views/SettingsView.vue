@@ -2,17 +2,15 @@
   <div class="mx-auto flex flex-col !gap-6 !py-8">
     <template v-if="loading" />
 
-    <div
-      v-else-if="!managesVenue"
-      data-no-venue
-      class="flex flex-col items-center !gap-2 rounded-2xl border border-surface-100 bg-surface-50/60 !px-4 !py-10 text-center"
-    >
-      <i class="fa-solid fa-building text-2xl text-surface-200" />
-      <p class="text-sm text-surface-300">You don't manage a venue</p>
-    </div>
-
     <template v-else>
       <!-- Joining & Availability -->
+      <button
+        @click="
+          saveSettings({ tenantId: tenantId!, settings: settingsPayload })
+        "
+      >
+        save
+      </button>
       <BasicWrapper>
         <div class="!mb-5">
           <h2 class="text-base font-semibold text-surface-900">
@@ -50,8 +48,8 @@
               </p>
               <p class="!mt-0.5 text-xs text-surface-400">
                 Minutes before start when the roster locks — no new joins, and
-                under-filled slots are redistributed or, if they can't be, marked
-                as not enough players
+                under-filled slots are redistributed or, if they can't be,
+                marked as not enough players
               </p>
             </div>
             <InputNumber
@@ -241,7 +239,9 @@
       <!-- Slot Defaults -->
       <BasicWrapper>
         <div class="!mb-5">
-          <h2 class="text-base font-semibold text-surface-900">Slot Defaults</h2>
+          <h2 class="text-base font-semibold text-surface-900">
+            Slot Defaults
+          </h2>
           <p class="!mt-0.5 text-sm text-surface-400">
             Default values applied when creating new timeslots
           </p>
@@ -313,7 +313,9 @@
 
           <div class="!py-4 first:!pt-0 last:!pb-0">
             <div class="!mb-3">
-              <p class="text-sm font-medium text-surface-700">Default features</p>
+              <p class="text-sm font-medium text-surface-700">
+                Default features
+              </p>
               <p class="!mt-0.5 text-xs text-surface-400">
                 Pre-selected features for new slots
               </p>
@@ -407,7 +409,6 @@ import type { AccountSearchResult } from "@football/shared";
 import BasicWrapper from "@/components/BasicWrapper.vue";
 import { useAuthStore } from "@/stores/auth";
 import {
-  isForbidden,
   useGetTenantSettings,
   useUpdateTenantSettings,
   useUpdateTenantAccount,
@@ -422,23 +423,12 @@ const tenantId = computed(() => auth.user?.tenantid ?? null);
 
 const { mutate: saveSettings } = useUpdateTenantSettings();
 const { mutate: saveAccountFlags } = useUpdateTenantAccount();
-const { data: tenantData, error: tenantError } =
-  useGetTenantSettings(tenantId);
-
-// The server is the boundary (SET-09); this only keeps a non-manager from
-// staring at a form that can't load or save.
-const managesVenue = computed(
-  () => tenantId.value !== null && !isForbidden(tenantError.value)
-);
+const { data: tenantData } = useGetTenantSettings(tenantId);
 
 // Nothing renders while either answer is pending: the no-venue message would
 // flash for a manager, and the form would show its defaults before the real
 // settings arrive.
-const loading = computed(
-  () => !accountLoaded.value || (managesVenue.value && !tenantData.value)
-);
-
-const hydrated = ref(false);
+const loading = computed(() => !accountLoaded.value || !tenantData.value);
 
 const lateJoinCutoff = ref(15);
 const allowJoinOnLive = ref(false);
@@ -590,8 +580,6 @@ watch(
     joinPolicy.value = s.joinMode ?? "free";
     includeBlacklisted.value = s.includeBlacklisted ?? false;
     deniedMessage.value = s.deniedMessage ?? "";
-
-    hydrated.value = true;
   },
   { immediate: true, once: true }
 );
@@ -599,7 +587,7 @@ watch(
 watchDebounced(
   settingsPayload,
   (settings) => {
-    if (!hydrated.value || tenantId.value === null) return;
+    if (tenantId.value === null) return;
     saveSettings({ tenantId: tenantId.value, settings });
   },
   { debounce: 800, deep: true }
