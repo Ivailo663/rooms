@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 describe("SettingsView", () => {
-  it("SET-11: a caller with no tenant sees the no-venue state and nothing is fetched or saved", async () => {
+  it("SET-11: a caller with no tenant fetches nothing, saves nothing, and renders nothing", async () => {
     auth.user = { id: 7, tenantid: null };
     const get = vi.spyOn(api, "get");
     const post = vi.spyOn(api, "post");
@@ -32,25 +32,24 @@ describe("SettingsView", () => {
     const wrapper = mountView();
     await flushPromises();
 
-    expect(wrapper.find("[data-no-venue]").text()).toBe(
-      "You don't manage a venue"
-    );
-    expect(wrapper.text()).not.toContain("Player Management");
+    // Blank rather than explained: the page neither checks the role nor reads
+    // a 403, because SET-10 keeps anyone the server would refuse from ever
+    // reaching it.
+    expect(wrapper.text()).toBe("");
     expect(get).not.toHaveBeenCalled();
     expect(post).not.toHaveBeenCalled();
 
     wrapper.unmount();
   });
 
-  it("SET-11: while the account is still loading, the no-venue state doesn't show", async () => {
+  it("SET-11: nothing renders while the account is still loading", async () => {
     auth.user = { uid: "firebase-only" };
     const get = vi.spyOn(api, "get");
 
     const wrapper = mountView();
     await flushPromises();
 
-    expect(wrapper.find("[data-no-venue]").exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("Player Management");
+    expect(wrapper.text()).toBe("");
     expect(get).not.toHaveBeenCalled();
 
     wrapper.unmount();
