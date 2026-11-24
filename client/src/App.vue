@@ -19,7 +19,7 @@
     <AppSidebar v-if="authStore.user" />
 
     <!-- Main content -->
-    <div class="flex-1 h-[100dvh] overflow-y-auto !p-4">
+    <div class="relative flex-1 h-[100dvh] overflow-y-auto !p-4">
       <RouterView />
     </div>
   </div>

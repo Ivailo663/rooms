@@ -34,20 +34,7 @@
       v-if="primaryGame"
       class="relative flex max-h-full min-h-0 w-full max-w-2xl"
     >
-      <span
-        v-if="isFailed"
-        class="absolute left-1/2 top-0 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center !gap-2 whitespace-nowrap rounded-full bg-rose-50 !px-2 !py-0.5 text-[0.6rem] text-xs font-bold uppercase tracking-widest text-rose-600"
-      >
-        <i class="fa-solid fa-circle-xmark" style="font-size: 0.6rem" />
-        Game off
-      </span>
-      <span
-        v-else
-        class="absolute left-1/2 top-0 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center !gap-2 whitespace-nowrap rounded-full bg-emerald-50 !px-2 !py-0.5 text-[0.6rem] text-xs font-bold uppercase tracking-widest text-emerald-600"
-      >
-        <i class="fa-solid fa-circle-check" style="font-size: 0.6rem" />
-        You're in
-      </span>
+      <CardStatusPill :status="isFailed ? 'off' : 'joined'" />
 
       <div
         class="hub-card relative w-full overflow-hidden rounded-3xl border bg-white"
@@ -231,6 +218,7 @@ import {
   formatCountdown,
   elapsedMinutes,
 } from "../composables/gameTime";
+import CardStatusPill from "../components/CardStatusPill.vue";
 import SlotRoster from "./SlotRoster.vue";
 import SlotFooter from "./SlotFooter.vue";
 

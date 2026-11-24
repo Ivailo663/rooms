@@ -2,24 +2,12 @@
   <!-- Unclipped shell so the status pill can straddle the card's top edge;
        the card itself keeps overflow-hidden for its rounded glow. -->
   <div class="relative h-full w-full">
-    <span
-      v-if="hasJoinedSlot"
-      class="absolute left-1/2 top-0 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center !gap-1 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 !px-2 !py-0.5 text-[0.6rem] font-bold uppercase leading-none tracking-widest text-emerald-600"
-    >
-      <i class="fa-solid fa-circle-check" style="font-size: 0.5rem" />
-      You're in
-    </span>
-    <span
-      v-else-if="hasPendingSlot"
-      class="absolute left-1/2 top-0 z-10 inline-flex -translate-x-1/2 -translate-y-1/2 items-center !gap-1 whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 !px-2 !py-0.5 text-[0.6rem] font-bold uppercase leading-none tracking-widest text-amber-600"
-    >
-      <i class="fa-solid fa-user-clock" style="font-size: 0.5rem" />
-      Requested
-    </span>
+    <CardStatusPill v-if="hasJoinedSlot" status="joined" />
+    <CardStatusPill v-else-if="hasPendingSlot" status="requested" />
 
     <div
       ref="cardEl"
-      class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-white transition-shadow"
+      class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-white/50 transition-shadow"
       :data-header-step="step"
       :class="
         hasJoinedSlot
@@ -32,11 +20,6 @@
       <div
         class="pointer-events-none absolute inset-0"
         :class="hasJoinedSlot ? 'card-glow--joined' : 'card-glow'"
-      />
-      <!-- A fine pattern of tiny footballs, clear under the header (CARD-07). -->
-      <div
-        class="card-pattern pointer-events-none absolute inset-0"
-        aria-hidden="true"
       />
 
       <div
@@ -101,12 +84,12 @@
             >
               "{{ room.deniedMessage }}"
             </p>
-            <p
+            <!-- <p
               v-else-if="showMessage"
               class="!mb-0 !mt-1 shrink-0 text-sm italic text-surface-400 line-clamp-1"
             >
               "{{ selectedSlot?.message }}"
-            </p>
+            </p> -->
           </div>
         </template>
 
@@ -144,6 +127,7 @@ import { useAuthStore } from "@/stores/auth";
 import type { PlayableRoomResponse } from "@football/shared";
 import { headerStep } from "../composables/headerStep";
 import { PICKER_FLOOR, PICKER_NOTE } from "../composables/slotTileStep";
+import CardStatusPill from "../components/CardStatusPill.vue";
 import SlotCarousel, {
   type SlotMarker,
   type TileAction,
@@ -358,26 +342,5 @@ const handleLeave = () => {
       rgba(16, 185, 129, 0.18) 0%,
       transparent 70%
     );
-}
-
-/* Tiny black-and-white footballs tiled over the card, staggered every other
-   row. Quiet enough to read text over. */
-.card-pattern {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Cdefs%3E%3CclipPath id=%22c%22%3E%3Ccircle r=%224.2%22/%3E%3C/clipPath%3E%3Cg id=%22b%22%3E%3Ccircle r=%224.2%22 fill=%22%23fff%22/%3E%3Cg fill=%22%23000%22 clip-path=%22url%28%23c%29%22%3E%3Cpolygon points=%220.00,-1.60 1.52,-0.49 0.94,1.29 -0.94,1.29 -1.52,-0.49%22/%3E%3Cpolygon points=%220.00,5.83 -1.47,4.76 -0.91,3.03 0.91,3.03 1.47,4.76%22/%3E%3Cpolygon points=%22-5.55,1.80 -4.99,0.07 -3.16,0.07 -2.60,1.80 -4.07,2.87%22/%3E%3Cpolygon points=%22-3.43,-4.72 -1.61,-4.72 -1.04,-2.99 -2.52,-1.92 -3.99,-2.99%22/%3E%3Cpolygon points=%223.43,-4.72 3.99,-2.99 2.52,-1.92 1.04,-2.99 1.61,-4.72%22/%3E%3Cpolygon points=%225.55,1.80 4.07,2.87 2.60,1.80 3.16,0.07 4.99,0.07%22/%3E%3C/g%3E%3Ccircle r=%224.2%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%220.55%22/%3E%3C/g%3E%3C/defs%3E%3Cuse href=%22%23b%22 x=%228%22 y=%228%22/%3E%3Cuse href=%22%23b%22 x=%2228%22 y=%2228%22/%3E%3C/svg%3E");
-  background-size: 40px 40px;
-  opacity: 0.13;
-  /* Clear under the header, full strength from the slot down. */
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 14%,
-    #000 34%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 14%,
-    #000 34%
-  );
 }
 </style>

@@ -34,10 +34,7 @@ Status: in progress on `rooms-restructure-and-mobile-pass`.
   produce.
 - **CARD-07** The card's background has texture around the slot tiles. Its
   top-edge tint (faint indigo, emerald once the user holds a seat here) covers
-  the whole card and is strongest low down, behind the picker. Over it is a
-  fine pattern of tiny black-and-white footballs (about 8px, 20px apart,
-  alternate rows offset, about 13% strength), clear under the header and
-  fading in towards the picker. The tiles sit on top of it, opaque.
+  the whole card and is strongest low down, behind the picker.
 
 ## Slot picker (SlotCarousel)
 

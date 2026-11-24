@@ -1,5 +1,5 @@
 <template>
-  <div class="!mb-6">
+  <div>
     <div class="flex flex-col items-center">
       <!-- Title -->
       <h1
@@ -19,7 +19,7 @@
         class="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white/70 backdrop-blur-xl border border-surface-200/40 shadow-sm transition-all focus-within:shadow-md focus-within:border-primary-300/50"
       >
         <!-- Search row -->
-        <div class="flex items-center">
+        <!-- <div class="flex items-center">
           <i
             class="fa-solid fa-magnifying-glass !ml-4 text-surface-300"
             style="font-size: 0.75rem"
@@ -39,10 +39,10 @@
             />
             <span class="text-xs font-medium text-primary-500">AI</span>
           </div>
-        </div>
+        </div> -->
 
         <!-- Day selector row -->
-        <div class="flex flex-wrap justify-center !mb-2 md:!mb-0 px-2">
+        <div class="flex flex-wrap justify-center px-2">
           <div
             class="flex items-center justify-center !gap-0.5 border-t border-surface-100/50 !py-1.5 !px-1 sm:!px-3"
           >
@@ -68,7 +68,7 @@
           </div>
 
           <!-- Quick filters -->
-          <div class="flex flex-wrap items-center justify-center !gap-2">
+          <!-- <div class="flex flex-wrap items-center justify-center !gap-2">
             <Button
               v-for="filter in quickFilters"
               :key="filter.value"
@@ -90,7 +90,7 @@
               <i :class="filter.icon" style="font-size: 0.6rem" />
               {{ filter.label }}
             </Button>
-          </div>
+          </div> -->
         </div>
       </div>
     </div>
@@ -98,41 +98,41 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { Button, InputText } from "primevue";
+import { computed } from "vue";
+import { Button } from "primevue";
 import { useRoomView } from "@/composables/useRoomView";
 import { useActiveDay } from "@/composables/useActiveDay";
 import { RoomView, DAYS, getTodayValue } from "@/constants";
 
 defineProps<{ search: string }>();
 
-const emit = defineEmits<{
-  "update:search": [value: string];
-}>();
+// const emit = defineEmits<{
+//   "update:search": [value: string];
+// }>();
 
 const roomView = useRoomView();
 const isHostedRooms = computed(() => roomView.value === RoomView.Host);
 
-const quickFilters = [
-  { label: "Open now", value: "open-now", icon: "fa-solid fa-bolt" },
-  {
-    label: "Has open slots",
-    value: "open-slots",
-    icon: "fa-solid fa-circle-check",
-  },
-  { label: "Top rated", value: "top-rated", icon: "fa-solid fa-star" },
-];
+// const quickFilters = [
+//   { label: "Open now", value: "open-now", icon: "fa-solid fa-bolt" },
+//   {
+//     label: "Has open slots",
+//     value: "open-slots",
+//     icon: "fa-solid fa-circle-check",
+//   },
+//   { label: "Top rated", value: "top-rated", icon: "fa-solid fa-star" },
+// ];
 
 const todayValue = getTodayValue();
 
-const activeFilters = ref<string[]>([]);
+// const activeFilters = ref<string[]>([]);
 const activeDay = useActiveDay();
 
-const toggleFilter = (value: string) => {
-  activeFilters.value = activeFilters.value.includes(value)
-    ? activeFilters.value.filter((v: string) => v !== value)
-    : [...activeFilters.value, value];
-};
+// const toggleFilter = (value: string) => {
+//   activeFilters.value = activeFilters.value.includes(value)
+//     ? activeFilters.value.filter((v: string) => v !== value)
+//     : [...activeFilters.value, value];
+// };
 
 const selectDay = (value: string) => {
   activeDay.value = activeDay.value === value ? "" : value;

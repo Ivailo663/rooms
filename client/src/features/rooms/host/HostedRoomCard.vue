@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white"
+    class="flex flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white/50"
   >
     <!-- Card Header -->
     <div class="flex items-center justify-between !gap-3 !px-4 !py-3">
