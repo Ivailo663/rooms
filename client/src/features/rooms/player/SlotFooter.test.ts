@@ -26,7 +26,7 @@ afterEach(() => {
 describe("CARD-35: the hub footer shows a block reason as text, never a button", () => {
   it("CARD-35: a leave block reason is a text line with its icon", () => {
     const w = render({
-      state: "status",
+      state: "cantLeave",
       label: "Roster locked",
       icon: "fa-lock",
     });

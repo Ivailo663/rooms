@@ -185,7 +185,7 @@
                in large type above. -->
           <SlotFooter
             class="border-surface-100"
-            :state="leavability.canLeave ? 'leave' : 'status'"
+            :state="leavability.canLeave ? 'leave' : 'cantLeave'"
             :label="leavability.label"
             :icon="leavability.icon"
             :pending="leaveMutation.isPending.value"

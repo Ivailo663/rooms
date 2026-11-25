@@ -5,8 +5,8 @@ import { useHoldPress } from "./useHoldPress";
 
 // jsdom has no PointerEvent, and test-utils can't set `button` on the
 // MouseEvent it falls back to, so build the event by hand.
-const pointer = async (el: Element, type: string, button = 0) => {
-  el.dispatchEvent(new MouseEvent(type, { button, bubbles: true }));
+const pointer = async (el: Element, type: string, button = 0, clientX = 0) => {
+  el.dispatchEvent(new MouseEvent(type, { button, clientX, bubbles: true }));
   await nextTick();
 };
 const key = async (el: Element, type: string, k: string, repeat = false) => {
@@ -14,16 +14,6 @@ const key = async (el: Element, type: string, k: string, repeat = false) => {
     new KeyboardEvent(type, { key: k, repeat, bubbles: true, cancelable: true })
   );
   await nextTick();
-};
-
-const scroller = () => {
-  const el = document.createElement("div");
-  let left = 0;
-  Object.defineProperty(el, "scrollLeft", {
-    get: () => left,
-    set: (v: number) => (left = v),
-  });
-  return el;
 };
 
 // v-on="handlers" in a template; in a render function the keys need on-prefixes.
@@ -35,15 +25,14 @@ const listeners = (handlers: Record<string, unknown>) =>
     ])
   );
 
-const setup = (opts: { enabled?: boolean; withScroll?: boolean } = {}) => {
+const setup = (opts: { enabled?: boolean } = {}) => {
   const onHold = vi.fn();
   const enabled = ref(opts.enabled ?? true);
-  const scrollEl = ref<HTMLElement | null>(opts.withScroll ? scroller() : null);
   let api!: ReturnType<typeof useHoldPress>;
   const w = mount(
     defineComponent({
       setup() {
-        api = useHoldPress({ onHold, enabled, scrollEl });
+        api = useHoldPress({ onHold, enabled });
         return () =>
           h("div", { id: "root", class: "root" }, [
             h("button", { id: "target", ...listeners(api.handlers) }),
@@ -53,7 +42,7 @@ const setup = (opts: { enabled?: boolean; withScroll?: boolean } = {}) => {
     { attachTo: document.body }
   );
   const target = w.element.querySelector("#target")!;
-  return { w, api, onHold, enabled, scrollEl, target };
+  return { w, api, onHold, enabled, target };
 };
 
 beforeEach(() => {
@@ -84,13 +73,13 @@ describe("useHoldPress", () => {
     vi.advanceTimersByTime(2000);
     expect(onHold).not.toHaveBeenCalled();
     expect(api.holding.value).toBe(false);
-    expect(api.hint.value).toBe(false);
+    expect(api.releasedEarly.value).toBe(false);
 
     await pointer(target, "pointerdown");
     await pointer(target, "pointerup");
-    expect(api.hint.value).toBe(true);
+    expect(api.releasedEarly.value).toBe(true);
     vi.advanceTimersByTime(2000);
-    expect(api.hint.value).toBe(false);
+    expect(api.releasedEarly.value).toBe(false);
   });
 
   it("CARD-33: pointercancel and pointerleave cancel without the hint", async () => {
@@ -101,22 +90,19 @@ describe("useHoldPress", () => {
       vi.advanceTimersByTime(2000);
     }
     expect(onHold).not.toHaveBeenCalled();
-    expect(api.hint.value).toBe(false);
+    expect(api.releasedEarly.value).toBe(false);
   });
 
-  it("CARD-33: a sideways scroll over 8px cancels, a smaller shift doesn't", async () => {
-    const { target, api, onHold, scrollEl } = setup({ withScroll: true });
-    const el = scrollEl.value!;
-    await pointer(target, "pointerdown");
-    el.scrollLeft = 8;
-    el.dispatchEvent(new Event("scroll"));
+  it("CARD-33: a sideways move over 8px cancels, a smaller one doesn't", async () => {
+    const { target, api, onHold } = setup();
+    await pointer(target, "pointerdown", 0, 100);
+    await pointer(target, "pointermove", 0, 108);
     expect(api.holding.value).toBe(true);
     vi.advanceTimersByTime(1000);
     expect(onHold).toHaveBeenCalledTimes(1);
 
-    await pointer(target, "pointerdown");
-    el.scrollLeft = 17;
-    el.dispatchEvent(new Event("scroll"));
+    await pointer(target, "pointerdown", 0, 100);
+    await pointer(target, "pointermove", 0, 91);
     expect(api.holding.value).toBe(false);
     vi.advanceTimersByTime(2000);
     expect(onHold).toHaveBeenCalledTimes(1);
@@ -163,7 +149,7 @@ describe("useHoldPress", () => {
     });
     target.dispatchEvent(up);
     expect(up.defaultPrevented).toBe(true);
-    expect(api.hint.value).toBe(true);
+    expect(api.releasedEarly.value).toBe(true);
     vi.advanceTimersByTime(2000);
     expect(onHold).not.toHaveBeenCalled();
   });
@@ -184,7 +170,7 @@ describe("useHoldPress", () => {
     target.dispatchEvent(new Event("blur"));
     vi.advanceTimersByTime(2000);
     expect(onHold).not.toHaveBeenCalled();
-    expect(api.hint.value).toBe(false);
+    expect(api.releasedEarly.value).toBe(false);
   });
 
   it("CARD-34: the context menu is suppressed only while enabled", () => {

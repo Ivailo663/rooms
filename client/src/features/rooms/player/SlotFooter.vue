@@ -29,17 +29,17 @@
             "
             style="font-size: 0.65rem"
           />
-          {{ hold.hint.value ? "Hold to leave" : "Leave game" }}
+          {{ hold.releasedEarly.value ? "Hold to leave" : "Leave game" }}
         </span>
       </button>
       <span :id="descriptionId" class="sr-only" role="status">
         Press and hold for one second to leave.
-        <template v-if="hold.hint.value">Hold to leave</template>
+        <template v-if="hold.releasedEarly.value">Hold to leave</template>
       </span>
     </template>
 
     <span
-      v-else-if="state === 'status' && label"
+      v-else-if="state === 'cantLeave' && label"
       class="flex items-center !gap-1.5 text-sm text-surface-400"
     >
       <i v-if="icon" :class="`fa-solid ${icon}`" style="font-size: 0.65rem" />
@@ -57,7 +57,7 @@ import { useHoldPress } from "../composables/useHoldPress";
 // so the only states are leaving and the reason they can't. Joining happens on
 // the browse card's tile.
 const props = defineProps<{
-  state: "leave" | "status";
+  state: "leave" | "cantLeave";
   pending?: boolean;
   label?: string;
   icon?: string;

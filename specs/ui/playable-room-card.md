@@ -1,10 +1,9 @@
 # Playable room card (player browse)
 
 Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
-`PlayableRoomCard.vue`, `SlotCarousel.vue`, `SlotRoster.vue`,
+`PlayableRoomCard.vue`, `TimeCarousel.vue`, `TimeTile.vue`,
+`SpotsTakenBar.vue`, `SlotRoster.vue`,
 `SlotAvatars.vue`). E2E: [client/e2e/playable-room-card.spec.ts](../../client/e2e/playable-room-card.spec.ts).
-
-Status: in progress on `rooms-restructure-and-mobile-pass`.
 
 ## Layout
 
@@ -36,13 +35,14 @@ Status: in progress on `rooms-restructure-and-mobile-pass`.
   top-edge tint (faint indigo, emerald once the user holds a seat here) covers
   the whole card and is strongest low down, behind the picker.
 
-## Slot picker (SlotCarousel)
+## Slot picker (TimeCarousel)
 
 - **CARD-10** It's a cover-flow of large tiles. The current tile is centred,
   larger and in front. At most 3 tiles are visible, and a neighbour peeks in
-  only if it exists. Every tile is a perfect square: its side is the smaller
-  of 86% of the picker's width and the picker's height, and it sits centred
-  vertically in the picker. Neighbour tiles are a flatter version of the same
+  only if it exists. Every tile fills the picker: it's 86% of the picker's
+  width (the rest is where neighbours peek in) and the picker's full height,
+  so a taller card gives taller tiles rather than empty space. Tiles aren't
+  kept square. Neighbour tiles are a flatter version of the same
   white card with a hairline border, so they read as cards behind the current
   one, not grey blocks.
 - **CARD-11** Each tile shows its slot's time, centred horizontally and
@@ -72,8 +72,8 @@ Status: in progress on `rooms-restructure-and-mobile-pass`.
   instead. A full slot's bar is grey.
 - **CARD-16** There are no arrows, no counter, no progress rail and no
   "Available slots" header.
-- **CARD-17** Tiles adapt in steps to their own size (the square's side,
-  CARD-10), not the screen's. That height depends on the header too, such
+- **CARD-17** Tiles adapt in steps to their own size (the smaller of the
+  tile's width and height, CARD-10), not the screen's. That height depends on the header too, such
   as a long description. Roomy: everything. Compact: smaller time, tighter
   padding, smaller avatars. Tight: at most 3 avatars, then "+N".
 - **CARD-18** A tile's content is never clipped and never scrolls vertically,
@@ -164,6 +164,17 @@ Status: in progress on `rooms-restructure-and-mobile-pass`.
   its own space so a full-height card can't push the pill under the view's
   edge. Raising it by z-index alone doesn't count — a clip isn't a stacking
   question.
+- **CARD-38** The action line follows the swipe. The moment a tile becomes the
+  centred one, its line shows its own slot's state (CARD-31, CARD-32): it never
+  shows the previous slot's line, and never waits for the strip to settle
+  first. Swiping back and forth across slots with different states never makes
+  a line visibly change after it appears. The host's denial message under the
+  picker (CARD-32) follows the swipe the same way: it always belongs to the
+  centred tile.
+- **CARD-39** A join or leave in flight belongs to its own slot. Only that
+  slot's tile shows the spinner and "Joining…" or "Leaving…" (CARD-33,
+  CARD-34). Any other tile centred in the meantime shows its own line, but
+  can't be held until the action in flight settles.
 
 ## Out of scope for this pass
 
