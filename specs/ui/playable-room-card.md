@@ -174,7 +174,8 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
 - **CARD-39** A join or leave in flight belongs to its own slot. Only that
   slot's tile shows the spinner and "Joining…" or "Leaving…" (CARD-33,
   CARD-34). Any other tile centred in the meantime shows its own line, but
-  can't be held until the action in flight settles.
+  can't be held until the action in flight settles. That holds across cards:
+  while any join or leave is in flight, no tile on any card can be held.
 
 ## Out of scope for this pass
 

@@ -28,13 +28,8 @@
           :centered="index === centeredSlotIndex"
           :chosen="index === chosenSlotIndex"
           :marker="markers[slot.id]"
-          :current-user-id="currentUserId"
-          :action="actions[slot.id]"
-          :pending="pendingSlotId === slot.id"
-          :blocked="pendingSlotId !== undefined && pendingSlotId !== slot.id"
+          :rules="rules"
           @click="onTileClick(index)"
-          @join="emit('join', slot.id)"
-          @leave="emit('leave', slot.id)"
         />
       </div>
     </div>
@@ -47,7 +42,6 @@ import useEmblaCarousel from "embla-carousel-vue";
 import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import type { PlayableRoomResponse } from "@football/shared";
 import { TILE_WIDTH_SHARE } from "../composables/tileSize";
-import type { TileAction } from "../composables/tileBottomText";
 import { useMiddleTile } from "../composables/useMiddleTile";
 import { useTileSize } from "../composables/useTileSize";
 import TimeTile, { type SlotMarker } from "./TimeTile.vue";
@@ -55,24 +49,16 @@ import TimeTile, { type SlotMarker } from "./TimeTile.vue";
 const props = withDefaults(
   defineProps<{
     timeslots: PlayableRoomResponse["timeslots"];
+    // The room's join rules, handed to every tile.
+    rules: Pick<PlayableRoomResponse, "lateJoinCutoff" | "allowJoinOnLive">;
     // Per-slot membership badges for the current user, keyed by slot id.
     markers?: Record<number, SlotMarker>;
     // Slot to land on when the strip mounts (e.g. the user's joined slot).
     initialIndex?: number;
-    currentUserId?: number;
-    // Each tile's own action by slot id, so a tile shows its line as soon as it
-    // is centred; only the centred one can be held (CARD-31, CARD-32, CARD-38).
-    actions?: Record<number, TileAction>;
-    // The slot whose join or leave is in flight: its tile shows the spinner,
-    // every other tile can't be held meanwhile (CARD-39).
-    pendingSlotId?: number;
   }>(),
   {
     markers: () => ({}),
     initialIndex: 0,
-    currentUserId: undefined,
-    actions: () => ({}),
-    pendingSlotId: undefined,
   }
 );
 const emit = defineEmits<{
@@ -81,8 +67,6 @@ const emit = defineEmits<{
   // Centred slot: follows the swipe, for anything that must match the tile on
   // screen right now.
   centerSlot: [index: number];
-  join: [slotId: number];
-  leave: [slotId: number];
 }>();
 
 const startIndex = Math.min(

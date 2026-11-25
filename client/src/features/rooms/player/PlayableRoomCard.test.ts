@@ -11,28 +11,18 @@ vi.mock("@vueuse/core", async (importOriginal) => ({
 }));
 vi.mock(
   "embla-carousel-vue",
-  async () => (await import("./__tests__/fakeEmbla")).module,
+  async () => (await import("./__tests__/fakeEmbla")).module
 );
 vi.mock("@/features/profile/api", () => ({
   getPlayer: () => new Promise(() => {}),
 }));
 vi.mock("@/stores/auth", () => ({ useAuthStore: () => ({ user: { id: 1 } }) }));
-// The join in flight, as the real mutation reports it.
-const joinPending = ref(false);
-const joinVariables = ref<number | undefined>(undefined);
 const joinMutate = vi.fn();
 vi.mock("../composables/queries", () => ({
+  SLOT_MEMBERSHIP_KEY: ["slot-membership"],
   useGetJoinedSlots: () => ({ data: ref([]) }),
-  useJoinTimeslot: () => ({
-    mutate: joinMutate,
-    isPending: joinPending,
-    variables: joinVariables,
-  }),
-  useLeaveTimeslot: () => ({
-    mutate: vi.fn(),
-    isPending: ref(false),
-    variables: ref(undefined),
-  }),
+  useJoinTimeslot: () => ({ mutate: joinMutate, isPending: ref(false) }),
+  useLeaveTimeslot: () => ({ mutate: vi.fn(), isPending: ref(false) }),
 }));
 
 import PlayableRoomCard from "./PlayableRoomCard.vue";
@@ -121,7 +111,7 @@ describe("PlayableRoomCard header steps", () => {
       expect(w.find("[data-header]").text()).toContain("Depot");
       expect(w.find("[data-header]").text()).toContain("Rail St 1");
       expect(w.find("[data-header]").text()).not.toMatch(
-        /ball|showers|parking/,
+        /ball|showers|parking/
       );
       expect(w.find("[data-header] .rounded-full").exists()).toBe(false);
       w.unmount();
@@ -137,7 +127,7 @@ describe("PlayableRoomCard header steps", () => {
     const w = mountCard(345);
     const header = w.find("[data-header]");
     expect(header.classes()).toEqual(
-      expect.arrayContaining(["shrink", "min-h-0", "overflow-hidden"]),
+      expect.arrayContaining(["shrink", "min-h-0", "overflow-hidden"])
     );
   });
 });
@@ -170,8 +160,6 @@ describe("PlayableRoomCard action follows the swipe", () => {
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    joinPending.value = false;
-    joinVariables.value = undefined;
     joinMutate.mockClear();
   });
   afterEach(() => {
@@ -192,29 +180,12 @@ describe("PlayableRoomCard action follows the swipe", () => {
     expect(w.text()).toContain("Sorry, we're full of regulars");
   });
 
-  it("CARD-39: the slot in flight is the one that spins, wherever the strip is centred", async () => {
-    const joinable = {
-      ...room,
-      timeslots: [slotOf(1), slotOf(2)],
-    };
-    const w = mountCard(540, joinable);
-    joinPending.value = true;
-    joinVariables.value = 1;
-    await nextTick();
-    expect(line(w, 0).text()).toBe("Joining…");
-
-    await swipeTo(w, 1);
-    expect(line(w, 1).text()).toBe("Hold to join");
-    expect(w.find(".slot-press").attributes("aria-disabled")).toBe("true");
-    expect(joinMutate).not.toHaveBeenCalled();
-  });
-
   it("CARD-39: a hold joins the slot it was made on, not the settled one", async () => {
     const joinable = { ...room, timeslots: [slotOf(1), slotOf(2)] };
     const w = mountCard(540, joinable);
     await swipeTo(w, 1);
     w.find(".slot-press").element.dispatchEvent(
-      new MouseEvent("pointerdown", { button: 0, bubbles: true }),
+      new MouseEvent("pointerdown", { button: 0, bubbles: true })
     );
     await nextTick();
     vi.advanceTimersByTime(1000);

@@ -64,7 +64,7 @@ export const useGetPlayableRooms = (
   options?: Omit<
     UseQueryOptions<PlayableRoomResponse[]>,
     "queryKey" | "queryFn"
-  >,
+  >
 ) => {
   const authStore = useAuthStore();
 
@@ -195,10 +195,15 @@ export const useDeleteTimeslot = () => {
   });
 };
 
+// Shared by join and leave, so a tile can tell that some seat change is in
+// flight anywhere in the app (CARD-39).
+export const SLOT_MEMBERSHIP_KEY = ["slot-membership"];
+
 export const useJoinTimeslot = () => {
   const queryClient = useQueryClient();
 
   return useMutation<JoinTimeslotResponse, Error, number>({
+    mutationKey: SLOT_MEMBERSHIP_KEY,
     mutationFn: joinTimeslot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
@@ -265,6 +270,7 @@ export const useLeaveTimeslot = () => {
   const queryClient = useQueryClient();
 
   return useMutation<MutationMessageResponse, Error, number>({
+    mutationKey: SLOT_MEMBERSHIP_KEY,
     mutationFn: leaveTimeslot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });

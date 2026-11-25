@@ -70,13 +70,9 @@
               :timeslots="room.timeslots"
               :markers="slotMarkers"
               :initial-index="initialSlotIndex"
-              :current-user-id="currentUserId"
-              :actions="actionBySlotId"
-              :pending-slot-id="pendingSlotId"
+              :rules="room"
               @choose-slot="handleChooseSlot"
               @center-slot="handleCenterSlot"
-              @join="handleJoin"
-              @leave="handleLeave"
             />
             <p
               v-if="showDenial"
@@ -110,22 +106,10 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useElementSize } from "@vueuse/core";
-import {
-  useGetJoinedSlots,
-  useJoinTimeslot,
-  useLeaveTimeslot,
-} from "../composables/queries";
-import { returnToGame } from "../composables/useGameMode";
-import { useNow } from "../composables/useNow";
-import {
-  getSlotJoinability,
-  getSlotLeavability,
-} from "../composables/slotJoinability";
 import { useAuthStore } from "@/stores/auth";
 import type { PlayableRoomResponse } from "@football/shared";
 import { headerSizeFor } from "../composables/headerSize";
 import { PICKER_FLOOR, PICKER_NOTE } from "../composables/tileSize";
-import type { TileAction } from "../composables/tileBottomText";
 import CardStatusPill from "../components/CardStatusPill.vue";
 import TimeCarousel from "./TimeCarousel.vue";
 import type { SlotMarker } from "./TimeTile.vue";
@@ -135,21 +119,8 @@ type Slot = PlayableRoomResponse["timeslots"][number];
 const props = defineProps<{ room: PlayableRoomResponse }>();
 
 const authStore = useAuthStore();
-const joinMutation = useJoinTimeslot();
-const leaveMutation = useLeaveTimeslot();
-const now = useNow();
 
 const currentUserId = computed(() => authStore.user?.id);
-
-// Cross-room, so the one-game-per-hour gate can see seats taken in rooms this
-// card knows nothing about. Shared query key — every card reads one fetch.
-const { data: joinedSlots } = useGetJoinedSlots();
-
-// Only confirmed seats clash; pending requests aren't commitments, matching the
-// server.
-const heldSlots = computed(() =>
-  (joinedSlots.value ?? []).filter((slot) => slot.membership === "joined")
-);
 
 // The card's own height, not the screen's, picks how much header it can afford
 // (CARD-05): the deck sizes cards, and the header steps down to leave the picker
@@ -179,12 +150,16 @@ const centeredSlot = computed<Slot | undefined>(
   () => props.room.timeslots[centeredSlotIndex.value]
 );
 
-const showDenial = computed(
-  () =>
-    !!centeredSlot.value &&
-    actionBySlotId.value[centeredSlot.value.id]?.state === "declined" &&
+// A seat held outranks a denial, as it does on the tile (getSlotAction).
+const showDenial = computed(() => {
+  const slot = centeredSlot.value;
+  return (
+    !!slot &&
+    slot.requestStatusForCurrentUser === "denied" &&
+    !slot.players.some((p) => p.id === currentUserId.value) &&
     !!props.room.deniedMessage
-);
+  );
+});
 
 // Either note takes a line under the strip, so the picker's floor grows by it.
 const hasNote = computed(() => showMessage.value || showDenial.value);
@@ -234,67 +209,6 @@ const initialSlotIndex = computed(() => {
   const pending = byMarker("pending");
   return pending >= 0 ? pending : 0;
 });
-
-// One action per slot, so a tile shows its own line the moment it is centred
-// instead of the previous slot's until the strip settles (CARD-38). A seat held
-// wins, then a request in flight, then a denial, then the join gates, which
-// mirror the server's so a hold reflects what would actually be accepted. A
-// locked roster keeps the slot visible for its hour but removes the exit.
-// A denial lasts for the current occurrence only: the row resets when the slot
-// ends and cycles back to scheduled.
-const actionBySlotId = computed(() => {
-  const userId = currentUserId.value;
-  const actions: Record<number, TileAction> = {};
-  for (const slot of props.room.timeslots) {
-    if (userId !== undefined && slot.players.some((p) => p.id === userId)) {
-      const { canLeave, label, icon } = getSlotLeavability(
-        slot,
-        props.room.lateJoinCutoff,
-        now.value
-      );
-      actions[slot.id] = canLeave
-        ? { state: "leave" }
-        : { state: "cantLeave", label, icon };
-    } else if (slot.requestStatusForCurrentUser === "pending") {
-      actions[slot.id] = { state: "awaiting" };
-    } else if (slot.requestStatusForCurrentUser === "denied") {
-      actions[slot.id] = { state: "declined" };
-    } else {
-      const { joinable, label, icon } = getSlotJoinability(
-        slot,
-        props.room,
-        now.value,
-        heldSlots.value
-      );
-      actions[slot.id] = joinable
-        ? { state: "join" }
-        : { state: "cantJoin", label, icon };
-    }
-  }
-  return actions;
-});
-
-// The slot whose join or leave is in flight, from the mutation's own variables
-// so it can't drift to whichever tile is centred meanwhile (CARD-39).
-const pendingSlotId = computed(() => {
-  if (joinMutation.isPending.value) return joinMutation.variables.value;
-  if (leaveMutation.isPending.value) return leaveMutation.variables.value;
-  return undefined;
-});
-
-const handleJoin = (slotId: number) => {
-  joinMutation.mutate(slotId, {
-    onSuccess: (data) => {
-      // A confirmed join flips the play view back to the match hub —
-      // the "you're in" moment. Pending approvals stay in browse mode.
-      if (data.status === "joined") returnToGame();
-    },
-  });
-};
-
-const handleLeave = (slotId: number) => {
-  leaveMutation.mutate(slotId);
-};
 </script>
 
 <style scoped>
