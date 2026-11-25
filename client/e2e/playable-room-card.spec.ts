@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 
-// Playable-room card: status pill, square slot picker, flat roster, hold-to-join.
+// Playable-room card: status pill, slot picker, flat roster, hold-to-join.
 //
 // Rendering states (big squads, long/unnamed players, pending, declined, a slot
 // far down the strip) don't exist in the shared live data, and creating them
@@ -116,7 +116,7 @@ const CROWDED_ROOMS = [
 ];
 FIXTURE.push(...CROWDED_ROOMS);
 
-// More icons than a phone's square tile can hold on one line (unknown names fall
+// More icons than a phone's tile can hold on one line (unknown names fall
 // back to a generic icon), to force the wrap the five known features never need.
 // Eight wrap to two rows at 320 and 375 and still fit the bigger 1280 tile.
 const OVERFLOWING = Array.from({ length: 8 }, (_, i) => `extra${i}`);
@@ -267,16 +267,14 @@ test.describe("stubbed states", () => {
     await expect(tiles(c).nth(10)).toHaveAccessibleName(/^16:00, 19 of 22 players, you're in$/);
     const geo = await strip(c).evaluate((el) => {
       const s = el.getBoundingClientRect();
-      const tile = el.children[10].getBoundingClientRect();
+      const tile = Array.from(el.querySelectorAll(".slot-tile"))[10].getBoundingClientRect();
       return { stripL: s.left, stripR: s.right, tileL: tile.left, tileR: tile.right,
-        off: (tile.left + tile.right) / 2 - (s.left + s.right) / 2,
-        scrollLeft: el.scrollLeft, max: el.scrollWidth - el.clientWidth };
+        off: (tile.left + tile.right) / 2 - (s.left + s.right) / 2 };
     });
     console.log("centre geometry", JSON.stringify(geo));
     expect(geo.tileL).toBeGreaterThanOrEqual(geo.stripL - 0.5);
     expect(geo.tileR).toBeLessThanOrEqual(geo.stripR + 0.5);
-    // Centred, unless the strip is already at its scroll end.
-    if (geo.scrollLeft < geo.max - 1) expect(Math.abs(geo.off)).toBeLessThan(8);
+    expect(Math.abs(geo.off)).toBeLessThan(8);
   });
 
   test("CARD-14: pending room lands on the pending slot; plain room lands on the first", async ({
@@ -293,8 +291,8 @@ test.describe("stubbed states", () => {
     const c = card(page, "QA Far Joined");
     const found = await strip(c).evaluate((el) => {
       const cs = (node: Element) => getComputedStyle(node);
-      const current = el.children[10] as HTMLElement;
-      const neighbour = el.children[9] as HTMLElement;
+      const current = el.querySelectorAll<HTMLElement>(".slot-tile")[10];
+      const neighbour = el.querySelectorAll<HTMLElement>(".slot-tile")[9];
       const dot = current.querySelector("span.absolute") as HTMLElement | null;
       return {
         currentBg: cs(current).backgroundColor,
@@ -360,7 +358,7 @@ test.describe("stubbed states", () => {
     }
   });
 
-  test("CARD-10: tiles are perfect squares, centred vertically, at 320, 375 and 1280 wide", async ({ page }) => {
+  test("CARD-10: a tile is 86% of the carousel wide and fills its height, at 320, 375 and 1280 wide", async ({ page }) => {
     for (const width of [320, 375, 1280]) {
       await page.setViewportSize({ width, height: 800 });
       await page.waitForTimeout(300);
@@ -373,31 +371,25 @@ test.describe("stubbed states", () => {
         return {
           content,
           stripW: el.clientWidth,
-          tiles: Array.from(el.children).map((t) => {
-            const r = t.getBoundingClientRect();
-            return {
-              w: (t as HTMLElement).offsetWidth,
-              h: (t as HTMLElement).offsetHeight,
-              dy: (r.top + r.bottom) / 2 - (s.top + s.bottom) / 2,
-            };
-          }),
+          tiles: Array.from(el.querySelectorAll<HTMLElement>(".slot-tile")).map((t) => ({
+            w: t.offsetWidth,
+            h: t.offsetHeight,
+            dy: (t.getBoundingClientRect().top + t.getBoundingClientRect().bottom) / 2 - (s.top + s.bottom) / 2,
+          })),
         };
       });
       for (const t of g.tiles) {
-        expect(Math.abs(t.w - t.h), `square at ${width}`).toBeLessThanOrEqual(1);
-        expect(Math.abs(t.dy), `centred vertically at ${width}`).toBeLessThanOrEqual(1);
-        // The smaller of 86% of the width and the picker's height.
-        expect(t.w, `side at ${width}`).toBeLessThanOrEqual(Math.floor(Math.min(g.stripW * 0.86, g.content)) + 1);
-        expect(t.w, `side at ${width}`).toBeGreaterThanOrEqual(Math.floor(Math.min(g.stripW * 0.86, g.content)) - 1);
+        expect(Math.abs(t.w - g.stripW * 0.86), `width at ${width}`).toBeLessThanOrEqual(1);
+        expect(Math.abs(t.h - g.content), `height at ${width}`).toBeLessThanOrEqual(1);
       }
     }
   });
 
-  test("CARD-10: the first and last squares centre, and a resize or rotation keeps the selected one centred", async ({ page }) => {
+  test("CARD-10: the first and last tiles centre, and a resize or rotation keeps the selected one centred", async ({ page }) => {
     const centredDx = (c: Locator, index: number) =>
       strip(c).evaluate((el, i) => {
         const s = el.getBoundingClientRect();
-        const r = el.children[i].getBoundingClientRect();
+        const r = el.querySelectorAll(".slot-tile")[i].getBoundingClientRect();
         return (r.left + r.right) / 2 - (s.left + s.right) / 2;
       }, index);
     const c = card(page, "QA Crowded");
@@ -427,10 +419,10 @@ test.describe("stubbed states", () => {
       const c = card(page, "QA Pending");
       await c.scrollIntoViewIfNeeded();
       const dims = await strip(c).evaluate((el) => ({
-        step: (el as HTMLElement).dataset.step,
+        tileSize: (el as HTMLElement).dataset.tileSize,
         stripScroll: el.scrollHeight,
         stripClient: el.clientHeight,
-        tiles: Array.from(el.children).map((t) => ({
+        tiles: Array.from(el.querySelectorAll(".slot-tile")).map((t) => ({
           scroll: t.scrollHeight,
           client: t.clientHeight,
         })),
@@ -472,8 +464,8 @@ test.describe("stubbed states", () => {
           const s = strip.getBoundingClientRect();
           return {
             card: Math.round(room.getBoundingClientRect().height),
-            step: room.dataset.headerStep,
-            tileStep: strip.dataset.step,
+            headerSize: room.dataset.headerSize,
+            tileSize: strip.dataset.tileSize,
             headerBottom: h.bottom,
             stripTop: s.top,
             stripBottom: s.bottom,
@@ -482,11 +474,10 @@ test.describe("stubbed states", () => {
             note: !!strip.parentElement!.querySelector(":scope > p"),
             headerClipped: header.scrollHeight - header.clientHeight,
             headerNatural: header.scrollHeight,
-            tilesClipped: Array.from(strip.children).some((t) => t.scrollHeight > t.clientHeight || t.scrollWidth > t.clientWidth),
-            squares: Array.from(strip.children).every((t) => Math.abs((t as HTMLElement).offsetWidth - (t as HTMLElement).offsetHeight) <= 1),
+            tilesClipped: Array.from(strip.querySelectorAll(".slot-tile")).some((t) => t.scrollHeight > t.clientHeight || t.scrollWidth > t.clientWidth),
             stripScrolls: strip.scrollHeight > strip.clientHeight,
             // Each tile's feature icons against its time text and its roster.
-            featureClashes: Array.from(strip.children).flatMap((tile, i) => {
+            featureClashes: Array.from(strip.querySelectorAll(".slot-tile")).flatMap((tile, i) => {
               const range = document.createRange();
               range.selectNodeContents(tile.querySelector("[data-time]")!);
               const text = range.getBoundingClientRect();
@@ -497,7 +488,7 @@ test.describe("stubbed states", () => {
                 ...(ch.bottom > roster.top ? [`tile ${i} chip over roster`] : []),
               ]);
             }),
-            timeDx: Array.from(strip.children).map((tile) => {
+            timeDx: Array.from(strip.querySelectorAll(".slot-tile")).map((tile) => {
               const range = document.createRange();
               range.selectNodeContents(tile.querySelector("[data-time]")!);
               const text = range.getBoundingClientRect();
@@ -508,15 +499,14 @@ test.describe("stubbed states", () => {
         });
         rows.push(`${width}x${height} ${name}: ${JSON.stringify(g)}`);
         console.log(rows[rows.length - 1]);
-        const at = `${name} at ${width}x${height} (card ${g.card}, ${g.step})`;
+        const at = `${name} at ${width}x${height} (card ${g.card}, ${g.headerSize})`;
         expect(g.headerBottom, `header over picker, ${at}`).toBeLessThanOrEqual(g.stripTop + 0.5);
         expect(g.stripBottom, `picker past the card's bottom padding, ${at}`).toBeLessThanOrEqual(g.bodyBottom + 0.5);
-        // The picker's floor (CARD-06) is the smallest square, 172px, plus the strip's 24px padding.
+        // The picker's floor (CARD-06) is the shortest tile, 172px, plus the strip's 24px padding.
         expect(g.stripHeight, `picker below its floor, ${at}`).toBeGreaterThanOrEqual(195);
-        // The steps are meant to make the header fit, so the clip is only a net.
+        // The header sizes are meant to make the header fit, so the clip is only a net.
         expect(g.headerClipped, `header clipped, ${at}`).toBeLessThanOrEqual(0);
         expect(g.tilesClipped, `tile clipped, ${at}`).toBe(false);
-        expect(g.squares, `tile not square, ${at}`).toBe(true);
         expect(g.stripScrolls, `strip scrolls, ${at}`).toBe(false);
         expect(g.featureClashes, `features clash, ${at}`).toEqual([]);
         expect(Math.max(...g.timeDx), `time off-centre, ${at}`).toBeLessThanOrEqual(2);
@@ -690,14 +680,14 @@ test.describe("stubbed states", () => {
     }
   });
 
-  test("CARD-17: at the smallest square the icons are the same icons, still named, no special case", async ({ page }, info) => {
+  test("CARD-17: at the smallest tile the icons are the same icons, still named, no special case", async ({ page }, info) => {
     // 1280 wide has the smallest picker: the header is at its widest, and a
     // declined slot's note takes a line besides.
     await page.setViewportSize({ width: 1280, height: 480 });
     await page.waitForTimeout(300);
     const c = card(page, "QA Crowded Declined");
     await c.scrollIntoViewIfNeeded();
-    await expect(strip(c)).toHaveAttribute("data-step", "tight");
+    await expect(strip(c)).toHaveAttribute("data-tile-size", "tight");
     const tile = tiles(c).first();
     const g = await corner(tile);
     expect(g.labelsHidden).toBe(true);
@@ -750,6 +740,47 @@ test.describe("stubbed states", () => {
     expect(await currentIndex(c)).toBe(8);
   });
 
+  test("CARD-12: a horizontal wheel or trackpad scroll over the strip slides it and snaps on a tile; a vertical one is left to the deck", async ({ page, isMobile }) => {
+    test.skip(isMobile, "wheel is a desktop input");
+    const c = card(page, "QA Far Joined");
+    await expect(tiles(c).nth(10)).toHaveAttribute("aria-current", "true");
+    await page.waitForTimeout(400);
+    const box = (await strip(c).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, 120);
+    await page.waitForTimeout(500);
+    expect(await currentIndex(c), "a vertical wheel must not move the strip").toBe(10);
+    for (let i = 0; i < 8; i++) {
+      await page.mouse.wheel(-40, 0);
+      await page.waitForTimeout(16);
+    }
+    await expect.poll(() => currentIndex(c)).toBeLessThan(10);
+    await page.waitForTimeout(700);
+    const dx = await strip(c).evaluate((el) => {
+      const s = el.getBoundingClientRect();
+      const t = el.querySelector("[aria-current='true']")!.getBoundingClientRect();
+      return (t.left + t.right) / 2 - (s.left + s.right) / 2;
+    });
+    expect(Math.abs(dx), "snapped to a tile centre").toBeLessThanOrEqual(2);
+  });
+
+  test("CARD-12: a mouse drag on the strip slides it, and the drag's release isn't a tap", async ({ page, isMobile }) => {
+    test.skip(isMobile, "mouse drag is a desktop input");
+    const c = card(page, "QA Far Joined");
+    await expect(tiles(c).nth(10)).toHaveAttribute("aria-current", "true");
+    await page.waitForTimeout(400);
+    const box = (await strip(c).boundingBox())!;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width / 2, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, y, { steps: 10 });
+    await page.mouse.move(box.x + box.width / 2 + 260, y, { steps: 10 });
+    await page.mouse.up();
+    await expect.poll(() => currentIndex(c)).toBe(9);
+    // Released over the pressed tile's avatars or not, no player card opened.
+    await expect(page.locator("[data-player-details-card]")).toHaveCount(0);
+  });
+
   test("PROF-02/CARD-12: Tab only reaches the centred tile's avatars, so focus never scrolls the strip to another slot", async ({ page }) => {
     const c = card(page, "QA Far Joined");
     await expect(tiles(c).nth(10)).toHaveAttribute("aria-current", "true");
@@ -764,7 +795,7 @@ test.describe("stubbed states", () => {
         const tile = a?.closest(".slot-tile");
         return {
           inStrip: !!a && item.contains(a) && !!tile,
-          tile: tile ? Array.from(tile.parentElement!.children).indexOf(tile) : -1,
+          tile: tile ? Array.from(tile.closest("[role=group][aria-label='Time slots']")!.querySelectorAll(".slot-tile")).indexOf(tile) : -1,
         };
       });
       if (at.inStrip) seen.push(String(at.tile));
@@ -868,7 +899,12 @@ test.describe("touch", () => {
     page.evaluate(() => ({
       deck: document.querySelector(".deck-scroll")!.scrollTop,
       winX: window.scrollX,
-      strip: document.querySelector<HTMLElement>(".slot-strip")!.scrollLeft,
+      // The carousel moves by transform, so its position is the first tile's.
+      strip: Array.from(document.querySelectorAll("h2"))
+        .find((h) => h.textContent?.trim() === "QA Far Joined")!
+        .closest(".deck-item")!
+        .querySelector(".slot-tile")!
+        .getBoundingClientRect().left,
       // The closed drawer stays in the DOM (invisible), so its close button
       // proves nothing; the grab pill is only there while the drawer is shut.
       drawer: !document.querySelector('[aria-label="Open menu"]'),
@@ -886,8 +922,8 @@ test.describe("touch", () => {
     const left = await state(page);
     console.log("touch strip", JSON.stringify({ before, right, left }));
     expect(right.drawer, "drawer opened by a strip swipe").toBe(false);
-    expect(right.strip).toBeLessThan(before.strip);
-    expect(left.strip).toBeGreaterThan(right.strip);
+    expect(right.strip).toBeGreaterThan(before.strip);
+    expect(left.strip).toBeLessThan(right.strip);
     expect(left.deck).toBe(before.deck);
     expect(left.winX).toBe(0);
   });

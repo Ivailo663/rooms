@@ -71,7 +71,7 @@ onBeforeUnmount(() =>
   /* Caps the card (deck height - 3rem) near its content's natural height, so
      tall screens don't stretch it into empty space; the peek of the next card
      stays the same because it's measured from the deck, not the screen. */
-  max-height: 38rem;
+  /* max-height: 38rem; */
   scrollbar-width: none;
 }
 
@@ -89,7 +89,7 @@ onBeforeUnmount(() =>
   scroll-snap-align: start;
   height: calc(100% - 3rem);
   /* The least a card can be and still hold a tight header, the picker's floor
-     and a declined slot's note under it (338px, see headerStep). On a screen
+     and a declined slot's note under it (338px, see headerSize). On a screen
      shorter than that the card keeps this height and the deck scrolls to its
      bottom rather than the parts overlapping (CARD-06). */
   min-height: 21.25rem;

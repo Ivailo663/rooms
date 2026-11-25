@@ -29,6 +29,8 @@
     "@vueuse/core": "^14.1.0",
     "@vueuse/integrations": "^14.1.0",
     "axios": "^1.13.6",
+    "embla-carousel-vue": "^8.6.0",
+    "embla-carousel-wheel-gestures": "^8.1.0",
     "firebase": "^12.10.0",
     "pinia": "^3.0.4",
     "primevue": "^4.5.4",

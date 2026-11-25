@@ -1,22 +1,20 @@
 import { ref, toValue, watch, type MaybeRefOrGetter } from "vue";
-import { tryOnScopeDispose, useEventListener } from "@vueuse/core";
+import { tryOnScopeDispose } from "@vueuse/core";
 
 // Joining and leaving are a deliberate 1 s press, so a stray tap can't do
 // either and no confirm step is needed (CARD-33, CARD-34, CARD-35).
 export const HOLD_MS = 1000;
 // How long "Keep holding…" shows after a press was let go too early.
-export const HINT_MS = 1800;
-// A scroll container that moves further than this while pressed means the
-// finger is swiping, not holding. A smaller shift is the browser nudging the
-// strip as the pressed element takes focus.
-export const SCROLL_TOLERANCE_PX = 8;
+export const RELEASED_EARLY_MS = 1800;
+// A pointer that travels further sideways than this while pressed is swiping,
+// not holding. Kept under Embla's 10px drag threshold, so the hold is dropped
+// before the strip starts to move.
+export const SWIPE_TOLERANCE_PX = 8;
 
 type Options = {
   onHold: () => void;
   // Presses are ignored while false, and a hold in progress is dropped.
   enabled?: MaybeRefOrGetter<boolean>;
-  // A horizontally scrolling ancestor; a swipe in it cancels the hold.
-  scrollEl?: MaybeRefOrGetter<HTMLElement | null | undefined>;
 };
 
 const isActivationKey = (event: KeyboardEvent) =>
@@ -32,19 +30,18 @@ const fromNestedControl = (event: Event) => {
   return nested !== null && nested !== event.currentTarget;
 };
 
-export const useHoldPress = ({ onHold, enabled = true, scrollEl }: Options) => {
+export const useHoldPress = ({ onHold, enabled = true }: Options) => {
   const holding = ref(false);
-  const hint = ref(false);
+  const releasedEarly = ref(false);
 
   let holdTimer: ReturnType<typeof setTimeout> | undefined;
-  let hintTimer: ReturnType<typeof setTimeout> | undefined;
-  let startLeft = 0;
+  let releasedEarlyTimer: ReturnType<typeof setTimeout> | undefined;
+  let startX = 0;
 
   const start = () => {
     if (holding.value || !toValue(enabled)) return;
-    startLeft = toValue(scrollEl)?.scrollLeft ?? 0;
     holding.value = true;
-    hint.value = false;
+    releasedEarly.value = false;
     holdTimer = setTimeout(() => {
       holding.value = false;
       holdTimer = undefined;
@@ -61,26 +58,17 @@ export const useHoldPress = ({ onHold, enabled = true, scrollEl }: Options) => {
   };
 
   // A release while the hold is still running is a tap or a short press:
-  // nothing is sent, and the hint says what is needed instead.
+  // nothing is sent, and the line says what is needed instead.
   const release = () => {
     if (!holding.value) return;
     cancel();
-    hint.value = true;
-    clearTimeout(hintTimer);
-    hintTimer = setTimeout(() => (hint.value = false), HINT_MS);
+    releasedEarly.value = true;
+    clearTimeout(releasedEarlyTimer);
+    releasedEarlyTimer = setTimeout(
+      () => (releasedEarly.value = false),
+      RELEASED_EARLY_MS
+    );
   };
-
-  useEventListener(
-    () => toValue(scrollEl),
-    "scroll",
-    () => {
-      const left = toValue(scrollEl)?.scrollLeft ?? 0;
-      if (holding.value && Math.abs(left - startLeft) > SCROLL_TOLERANCE_PX) {
-        cancel();
-      }
-    },
-    { passive: true }
-  );
 
   watch(
     () => toValue(enabled),
@@ -91,15 +79,24 @@ export const useHoldPress = ({ onHold, enabled = true, scrollEl }: Options) => {
 
   tryOnScopeDispose(() => {
     clearTimeout(holdTimer);
-    clearTimeout(hintTimer);
+    clearTimeout(releasedEarlyTimer);
   });
 
-  // Bound with v-on="handlers". Pointer-leave and blur cancel without the hint:
-  // the press didn't end, it was taken away.
+  // Bound with v-on="handlers". Pointer-leave and blur cancel without the
+  // early-release message: the press didn't end, it was taken away.
   const handlers = {
     pointerdown: (event: PointerEvent) => {
       if (event.button !== 0 || fromNestedControl(event)) return;
+      startX = event.clientX;
       start();
+    },
+    pointermove: (event: PointerEvent) => {
+      if (
+        holding.value &&
+        Math.abs(event.clientX - startX) > SWIPE_TOLERANCE_PX
+      ) {
+        cancel();
+      }
     },
     pointerup: release,
     pointercancel: cancel,
@@ -127,5 +124,5 @@ export const useHoldPress = ({ onHold, enabled = true, scrollEl }: Options) => {
     },
   };
 
-  return { holding, hint, handlers };
+  return { holding, releasedEarly, handlers };
 };

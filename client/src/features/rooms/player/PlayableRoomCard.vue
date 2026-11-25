@@ -8,7 +8,7 @@
     <div
       ref="cardEl"
       class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-white/50 transition-shadow"
-      :data-header-step="step"
+      :data-header-size="headerSize"
       :class="
         hasJoinedSlot
           ? 'room-card--joined border-emerald-200'
@@ -48,9 +48,9 @@
           </span>
 
           <p
-            v-if="room.description && step !== 'tight'"
+            v-if="room.description && headerSize !== 'tight'"
             class="!mb-0 !mt-2 text-sm text-surface-600"
-            :class="step === 'compact' ? 'line-clamp-1' : 'line-clamp-2'"
+            :class="headerSize === 'compact' ? 'line-clamp-1' : 'line-clamp-2'"
           >
             {{ room.description }}
           </p>
@@ -65,16 +65,16 @@
             class="relative flex flex-1 flex-col"
             :style="{ minHeight: `${pickerFloor}px` }"
           >
-            <SlotCarousel
+            <TimeCarousel
               class="relative min-h-0 flex-1"
               :timeslots="room.timeslots"
               :markers="slotMarkers"
               :initial-index="initialSlotIndex"
               :current-user-id="currentUserId"
-              :action="selectedSlot ? tileAction : undefined"
-              :pending="actionPending"
-              :price="price"
-              @select="handleSlotSelect"
+              :actions="actionBySlotId"
+              :pending-slot-id="pendingSlotId"
+              @choose-slot="handleChooseSlot"
+              @center-slot="handleCenterSlot"
               @join="handleJoin"
               @leave="handleLeave"
             />
@@ -88,7 +88,7 @@
               v-else-if="showMessage"
               class="!mb-0 !mt-1 shrink-0 text-sm italic text-surface-400 line-clamp-1"
             >
-              "{{ selectedSlot?.message }}"
+              "{{ chosenSlot?.message }}"
             </p> -->
           </div>
         </template>
@@ -120,18 +120,15 @@ import { useNow } from "../composables/useNow";
 import {
   getSlotJoinability,
   getSlotLeavability,
-  type Joinability,
-  type Leavability,
 } from "../composables/slotJoinability";
 import { useAuthStore } from "@/stores/auth";
 import type { PlayableRoomResponse } from "@football/shared";
-import { headerStep } from "../composables/headerStep";
-import { PICKER_FLOOR, PICKER_NOTE } from "../composables/slotTileStep";
+import { headerSizeFor } from "../composables/headerSize";
+import { PICKER_FLOOR, PICKER_NOTE } from "../composables/tileSize";
+import type { TileAction } from "../composables/tileBottomText";
 import CardStatusPill from "../components/CardStatusPill.vue";
-import SlotCarousel, {
-  type SlotMarker,
-  type TileAction,
-} from "./SlotCarousel.vue";
+import TimeCarousel from "./TimeCarousel.vue";
+import type { SlotMarker } from "./TimeTile.vue";
 
 type Slot = PlayableRoomResponse["timeslots"][number];
 
@@ -159,22 +156,34 @@ const heldSlots = computed(() =>
 // its floor.
 const cardEl = ref<HTMLElement | null>(null);
 const { height: cardHeight } = useElementSize(cardEl);
-const step = computed(() => headerStep(cardHeight.value));
+const headerSize = computed(() => headerSizeFor(cardHeight.value));
 
-const selectedIndex = ref(0);
+// Two indices, on purpose. chosenSlotIndex changes only once the strip settles
+// and drives what should not flicker mid-swipe (the slot message, the pill).
+// centeredSlotIndex follows the finger and drives what must match the tile on
+// screen right now (the denial note, CARD-38).
+const chosenSlotIndex = ref(0);
+const centeredSlotIndex = ref(0);
 
 const hasSlots = computed(() => props.room.timeslots.length > 0);
 
-const selectedSlot = computed<Slot | undefined>(
-  () => props.room.timeslots[selectedIndex.value]
+const chosenSlot = computed<Slot | undefined>(
+  () => props.room.timeslots[chosenSlotIndex.value]
 );
 
 const showMessage = computed(
-  () => !!selectedSlot.value?.message && step.value !== "tight"
+  () => !!chosenSlot.value?.message && headerSize.value !== "tight"
+);
+
+const centeredSlot = computed<Slot | undefined>(
+  () => props.room.timeslots[centeredSlotIndex.value]
 );
 
 const showDenial = computed(
-  () => tileAction.value.state === "declined" && !!props.room.deniedMessage
+  () =>
+    !!centeredSlot.value &&
+    actionBySlotId.value[centeredSlot.value.id]?.state === "declined" &&
+    !!props.room.deniedMessage
 );
 
 // Either note takes a line under the strip, so the picker's floor grows by it.
@@ -183,17 +192,13 @@ const pickerFloor = computed(
   () => PICKER_FLOOR + (hasNote.value ? PICKER_NOTE : 0)
 );
 
-const handleSlotSelect = (index: number) => {
-  selectedIndex.value = index;
+const handleChooseSlot = (index: number) => {
+  chosenSlotIndex.value = index;
 };
 
-const isCurrentUserInSlot = computed(() => {
-  const slot = selectedSlot.value;
-  if (!slot) return false;
-  const userId = currentUserId.value;
-  if (userId === undefined) return false;
-  return slot.players.some((p) => p.id === userId);
-});
+const handleCenterSlot = (index: number) => {
+  centeredSlotIndex.value = index;
+};
 
 // Membership badges per slot id, driving the carousel markers and card pill.
 const slotMarkers = computed<Record<number, SlotMarker>>(() => {
@@ -230,60 +235,55 @@ const initialSlotIndex = computed(() => {
   return pending >= 0 ? pending : 0;
 });
 
-const isAwaitingApproval = computed(
-  () => selectedSlot.value?.requestStatusForCurrentUser === "pending"
-);
-
-// Denial lasts for the current occurrence only — the row (and this state)
-// resets when the slot ends and cycles back to scheduled.
-const isDeclined = computed(
-  () => selectedSlot.value?.requestStatusForCurrentUser === "denied"
-);
-
-// Joinability mirrors the server's gates, so the button reflects whether a
-// click would actually be accepted — no click-then-error.
-const joinability = computed<Joinability>(() => {
-  const slot = selectedSlot.value;
-  if (!slot) return { joinable: false };
-  return getSlotJoinability(slot, props.room, now.value, heldSlots.value);
-});
-
-// The mirror of joinability for a seat already taken: once the roster locks,
-// the slot stays visible for the rest of its hour but the exit is gone.
-const leavability = computed<Leavability>(() => {
-  const slot = selectedSlot.value;
-  if (!slot) return { canLeave: true };
-  return getSlotLeavability(slot, props.room.lateJoinCutoff, now.value);
-});
-
-// One state for the slot tile's action line: a seat held wins, then a request
-// in flight, then a denial, then the join gates.
-const tileAction = computed<TileAction>(() => {
-  if (isCurrentUserInSlot.value) {
-    const { canLeave, label, icon } = leavability.value;
-    return canLeave ? { state: "leave" } : { state: "status", label, icon };
+// One action per slot, so a tile shows its own line the moment it is centred
+// instead of the previous slot's until the strip settles (CARD-38). A seat held
+// wins, then a request in flight, then a denial, then the join gates, which
+// mirror the server's so a hold reflects what would actually be accepted. A
+// locked roster keeps the slot visible for its hour but removes the exit.
+// A denial lasts for the current occurrence only: the row resets when the slot
+// ends and cycles back to scheduled.
+const actionBySlotId = computed(() => {
+  const userId = currentUserId.value;
+  const actions: Record<number, TileAction> = {};
+  for (const slot of props.room.timeslots) {
+    if (userId !== undefined && slot.players.some((p) => p.id === userId)) {
+      const { canLeave, label, icon } = getSlotLeavability(
+        slot,
+        props.room.lateJoinCutoff,
+        now.value
+      );
+      actions[slot.id] = canLeave
+        ? { state: "leave" }
+        : { state: "cantLeave", label, icon };
+    } else if (slot.requestStatusForCurrentUser === "pending") {
+      actions[slot.id] = { state: "awaiting" };
+    } else if (slot.requestStatusForCurrentUser === "denied") {
+      actions[slot.id] = { state: "declined" };
+    } else {
+      const { joinable, label, icon } = getSlotJoinability(
+        slot,
+        props.room,
+        now.value,
+        heldSlots.value
+      );
+      actions[slot.id] = joinable
+        ? { state: "join" }
+        : { state: "cantJoin", label, icon };
+    }
   }
-  if (isAwaitingApproval.value) return { state: "awaiting" };
-  if (isDeclined.value) return { state: "declined" };
-  const { joinable, label, icon } = joinability.value;
-  return joinable ? { state: "join" } : { state: "status", label, icon };
+  return actions;
 });
 
-const actionPending = computed(
-  () =>
-    (tileAction.value.state === "join" && joinMutation.isPending.value) ||
-    (tileAction.value.state === "leave" && leaveMutation.isPending.value)
-);
-
-const price = computed(() => {
-  const slot = selectedSlot.value;
-  if (!slot) return "";
-  return slot.price ? `${slot.price}€` : "";
+// The slot whose join or leave is in flight, from the mutation's own variables
+// so it can't drift to whichever tile is centred meanwhile (CARD-39).
+const pendingSlotId = computed(() => {
+  if (joinMutation.isPending.value) return joinMutation.variables.value;
+  if (leaveMutation.isPending.value) return leaveMutation.variables.value;
+  return undefined;
 });
 
-const handleJoin = () => {
-  if (!selectedSlot.value) return;
-  joinMutation.mutate(selectedSlot.value.id, {
+const handleJoin = (slotId: number) => {
+  joinMutation.mutate(slotId, {
     onSuccess: (data) => {
       // A confirmed join flips the play view back to the match hub —
       // the "you're in" moment. Pending approvals stay in browse mode.
@@ -292,8 +292,8 @@ const handleJoin = () => {
   });
 };
 
-const handleLeave = () => {
-  if (selectedSlot.value) leaveMutation.mutate(selectedSlot.value.id);
+const handleLeave = (slotId: number) => {
+  leaveMutation.mutate(slotId);
 };
 </script>
 
