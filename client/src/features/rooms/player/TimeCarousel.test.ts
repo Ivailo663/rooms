@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { nextTick, ref } from "vue";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
 
 // jsdom does no layout, so the strip's size is whatever the test says.
@@ -17,20 +17,42 @@ vi.mock(
 vi.mock("@/features/profile/api", () => ({
   getPlayer: () => new Promise(() => {}),
 }));
+vi.mock("@/stores/auth", () => ({ useAuthStore: () => ({ user: { id: 1 } }) }));
+// The server calls a tile makes. A join or leave never settles unless a test
+// says so, which is what "in flight" looks like.
+const { joinTimeslot, leaveTimeslot, returnToGame } = vi.hoisted(() => ({
+  joinTimeslot: vi.fn(),
+  leaveTimeslot: vi.fn(),
+  returnToGame: vi.fn(),
+}));
+vi.mock("../api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api")>()),
+  getJoinedSlots: () => Promise.resolve([]),
+  joinTimeslot,
+  leaveTimeslot,
+}));
+vi.mock("../composables/useGameMode", () => ({ returnToGame }));
 
 import TimeCarousel from "./TimeCarousel.vue";
 import { fakeEmbla } from "./__tests__/fakeEmbla";
-import type { TileAction } from "../composables/tileBottomText";
 
+// Other players, never the signed-in user (id 1).
 const players = (n: number) =>
-  Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `Player ${i + 1}` }));
+  Array.from({ length: n }, (_, i) => ({
+    id: 101 + i,
+    name: `Player ${i + 1}`,
+  }));
 
+const me = { id: 1, name: "Me" };
+
+// A slot nobody has blocked: far from today, so the join gates stay open.
 const slot = (
   id: number,
   taken: number,
   max: number,
   features: unknown = [],
   price: number | null = null,
+  extra: object = {},
 ) => ({
   id,
   label: `${10 + id}:00`,
@@ -38,18 +60,29 @@ const slot = (
   players: players(taken),
   features,
   price,
+  day: "never",
+  start_time: 600,
+  status: "scheduled",
+  requestStatusForCurrentUser: null,
+  ...extra,
 });
 
 type Props = InstanceType<typeof TimeCarousel>["$props"];
 
 let wrapper: VueWrapper | undefined;
-const mountStrip = (timeslots: unknown[], props: Partial<Props> = {}) => {
+const mountStrip = (
+  timeslots: unknown[],
+  props: Partial<Props> = {},
+  queryClient = new QueryClient(),
+) => {
   wrapper = mount(TimeCarousel, {
-    props: { timeslots, ...props } as Props,
+    props: {
+      timeslots,
+      rules: { lateJoinCutoff: 0, allowJoinOnLive: false },
+      ...props,
+    } as Props,
     attachTo: document.body,
-    global: {
-      plugins: [[VueQueryPlugin, { queryClient: new QueryClient() }]],
-    },
+    global: { plugins: [[VueQueryPlugin, { queryClient }]] },
   });
   return wrapper;
 };
@@ -67,6 +100,9 @@ beforeEach(() => {
   stripWidth.value = 0;
   stripHeight.value = 0;
   fakeEmbla.reset();
+  joinTimeslot.mockReset().mockReturnValue(new Promise(() => {}));
+  leaveTimeslot.mockReset().mockReturnValue(new Promise(() => {}));
+  returnToGame.mockReset();
 });
 
 afterEach(() => {
@@ -191,7 +227,7 @@ describe("TimeCarousel tiles", () => {
 });
 
 describe("TimeCarousel tile sizes", () => {
-  const buttons = (w: VueWrapper) => tiles(w)[0]!.findAll("button");
+  const buttons = (w: VueWrapper) => tiles(w)[0]!.findAll("ul button");
 
   it("CARD-17: with room, every avatar shows at full size", () => {
     setSide(240);
@@ -242,7 +278,7 @@ describe("TimeCarousel keyboard", () => {
     const w = mountStrip([slot(1, 2, 10), slot(2, 2, 10), slot(3, 2, 10)]);
     const tabindexes = (i: number) => {
       const tile = tiles(w)[i]!;
-      return tile.findAll("button").map((b) => b.attributes("tabindex"));
+      return tile.findAll("ul button").map((b) => b.attributes("tabindex"));
     };
     expect(tabindexes(0)).toEqual([undefined, undefined]);
     expect(tabindexes(1)).toEqual(["-1", "-1"]);
@@ -349,12 +385,21 @@ describe("TimeCarousel slot action", () => {
     el.dispatchEvent(new MouseEvent(type, { button: 0, bubbles: true }));
     await nextTick();
   };
+  // Query state settles on a timer, which these tests have faked.
+  const settle = async () => {
+    await vi.advanceTimersByTimeAsync(0);
+    await nextTick();
+  };
+  const hold = async (w: VueWrapper) => {
+    await fire(press(w).element, "pointerdown");
+    vi.advanceTimersByTime(1000);
+    await settle();
+  };
 
-  // The same action for slots 1 and 2, the ids these tests use.
-  const same = (action: TileAction): Record<number, TileAction> => ({
-    1: action,
-    2: action,
-  });
+  // Slots whose action is join, leave and "full" for the signed-in user.
+  const joinable = (price: number | null = null) => slot(1, 1, 10, [], price);
+  const mine = () => slot(1, 1, 10, [], null, { players: [me] });
+  const full = () => slot(1, 10, 10);
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -364,58 +409,50 @@ describe("TimeCarousel slot action", () => {
   });
 
   it("CARD-31: the centred tile's last line says Hold to join, with the price only when there is one", () => {
-    const priced = mountStrip([slot(1, 1, 10, [], 6)], {
-      actions: same({ state: "join" }),
-    });
+    const priced = mountStrip([joinable(6)]);
     expect(line(priced).text()).toBe("Hold to join · 6€");
     priced.unmount();
 
-    const free = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "join" }),
-    });
+    const free = mountStrip([joinable()]);
     expect(line(free).text()).toBe("Hold to join");
     expect(line(free).text()).not.toContain("·");
   });
 
   it("CARD-31: leaving reads Hold to leave in red, and never shows the price", () => {
-    const w = mountStrip([slot(1, 1, 10, [], 6)], {
-      actions: same({ state: "leave" }),
-    });
+    const w = mountStrip([{ ...mine(), price: 6 }]);
     expect(line(w).text()).toBe("Hold to leave");
     expect(line(w).attributes("data-tone")).toBe("leave");
   });
 
   it("CARD-31: only an actionable line shimmers", () => {
-    const w = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "join" }),
-    });
+    const w = mountStrip([joinable()]);
     expect(line(w).find(".slot-shimmer").exists()).toBe(true);
-    const status = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "cantLeave", label: "Roster locked" }),
-    });
+    const status = mountStrip([full()]);
     expect(line(status).find(".slot-shimmer").exists()).toBe(false);
   });
 
   it("CARD-31: side tiles keep the line's space but hide it", () => {
-    const w = mountStrip([slot(1, 1, 10), slot(2, 1, 10)], {
-      actions: same({ state: "join" }),
-    });
+    const w = mountStrip([joinable(), { ...joinable(), id: 2 }]);
     expect(line(w, 0).classes()).not.toContain("invisible");
     expect(line(w, 1).classes()).toContain("invisible");
   });
 
   it("CARD-32: awaiting, declined and blocked states are text with an icon, and the tile isn't pressable", () => {
     const cases = [
-      [{ state: "awaiting" }, "Awaiting approval", "fa-user-clock"],
-      [{ state: "declined" }, "Not accepted", "fa-circle-xmark"],
       [
-        { state: "cantLeave", label: "Roster locked", icon: "fa-lock" },
-        "Roster locked",
-        "fa-lock",
+        slot(1, 1, 10, [], null, { requestStatusForCurrentUser: "pending" }),
+        "Awaiting approval",
+        "fa-user-clock",
       ],
+      [
+        slot(1, 1, 10, [], null, { requestStatusForCurrentUser: "denied" }),
+        "Not accepted",
+        "fa-circle-xmark",
+      ],
+      [full(), "Game is full", "fa-users-slash"],
     ] as const;
-    for (const [action, text, icon] of cases) {
-      const w = mountStrip([slot(1, 1, 10)], { actions: same(action) });
+    for (const [timeslot, text, icon] of cases) {
+      const w = mountStrip([timeslot]);
       expect(line(w).text()).toBe(text);
       expect(line(w).find(`i.${icon}`).exists()).toBe(true);
       expect(press(w).exists()).toBe(false);
@@ -424,17 +461,13 @@ describe("TimeCarousel slot action", () => {
     }
   });
 
-  it("CARD-32: a status line has no price even on a joinable-looking slot", () => {
-    const w = mountStrip([slot(1, 1, 10, [], 6)], {
-      actions: same({ state: "cantJoin", label: "Game is full" }),
-    });
+  it("CARD-32: a status line has no price even on a priced slot", () => {
+    const w = mountStrip([{ ...full(), price: 6 }]);
     expect(line(w).text()).toBe("Game is full");
   });
 
   it("CARD-12: the tile stays a plain group; the hold is one button laid over the centred tile only", () => {
-    const w = mountStrip([slot(1, 1, 10), slot(2, 1, 10)], {
-      actions: same({ state: "join" }),
-    });
+    const w = mountStrip([joinable(), { ...joinable(), id: 2 }]);
     for (const tile of tiles(w)) {
       expect(tile.attributes("role")).toBe("group");
       expect(tile.attributes("tabindex")).toBeUndefined();
@@ -446,9 +479,7 @@ describe("TimeCarousel slot action", () => {
   });
 
   it("CARD-34: the button says how to join or leave, and the tile's own name doesn't repeat it", () => {
-    const join = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "join" }),
-    });
+    const join = mountStrip([joinable()]);
     expect(press(join).attributes("aria-label")).toBe(
       "Press and hold for one second to join",
     );
@@ -456,18 +487,14 @@ describe("TimeCarousel slot action", () => {
       "11:00, 1 of 10 players",
     );
     join.unmount();
-    const leave = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "leave" }),
-    });
+    const leave = mountStrip([mine()]);
     expect(press(leave).attributes("aria-label")).toBe(
       "Press and hold for one second to leave",
     );
   });
 
-  it("CARD-33: holding the tile for 1s emits join once; the visible line is hidden from assistive tech", async () => {
-    const w = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "join" }),
-    });
+  it("CARD-33: holding the tile for 1s joins its slot once; the visible line is hidden from assistive tech", async () => {
+    const w = mountStrip([joinable()]);
     expect(line(w).attributes("aria-hidden")).toBe("true");
     const before = tiles(w)[0]!.attributes("style");
     await fire(press(w).element, "pointerdown");
@@ -476,26 +503,42 @@ describe("TimeCarousel slot action", () => {
     expect(tiles(w)[0]!.attributes("style")).toBe(before);
     expect(w.find(".slot-hold-fill").exists()).toBe(true);
     vi.advanceTimersByTime(999);
-    expect(w.emitted("join")).toBeUndefined();
+    expect(joinTimeslot).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
-    expect(w.emitted("join")).toHaveLength(1);
-    expect(w.emitted("leave")).toBeUndefined();
+    await settle();
+    expect(joinTimeslot).toHaveBeenCalledTimes(1);
+    expect(joinTimeslot.mock.calls[0]![0]).toBe(1);
+    expect(leaveTimeslot).not.toHaveBeenCalled();
   });
 
-  it("CARD-34: holding the tile for 1s emits leave", async () => {
-    const w = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "leave" }),
-    });
-    await fire(press(w).element, "pointerdown");
-    vi.advanceTimersByTime(1000);
-    expect(w.emitted("leave")).toHaveLength(1);
-    expect(w.emitted("join")).toBeUndefined();
+  it("CARD-34: holding the tile for 1s leaves its slot", async () => {
+    const w = mountStrip([mine()]);
+    await hold(w);
+    expect(leaveTimeslot).toHaveBeenCalledTimes(1);
+    expect(leaveTimeslot.mock.calls[0]![0]).toBe(1);
+    expect(joinTimeslot).not.toHaveBeenCalled();
+  });
+
+  it("CARD-33: a confirmed join returns to the match hub, a request waiting for approval stays", async () => {
+    joinTimeslot.mockResolvedValueOnce({ status: "pending" });
+    const asked = mountStrip([joinable()]);
+    await hold(asked);
+    await flushPromises();
+    await settle();
+    expect(joinTimeslot).toHaveBeenCalledTimes(1);
+    expect(returnToGame).not.toHaveBeenCalled();
+    asked.unmount();
+
+    joinTimeslot.mockResolvedValueOnce({ status: "joined" });
+    const joined = mountStrip([joinable()]);
+    await hold(joined);
+    await flushPromises();
+    await settle();
+    expect(returnToGame).toHaveBeenCalledTimes(1);
   });
 
   it("CARD-33: letting go early cancels, shows Keep holding for a moment, and sends nothing", async () => {
-    const w = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "join" }),
-    });
+    const w = mountStrip([joinable()]);
     await fire(press(w).element, "pointerdown");
     vi.advanceTimersByTime(400);
     await fire(press(w).element, "pointerup");
@@ -503,66 +546,58 @@ describe("TimeCarousel slot action", () => {
     expect(w.get('[role="status"]').text()).toBe("Keep holding…");
     vi.advanceTimersByTime(3000);
     await nextTick();
-    expect(w.emitted("join")).toBeUndefined();
+    expect(joinTimeslot).not.toHaveBeenCalled();
     expect(line(w).text()).toBe("Hold to join");
   });
 
-  it("CARD-33: while in flight the line is a spinner and Joining…, and the tile can't be held", async () => {
-    const w = mountStrip([slot(1, 1, 10, [], 6)], {
-      actions: same({ state: "join" }),
-      pendingSlotId: 1,
-    });
+  it("CARD-33: while in flight the line is a spinner and Joining…, and the tile can't be held again", async () => {
+    const w = mountStrip([joinable(6)]);
+    await hold(w);
     expect(line(w).text()).toBe("Joining…");
     expect(line(w).find("i.fa-spinner").exists()).toBe(true);
     expect(press(w).attributes("aria-disabled")).toBe("true");
     await fire(press(w).element, "pointerdown");
     vi.advanceTimersByTime(2000);
-    expect(w.emitted("join")).toBeUndefined();
+    await settle();
+    expect(joinTimeslot).toHaveBeenCalledTimes(1);
   });
 
-  it("CARD-34: Leaving… shows while a leave is in flight", () => {
-    const w = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "leave" }),
-      pendingSlotId: 1,
-    });
+  it("CARD-34: Leaving… shows while a leave is in flight", async () => {
+    const w = mountStrip([mine()]);
+    await hold(w);
     expect(line(w).text()).toBe("Leaving…");
   });
 
   it("CARD-34: holding Enter on the focused tile works, and no context menu opens", async () => {
-    const w = mountStrip([slot(1, 1, 10)], {
-      actions: same({ state: "join" }),
-    });
-    await press(w).trigger("keydown", { key: "Enter" });
-    vi.advanceTimersByTime(1000);
-    expect(w.emitted("join")).toHaveLength(1);
-
+    const w = mountStrip([joinable()]);
     const menu = new Event("contextmenu", { cancelable: true, bubbles: true });
     press(w).element.dispatchEvent(menu);
     expect(menu.defaultPrevented).toBe(true);
+
+    await press(w).trigger("keydown", { key: "Enter" });
+    vi.advanceTimersByTime(1000);
+    await settle();
+    expect(joinTimeslot).toHaveBeenCalledTimes(1);
   });
 
   it("CARD-12: a press on an avatar doesn't start a hold", async () => {
-    const w = mountStrip([slot(1, 2, 10)], {
-      actions: same({ state: "join" }),
-    });
+    const w = mountStrip([slot(1, 2, 10)]);
     const avatar = tiles(w)[0]!.find("ul button");
     await fire(avatar.element, "pointerdown");
     expect(tiles(w)[0]!.classes()).not.toContain("slot-tile--holding");
     vi.advanceTimersByTime(2000);
-    expect(w.emitted("join")).toBeUndefined();
+    expect(joinTimeslot).not.toHaveBeenCalled();
   });
 
   it("CARD-12: a tap on the centred tile does nothing, a tap on a neighbour slides it in", async () => {
-    const w = mountStrip([slot(1, 1, 10), slot(2, 1, 10)], {
-      actions: same({ state: "join" }),
-    });
+    const w = mountStrip([joinable(), { ...joinable(), id: 2 }]);
     await nextTick();
     const { scrollTo } = fakeEmbla.api;
     await tiles(w)[0]!.trigger("click");
     expect(scrollTo).not.toHaveBeenCalled();
     await tiles(w)[1]!.trigger("click");
     expect(scrollTo).toHaveBeenCalledWith(1, false);
-    expect(w.emitted("join")).toBeUndefined();
+    expect(joinTimeslot).not.toHaveBeenCalled();
   });
 });
 
@@ -612,21 +647,25 @@ describe("TimeCarousel swipe", () => {
   const line = (w: VueWrapper, index: number) =>
     tiles(w)[index]!.find(".slot-hint");
   const press = (w: VueWrapper) => w.find(".slot-press");
+  const fire = async (el: Element, type: string) => {
+    el.dispatchEvent(new MouseEvent(type, { button: 0, bubbles: true }));
+    await nextTick();
+  };
   // The strip moves to a slide mid-swipe: its position changes, nothing settles.
   const swipeTo = async (index: number) => {
     fakeEmbla.swipeTo(index);
     await nextTick();
   };
 
-  const actions: Record<number, TileAction> = {
-    1: { state: "join" },
-    2: { state: "leave" },
-    3: { state: "cantJoin", label: "Game is full" },
-  };
-  const three = [slot(1, 1, 10), slot(2, 1, 10), slot(3, 10, 10)];
+  // Join, leave and "Game is full", in that order.
+  const three = [
+    slot(1, 1, 10),
+    slot(2, 1, 10, [], null, { players: [me] }),
+    slot(3, 10, 10),
+  ];
 
   it("CARD-14: the strip starts on the initial slot, which is both chosen and centred", async () => {
-    const w = mountStrip(three, { actions, initialIndex: 2 });
+    const w = mountStrip(three, { initialIndex: 2 });
     await nextTick();
     expect(fakeEmbla.options).toMatchObject({ startIndex: 2 });
     expect(w.emitted("chooseSlot")).toEqual([[2]]);
@@ -641,7 +680,7 @@ describe("TimeCarousel swipe", () => {
   });
 
   it("CARD-10: neighbours shrink and fade in step with the scroll position, the centred tile doesn't", async () => {
-    const w = mountStrip(three, { actions });
+    const w = mountStrip(three);
     await nextTick();
     const scaleOf = (i: number) =>
       parseFloat(
@@ -664,7 +703,7 @@ describe("TimeCarousel swipe", () => {
   });
 
   it("CARD-38: the tile that becomes centred shows its own line at once, before the strip settles", async () => {
-    const w = mountStrip(three, { actions });
+    const w = mountStrip(three);
     await nextTick();
     expect(line(w, 0).classes()).not.toContain("invisible");
     expect(line(w, 0).text()).toBe("Hold to join");
@@ -682,7 +721,7 @@ describe("TimeCarousel swipe", () => {
   });
 
   it("CARD-38: the strip reports the centred slot as it moves, apart from the settled one", async () => {
-    const w = mountStrip(three, { actions });
+    const w = mountStrip(three);
     await nextTick();
     await swipeTo(2);
     expect(w.emitted("centerSlot")?.at(-1)).toEqual([2]);
@@ -692,7 +731,7 @@ describe("TimeCarousel swipe", () => {
   });
 
   it("CARD-38: settling on the slot already chosen announces nothing", async () => {
-    const w = mountStrip(three, { actions });
+    const w = mountStrip(three);
     await nextTick();
     await swipeTo(1);
     fakeEmbla.settleOn(0);
@@ -701,10 +740,11 @@ describe("TimeCarousel swipe", () => {
 
   it("CARD-39: only the slot in flight shows the spinner; another centred tile shows its own line and can't be held", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const w = mountStrip([slot(1, 1, 10), slot(2, 1, 10)], {
-      actions: { 1: { state: "join" }, 2: { state: "join" } },
-      pendingSlotId: 1,
-    });
+    const w = mountStrip([slot(1, 1, 10), slot(2, 1, 10)]);
+    await nextTick();
+    await fire(press(w).element, "pointerdown");
+    vi.advanceTimersByTime(1000);
+    await vi.advanceTimersByTimeAsync(0);
     await nextTick();
     expect(line(w, 0).text()).toBe("Joining…");
 
@@ -713,32 +753,60 @@ describe("TimeCarousel swipe", () => {
     expect(line(w, 1).find("i.fa-spinner").exists()).toBe(false);
     expect(line(w, 1).find(".slot-shimmer").exists()).toBe(false);
     expect(press(w).attributes("aria-disabled")).toBe("true");
-    press(w).element.dispatchEvent(
-      new MouseEvent("pointerdown", { button: 0, bubbles: true }),
-    );
-    await nextTick();
+    await fire(press(w).element, "pointerdown");
     vi.advanceTimersByTime(2000);
-    expect(w.emitted("join")).toBeUndefined();
+    expect(joinTimeslot).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
 
-  it("CARD-39: a hold emits the slot's own id", async () => {
+  it("CARD-39: a join in flight on one card blocks holding on another", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const w = mountStrip(three, { actions });
+    const queryClient = new QueryClient();
+    const first = mountStrip([slot(1, 1, 10)], {}, queryClient);
+    const second = mount(TimeCarousel, {
+      props: {
+        timeslots: [slot(2, 1, 10)],
+        rules: { lateJoinCutoff: 0, allowJoinOnLive: false },
+      } as Props,
+      attachTo: document.body,
+      global: { plugins: [[VueQueryPlugin, { queryClient }]] },
+    });
+    await nextTick();
+    expect(
+      second.find(".slot-press").attributes("aria-disabled"),
+    ).toBeUndefined();
+
+    await fire(first.find(".slot-press").element, "pointerdown");
+    vi.advanceTimersByTime(1000);
+    await vi.advanceTimersByTimeAsync(0);
+    await nextTick();
+
+    // The other card shows its own line and no spinner, but can't be held.
+    expect(line(second, 0).text()).toBe("Hold to join");
+    expect(line(second, 0).find("i.fa-spinner").exists()).toBe(false);
+    expect(second.find(".slot-press").attributes("aria-disabled")).toBe("true");
+    await fire(second.find(".slot-press").element, "pointerdown");
+    vi.advanceTimersByTime(2000);
+    expect(joinTimeslot).toHaveBeenCalledTimes(1);
+    second.unmount();
+    vi.useRealTimers();
+  });
+
+  it("CARD-39: a hold acts on the slot's own id", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const w = mountStrip(three);
     await nextTick();
     await swipeTo(1);
-    press(w).element.dispatchEvent(
-      new MouseEvent("pointerdown", { button: 0, bubbles: true }),
-    );
-    await nextTick();
+    await fire(press(w).element, "pointerdown");
     vi.advanceTimersByTime(1000);
-    expect(w.emitted("leave")).toEqual([[2]]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(leaveTimeslot.mock.calls[0]![0]).toBe(2);
     vi.useRealTimers();
   });
 
   it("CARD-33: a sideways drag of more than 8px on the tile cancels the hold", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const w = mountStrip(three, { actions });
+    const w = mountStrip(three);
     await nextTick();
     const el = press(w).element;
     const fire = async (type: string, clientX: number) => {
@@ -750,7 +818,7 @@ describe("TimeCarousel swipe", () => {
     await fire("pointerdown", 100);
     await fire("pointermove", 80);
     vi.advanceTimersByTime(2000);
-    expect(w.emitted("join")).toBeUndefined();
+    expect(joinTimeslot).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 });

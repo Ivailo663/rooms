@@ -100,7 +100,6 @@
          is the hold's own label the button already carries it, so it is hidden
          from assistive tech here. -->
     <span
-      v-if="action"
       class="slot-hint relative flex shrink-0 items-center justify-center !gap-1.5 whitespace-nowrap font-medium"
       :class="[
         tileSizeClasses.bottomGap,
@@ -160,11 +159,21 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useIsMutating } from "@tanstack/vue-query";
 import type { PlayableRoomResponse } from "@football/shared";
+import { useAuthStore } from "@/stores/auth";
+import {
+  SLOT_MEMBERSHIP_KEY,
+  useGetJoinedSlots,
+  useJoinTimeslot,
+  useLeaveTimeslot,
+} from "../composables/queries";
+import { returnToGame } from "../composables/useGameMode";
+import { useNow } from "../composables/useNow";
 import { AVATAR_SIZE, avatarCap, type TileSize } from "../composables/tileSize";
 import { featureIconMap, slotFeatures } from "../composables/featureIcons";
 import { useHoldPress } from "../composables/useHoldPress";
-import { tileBottomText, type TileAction } from "../composables/tileBottomText";
+import { getSlotAction, tileBottomText } from "../composables/tileBottomText";
 import {
   spotsLeftLabel,
   spotsLeftTone,
@@ -229,18 +238,44 @@ const props = defineProps<{
   // The slot the card is showing (aria-current).
   chosen: boolean;
   marker?: SlotMarker;
-  // Puts the current user first, in emerald, in the avatar row.
-  currentUserId?: number;
-  // What holding the tile does, or why it does nothing (CARD-31, CARD-32).
-  // Without it the tile shows no bottom line at all.
-  action?: TileAction;
-  // This tile's own join or leave is in flight: spinner and "Joining…".
-  pending?: boolean;
-  // Another tile's action is in flight: this one shows its own line but can't
-  // be held until that settles (CARD-39).
-  blocked?: boolean;
+  // The room's join rules, which decide what holding the tile does.
+  rules: Pick<PlayableRoomResponse, "lateJoinCutoff" | "allowJoinOnLive">;
 }>();
-const emit = defineEmits<{ join: []; leave: [] }>();
+
+const auth = useAuthStore();
+const now = useNow();
+const joinMutation = useJoinTimeslot();
+const leaveMutation = useLeaveTimeslot();
+
+const currentUserId = computed(() => auth.user?.id);
+
+// Cross-room, so the one-game-per-hour gate sees seats taken in other rooms.
+// Only confirmed seats clash; pending requests aren't commitments.
+const { data: joinedSlots } = useGetJoinedSlots();
+const heldSlots = computed(() =>
+  (joinedSlots.value ?? []).filter((slot) => slot.membership === "joined")
+);
+
+// What holding the tile does, or why it does nothing (CARD-31, CARD-32).
+const action = computed(() =>
+  getSlotAction(
+    props.timeslot,
+    props.rules,
+    now.value,
+    heldSlots.value,
+    currentUserId.value
+  )
+);
+
+// This tile's own join or leave is in flight: spinner and "Joining…".
+const pending = computed(
+  () => joinMutation.isPending.value || leaveMutation.isPending.value
+);
+
+// A join or leave in flight on any tile, on any card, blocks holding here until
+// it settles (CARD-39).
+const mutatingCount = useIsMutating({ mutationKey: SLOT_MEMBERSHIP_KEY });
+const blocked = computed(() => mutatingCount.value > 0 && !pending.value);
 
 const tileSizeClasses = computed(() => TILE_SIZE_CLASSES[props.tileSize]);
 const taken = computed(() => props.timeslot.players.length);
@@ -249,35 +284,44 @@ const features = computed(() => slotFeatures(props.timeslot.features));
 // What holding does: a join or leave is a 1 s hold on the centred tile
 // (CARD-31..34); anything else is a status line and the tile isn't holdable.
 const holdSlotAction = computed<"join" | "leave" | null>(() =>
-  props.action?.state === "join" || props.action?.state === "leave"
-    ? props.action.state
+  action.value.state === "join" || action.value.state === "leave"
+    ? action.value.state
     : null
 );
 const canHoldNow = computed(
-  () => !!holdSlotAction.value && !props.pending && !props.blocked
+  () => !!holdSlotAction.value && !pending.value && !blocked.value
 );
+
+const join = () => {
+  joinMutation.mutate(props.timeslot.id, {
+    onSuccess: (data) => {
+      // A confirmed join flips the play view back to the match hub, the
+      // "you're in" moment. Pending approvals stay in browse mode.
+      if (data.status === "joined") returnToGame();
+    },
+  });
+};
 
 const hold = useHoldPress({
   onHold: () => {
-    if (holdSlotAction.value === "join") emit("join");
-    else if (holdSlotAction.value === "leave") emit("leave");
+    if (holdSlotAction.value === "join") join();
+    else if (holdSlotAction.value === "leave")
+      leaveMutation.mutate(props.timeslot.id);
   },
   enabled: () => props.centered && canHoldNow.value,
 });
 
 const bottomText = computed(() =>
-  props.action
-    ? tileBottomText(props.action, {
-        pending: !!props.pending,
-        releasedEarly: hold.releasedEarly.value,
-      })
-    : { text: "" }
+  tileBottomText(action.value, {
+    pending: pending.value,
+    releasedEarly: hold.releasedEarly.value,
+  })
 );
 
 // What a screen reader should hear change while the visible line is hidden
 // from it.
 const announcement = computed(() =>
-  holdSlotAction.value && (props.pending || hold.releasedEarly.value)
+  holdSlotAction.value && (pending.value || hold.releasedEarly.value)
     ? bottomText.value.text
     : ""
 );
