@@ -5,8 +5,6 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
 `SpotsTakenBar.vue`, `SlotRoster.vue`,
 `SlotAvatars.vue`). E2E: [client/e2e/playable-room-card.spec.ts](../../client/e2e/playable-room-card.spec.ts).
 
-Status: in progress on `rooms-restructure-and-mobile-pass`.
-
 ## Layout
 
 - **CARD-01** The header is stacked: title and address, then description.

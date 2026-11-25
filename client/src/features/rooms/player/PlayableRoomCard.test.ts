@@ -9,7 +9,10 @@ vi.mock("@vueuse/core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@vueuse/core")>()),
   useElementSize: () => ({ width: ref(0), height: cardHeight }),
 }));
-vi.mock("embla-carousel-vue", async () => (await import("./fakeEmbla")).module);
+vi.mock(
+  "embla-carousel-vue",
+  async () => (await import("./__tests__/fakeEmbla")).module,
+);
 vi.mock("@/features/profile/api", () => ({
   getPlayer: () => new Promise(() => {}),
 }));
@@ -33,7 +36,7 @@ vi.mock("../composables/queries", () => ({
 }));
 
 import PlayableRoomCard from "./PlayableRoomCard.vue";
-import { fakeEmbla } from "./fakeEmbla";
+import { fakeEmbla } from "./__tests__/fakeEmbla";
 
 beforeEach(() => fakeEmbla.reset());
 
@@ -118,7 +121,7 @@ describe("PlayableRoomCard header steps", () => {
       expect(w.find("[data-header]").text()).toContain("Depot");
       expect(w.find("[data-header]").text()).toContain("Rail St 1");
       expect(w.find("[data-header]").text()).not.toMatch(
-        /ball|showers|parking/
+        /ball|showers|parking/,
       );
       expect(w.find("[data-header] .rounded-full").exists()).toBe(false);
       w.unmount();
@@ -134,7 +137,7 @@ describe("PlayableRoomCard header steps", () => {
     const w = mountCard(345);
     const header = w.find("[data-header]");
     expect(header.classes()).toEqual(
-      expect.arrayContaining(["shrink", "min-h-0", "overflow-hidden"])
+      expect.arrayContaining(["shrink", "min-h-0", "overflow-hidden"]),
     );
   });
 });
@@ -211,7 +214,7 @@ describe("PlayableRoomCard action follows the swipe", () => {
     const w = mountCard(540, joinable);
     await swipeTo(w, 1);
     w.find(".slot-press").element.dispatchEvent(
-      new MouseEvent("pointerdown", { button: 0, bubbles: true })
+      new MouseEvent("pointerdown", { button: 0, bubbles: true }),
     );
     await nextTick();
     vi.advanceTimersByTime(1000);

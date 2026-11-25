@@ -2,8 +2,13 @@ import { onMounted, shallowRef } from "vue";
 import { vi } from "vitest";
 
 // Embla needs real layout, so unit tests swap it for this stand-in:
-// vi.mock("embla-carousel-vue", async () => (await import("./fakeEmbla")).module)
+// vi.mock("embla-carousel-vue", async () =>
+//   (await import("./__tests__/fakeEmbla")).module)
 // Real swiping and snapping is covered in e2e/playable-room-card.spec.ts.
+//
+// It lives under __tests__ because it imports vitest: that's the one path
+// tsconfig.app.json excludes, so nothing in the app can reach for it by
+// accident and drag the test framework along.
 type Handler = () => void;
 
 let node: HTMLElement | undefined;
