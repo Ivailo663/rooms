@@ -40,3 +40,6 @@ lives on the right.
   maintained library (proposed: `@use-gesture/vanilla`), replacing the
   hand-written `useSwipe.ts`; the edge rules of NAV-10 and NAV-11 stay ours.
   `[deferred]`
+- **NAV-15** The sidebar (and the phone drawer handle) never shows on the
+  sign-in screen, including in the moment after signing in, before the app
+  moves to Home.
