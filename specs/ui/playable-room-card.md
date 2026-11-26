@@ -9,8 +9,7 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
 
 - **CARD-01** The header is stacked: title and address, then description.
   Features and price aren't in the header, because they belong to a slot, not
-  the room. Features are on each slot's tile (CARD-11) and the price is in the
-  tile's action line (CARD-31).
+  the room. Features and price are on each slot's tile (CARD-11).
 - **CARD-02** Room cards are a fixed height, one per screen, and the deck
   scrolls vertically. There is no footer bar: the slot picker fills the card
   down to its bottom padding, and empty space in the tiles on tall phones is
@@ -46,7 +45,10 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
   white card with a hairline border, so they read as cards behind the current
   one, not grey blocks.
 - **CARD-11** Each tile shows its slot's time, centred horizontally and
-  vertically in the space above the roster. That slot's features sit in the
+  vertically in the space above the roster, with its price ("6€") just below
+  the time when the slot has one. The price shows on every tile, whatever the
+  player can do there, and hides while that tile's join or leave is in
+  flight. That slot's features sit in the
   tile's top-right corner as icons only, side by side, each still named for
   screen readers. When they don't fit on one line, they wrap onto the next
   line, left-aligned. Below the time is the slot's roster: count, seat bar
@@ -127,8 +129,8 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
   ([MEM-03..08](../membership.md)), and whether they can leave comes from
   `getSlotLeavability` ([MEM-12](../membership.md)).
 - **CARD-31** The card has no footer bar. The centred tile's last line says
-  what holding it does: "Hold to join · 5€" (the price only when the slot has
-  one), or "Hold to leave" in red. While the tile is actionable the words
+  what holding it does: "Hold to join", or "Hold to leave" in red. The line
+  never carries the price (CARD-11). While the tile is actionable the words
   carry a slow light sweep; with reduced motion they don't. Side tiles keep
   the line's space but don't show it, so every tile lays out alike.
 - **CARD-32** Only joining and leaving are actions. Every other state is the

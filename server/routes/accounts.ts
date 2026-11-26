@@ -2,6 +2,8 @@ import type { Application, RequestHandler } from "express";
 import prisma from "../prisma.js";
 import { asyncHandler } from "../utils/http.js";
 import type { AccountSearchResult } from "@football/shared";
+import { createGuardedRoutes } from "../utils/guardedRoutes.js";
+import { Role } from "../../packages/shared/index.js";
 
 // Minimum characters before we run a search. Mirrors the client guard so a bare
 // `?search=` or a one-letter query can never dump the whole accounts table.
@@ -46,5 +48,8 @@ const searchAccounts: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 export const registerAccountRoutes = (app: Application) => {
-  app.get("/accounts", searchAccounts);
+  const routes = createGuardedRoutes(app);
+
+  // API-04: a player would otherwise read every account's email.
+  routes.get("/accounts", Role.clientAdmin, searchAccounts);
 };

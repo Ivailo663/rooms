@@ -1,19 +1,20 @@
 import type { Application, RequestHandler } from "express";
 import prisma from "../prisma.js";
-import type {
-  TimeslotResponse,
-  EnabledDaySummary,
-  CreateTimeslotRequest,
-  UpdateTimeslotRequest,
-  CreateTimeslotResponse,
+import {
+  Role,
+  type TimeslotResponse,
+  type EnabledDaySummary,
+  type CreateTimeslotRequest,
+  type UpdateTimeslotRequest,
+  type CreateTimeslotResponse,
 } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { assertPlayerLimits, toInteger } from "../utils/validation.js";
 import { Prisma } from "@prisma/client";
 import { syncSlot } from "../scheduler.js";
 import { slotsClash } from "../slotRules.js";
-import { assertRole } from "../tenantAccess.js";
 import { getCurrentAccount } from "../currentAccount.js";
+import { createGuardedRoutes } from "../utils/guardedRoutes.js";
 
 const labelToStartTime = (label: string): number => {
   const [h, m] = label.split(":").map(Number);
@@ -35,12 +36,12 @@ type SlotWithRequests = {
 // seats can live in any room or tenant, so there is nothing narrower to scope
 // it to than the requesting accounts themselves.
 const findInvalidRequests = async (
-  timeslots: SlotWithRequests[]
+  timeslots: SlotWithRequests[],
 ): Promise<Set<string>> => {
   const accountIds = Array.from(
     new Set(
-      timeslots.flatMap((slot) => slot.join_requests.map((r) => r.accountId))
-    )
+      timeslots.flatMap((slot) => slot.join_requests.map((r) => r.accountId)),
+    ),
   );
 
   if (!accountIds.length) {
@@ -70,7 +71,7 @@ const findInvalidRequests = async (
         (seat) =>
           seat.accountId === request.accountId &&
           seat.timeslotId !== slot.id &&
-          slotsClash(seat.room_timeslots, slot)
+          slotsClash(seat.room_timeslots, slot),
       );
 
       if (clashes) {
@@ -277,7 +278,7 @@ const getEnabledTimeslotDaysAndFirstSlot: RequestHandler = asyncHandler(
     });
 
     res.send(response);
-  }
+  },
 );
 
 // Which days of the room hold at least one pending join request. The slot list
@@ -306,7 +307,6 @@ const getPendingRequestDays: RequestHandler = asyncHandler(async (req, res) => {
 
 const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.uid);
-  assertRole(account, "clientAdmin");
   const body: CreateTimeslotRequest = req.body;
 
   // Validate room belongs to account
@@ -353,7 +353,6 @@ const createTimeslot: RequestHandler = asyncHandler(async (req, res) => {
 
 const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.uid);
-  assertRole(account, "clientAdmin");
   const body: UpdateTimeslotRequest = req.body;
 
   // Validate timeslot exists and belongs to user's room
@@ -377,7 +376,7 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
       : existingTimeslot.min_players,
     body.max_players !== undefined
       ? body.max_players
-      : existingTimeslot.max_players
+      : existingTimeslot.max_players,
   );
 
   const updateData: Partial<Prisma.RoomTimeslotUpdateInput> = {};
@@ -414,7 +413,6 @@ const updateTimeslot: RequestHandler = asyncHandler(async (req, res) => {
 
 const deleteTimeslot: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.uid);
-  assertRole(account, "clientAdmin");
   const timeslotId = toInteger(getQueryValue(req.params.id), "id");
 
   // Validate timeslot exists and belongs to user's room
@@ -441,11 +439,21 @@ const deleteTimeslot: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 export const registerTimeslotRoutes = (app: Application) => {
-  app.get("/timeslots", getTimeslots);
-  app.get("/timeslots/enabled", getEnabledTimeslots);
-  app.get("/timeslots/enabled/days", getEnabledTimeslotDaysAndFirstSlot);
-  app.get("/timeslots/pending-days", getPendingRequestDays);
-  app.post("/timeslots", createTimeslot);
-  app.put("/timeslots", updateTimeslot);
-  app.delete("/timeslots/:id", deleteTimeslot);
+  const routes = createGuardedRoutes(app);
+
+  routes.get("/timeslots", Role.clientAdmin, getTimeslots);
+  routes.get("/timeslots/enabled", Role.clientAdmin, getEnabledTimeslots);
+  routes.get(
+    "/timeslots/enabled/days",
+    Role.clientAdmin,
+    getEnabledTimeslotDaysAndFirstSlot,
+  );
+  routes.get(
+    "/timeslots/pending-days",
+    Role.clientAdmin,
+    getPendingRequestDays,
+  );
+  routes.post("/timeslots", Role.clientAdmin, createTimeslot);
+  routes.put("/timeslots", Role.clientAdmin, updateTimeslot);
+  routes.delete("/timeslots/:id", Role.clientAdmin, deleteTimeslot);
 };

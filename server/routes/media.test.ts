@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Application, RequestHandler } from "express";
 
 const { prisma, files, fileDelete } = vi.hoisted(() => ({
   prisma: {
@@ -31,16 +30,12 @@ vi.mock("../firebase.js", () => ({
   },
 }));
 
+import { Role } from "../../packages/shared/index.js";
+import { createFakeApp } from "../testing/fakeApp.js";
 import { registerMediaRoutes } from "./media.js";
 import { AUTHENTICATED_PATHS } from "../middleware/verifyFirebaseToken.js";
 
-const handlers = new Map<string, RequestHandler>();
-const app = {
-  get: (path: string, h: RequestHandler) => handlers.set(`GET ${path}`, h),
-  post: (path: string, h: RequestHandler) => handlers.set(`POST ${path}`, h),
-  delete: (path: string, h: RequestHandler) =>
-    handlers.set(`DELETE ${path}`, h),
-} as unknown as Application;
+const { app, handlers } = createFakeApp();
 registerMediaRoutes(app);
 
 const OWNER = { uid: "u1" };
@@ -71,7 +66,7 @@ beforeEach(() => {
   prisma.account.findUnique.mockResolvedValue({
     id: 7,
     name: "A",
-    role: "player",
+    role: Role.player,
   });
   prisma.media.create.mockImplementation(({ data }) =>
     Promise.resolve({

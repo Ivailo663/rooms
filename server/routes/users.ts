@@ -5,6 +5,8 @@ import admin from "../firebase.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { parseProfileUpdate } from "../profile.js";
 import type { AuthenticatedLocals } from "../types/auth.js";
+import { createGuardedRoutes } from "../utils/guardedRoutes.js";
+import { Role } from "../../packages/shared/index.js";
 
 const NAME_MAX_LENGTH = 50;
 
@@ -143,7 +145,9 @@ const updateUser: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 export const registerUserRoutes = (app: Application) => {
-  app.post("/user", createUser);
-  app.get("/user", getUser);
-  app.patch("/user", updateUser);
+  const routes = createGuardedRoutes(app);
+
+  routes.post("/user", Role.player, createUser);
+  routes.get("/user", Role.player, getUser);
+  routes.patch("/user", Role.player, updateUser);
 };

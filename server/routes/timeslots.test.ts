@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Application, RequestHandler } from "express";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
@@ -18,23 +17,19 @@ const { prisma } = vi.hoisted(() => ({
 vi.mock("../prisma.js", () => ({ default: prisma }));
 vi.mock("../scheduler.js", () => ({ syncSlot: vi.fn() }));
 
+import { Role } from "../../packages/shared/index.js";
+import { createFakeApp } from "../testing/fakeApp.js";
 import { registerTimeslotRoutes } from "./timeslots.js";
 
-const handlers = new Map<string, RequestHandler>();
-registerTimeslotRoutes({
-  get: (path: string, h: RequestHandler) => handlers.set(`GET ${path}`, h),
-  post: (path: string, h: RequestHandler) => handlers.set(`POST ${path}`, h),
-  put: (path: string, h: RequestHandler) => handlers.set(`PUT ${path}`, h),
-  delete: (path: string, h: RequestHandler) =>
-    handlers.set(`DELETE ${path}`, h),
-} as unknown as Application);
+const { app, handlers } = createFakeApp();
+registerTimeslotRoutes(app);
 
 const update = async (body: object) => {
   const next = vi.fn();
   await handlers.get("PUT /timeslots")!(
     { body: { id: 5, ...body } } as never,
     { locals: { user: { uid: "uid-1" } }, send: vi.fn() } as never,
-    next
+    next,
   );
   return next.mock.calls[0]?.[0];
 };
@@ -42,7 +37,10 @@ const update = async (body: object) => {
 describe("PUT /timeslots", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prisma.account.findUnique.mockResolvedValue({ id: 7, role: "clientAdmin" });
+    prisma.account.findUnique.mockResolvedValue({
+      id: 7,
+      role: Role.clientAdmin,
+    });
     prisma.roomTimeslot.findFirst.mockResolvedValue({
       id: 5,
       min_players: 8,
@@ -66,7 +64,10 @@ describe("PUT /timeslots", () => {
 describe("GET /timeslots/enabled/days", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prisma.account.findUnique.mockResolvedValue({ id: 7, role: "player" });
+    prisma.account.findUnique.mockResolvedValue({
+      id: 7,
+      role: Role.clientAdmin,
+    });
   });
 
   it("SLOT-20: each day's first slot carries its roster (id and name only), counted from the same list", async () => {
@@ -97,7 +98,7 @@ describe("GET /timeslots/enabled/days", () => {
     await handlers.get("GET /timeslots/enabled/days")!(
       { query: { room_id: "1" } } as never,
       { locals: { user: { uid: "uid-1" } }, send } as never,
-      next
+      next,
     );
 
     expect(next).not.toHaveBeenCalled();
@@ -161,7 +162,7 @@ describe("ROLE-11: slot writes need clientAdmin and owning the room", () => {
     await handlers.get(route)!(
       req as never,
       { locals: { user: { uid: "uid-1" } }, send: vi.fn() } as never,
-      next
+      next,
     );
     return next.mock.calls[0]?.[0];
   };
@@ -169,7 +170,7 @@ describe("ROLE-11: slot writes need clientAdmin and owning the room", () => {
   const ownsRoom = (owns: boolean) => {
     prisma.room.findFirst.mockResolvedValue(owns ? { id: 1 } : null);
     prisma.roomTimeslot.findFirst.mockResolvedValue(
-      owns ? { id: 5, min_players: 6, max_players: 10 } : null
+      owns ? { id: 5, min_players: 6, max_players: 10 } : null,
     );
   };
 
@@ -186,7 +187,7 @@ describe("ROLE-11: slot writes need clientAdmin and owning the room", () => {
 
   for (const [name, write] of Object.entries(writes)) {
     it(`ROLE-11: a player who owns the room gets 403 on ${name}, before the ownership lookup`, async () => {
-      prisma.account.findUnique.mockResolvedValue({ id: 7, role: "player" });
+      prisma.account.findUnique.mockResolvedValue({ id: 7, role: Role.player });
       ownsRoom(true);
 
       expect(await write()).toMatchObject({
@@ -201,7 +202,7 @@ describe("ROLE-11: slot writes need clientAdmin and owning the room", () => {
     it(`ROLE-11: a clientAdmin who owns the room can ${name}`, async () => {
       prisma.account.findUnique.mockResolvedValue({
         id: 7,
-        role: "clientAdmin",
+        role: Role.clientAdmin,
       });
       ownsRoom(true);
 
@@ -211,7 +212,7 @@ describe("ROLE-11: slot writes need clientAdmin and owning the room", () => {
     it(`ROLE-11: a clientAdmin who doesn't own the room still gets 404 on ${name}`, async () => {
       prisma.account.findUnique.mockResolvedValue({
         id: 9,
-        role: "clientAdmin",
+        role: Role.clientAdmin,
       });
       ownsRoom(false);
 
@@ -221,7 +222,10 @@ describe("ROLE-11: slot writes need clientAdmin and owning the room", () => {
   }
 
   it("ROLE-11: the owner check is scoped to the caller's account", async () => {
-    prisma.account.findUnique.mockResolvedValue({ id: 7, role: "superAdmin" });
+    prisma.account.findUnique.mockResolvedValue({
+      id: 7,
+      role: Role.superAdmin,
+    });
     ownsRoom(true);
 
     await writes.create();
@@ -235,4 +239,37 @@ describe("ROLE-11: slot writes need clientAdmin and owning the room", () => {
       room: { creatorId: 7 },
     });
   });
+});
+
+describe("ROLE-17: host-dashboard reads need clientAdmin", () => {
+  const reads = [
+    "GET /timeslots",
+    "GET /timeslots/enabled",
+    "GET /timeslots/enabled/days",
+    "GET /timeslots/pending-days",
+  ];
+
+  beforeEach(() => vi.clearAllMocks());
+
+  for (const route of reads) {
+    it(`ROLE-17: a player gets 403 on ${route} before any room is looked up`, async () => {
+      prisma.account.findUnique.mockResolvedValue({ id: 7, role: Role.player });
+      const send = vi.fn();
+      const next = vi.fn();
+
+      await handlers.get(route)!(
+        { query: { room_id: "1", day: "Monday" } } as never,
+        { locals: { user: { uid: "uid-1" } }, send } as never,
+        next,
+      );
+
+      expect(next.mock.calls[0]?.[0]).toMatchObject({
+        status: 403,
+        message: "Your role can't do this",
+      });
+      expect(send).not.toHaveBeenCalled();
+      expect(prisma.room.findFirst).not.toHaveBeenCalled();
+      expect(prisma.roomTimeslot.findMany).not.toHaveBeenCalled();
+    });
+  }
 });

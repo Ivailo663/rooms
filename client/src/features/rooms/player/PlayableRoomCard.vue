@@ -7,7 +7,7 @@
 
     <div
       ref="cardEl"
-      class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-white/50 transition-shadow"
+      class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-white/65 transition-shadow"
       :data-header-size="headerSize"
       :class="
         hasJoinedSlot
@@ -139,15 +139,15 @@ const centeredSlotIndex = ref(0);
 const hasSlots = computed(() => props.room.timeslots.length > 0);
 
 const chosenSlot = computed<Slot | undefined>(
-  () => props.room.timeslots[chosenSlotIndex.value]
+  () => props.room.timeslots[chosenSlotIndex.value],
 );
 
 const showMessage = computed(
-  () => !!chosenSlot.value?.message && headerSize.value !== "tight"
+  () => !!chosenSlot.value?.message && headerSize.value !== "tight",
 );
 
 const centeredSlot = computed<Slot | undefined>(
-  () => props.room.timeslots[centeredSlotIndex.value]
+  () => props.room.timeslots[centeredSlotIndex.value],
 );
 
 // A seat held outranks a denial, as it does on the tile (getSlotAction).
@@ -164,7 +164,7 @@ const showDenial = computed(() => {
 // Either note takes a line under the strip, so the picker's floor grows by it.
 const hasNote = computed(() => showMessage.value || showDenial.value);
 const pickerFloor = computed(
-  () => PICKER_FLOOR + (hasNote.value ? PICKER_NOTE : 0)
+  () => PICKER_FLOOR + (hasNote.value ? PICKER_NOTE : 0),
 );
 
 const handleChooseSlot = (index: number) => {
@@ -191,10 +191,10 @@ const slotMarkers = computed<Record<number, SlotMarker>>(() => {
 });
 
 const hasJoinedSlot = computed(() =>
-  Object.values(slotMarkers.value).includes("joined")
+  Object.values(slotMarkers.value).includes("joined"),
 );
 const hasPendingSlot = computed(() =>
-  Object.values(slotMarkers.value).includes("pending")
+  Object.values(slotMarkers.value).includes("pending"),
 );
 
 // Land the carousel on the slot the user cares about instead of index 0:
@@ -202,7 +202,7 @@ const hasPendingSlot = computed(() =>
 const initialSlotIndex = computed(() => {
   const byMarker = (marker: SlotMarker) =>
     props.room.timeslots.findIndex(
-      (slot) => slotMarkers.value[slot.id] === marker
+      (slot) => slotMarkers.value[slot.id] === marker,
     );
   const joined = byMarker("joined");
   if (joined >= 0) return joined;
