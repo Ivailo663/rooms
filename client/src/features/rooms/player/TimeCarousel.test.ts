@@ -12,7 +12,7 @@ vi.mock("@vueuse/core", async (importOriginal) => ({
 }));
 vi.mock(
   "embla-carousel-vue",
-  async () => (await import("./__tests__/fakeEmbla")).module,
+  async () => (await import("./__tests__/fakeEmbla")).module
 );
 vi.mock("@/features/profile/api", () => ({
   getPlayer: () => new Promise(() => {}),
@@ -52,7 +52,7 @@ const slot = (
   max: number,
   features: unknown = [],
   price: number | null = null,
-  extra: object = {},
+  extra: object = {}
 ) => ({
   id,
   label: `${10 + id}:00`,
@@ -73,7 +73,7 @@ let wrapper: VueWrapper | undefined;
 const mountStrip = (
   timeslots: unknown[],
   props: Partial<Props> = {},
-  queryClient = new QueryClient(),
+  queryClient = new QueryClient()
 ) => {
   wrapper = mount(TimeCarousel, {
     props: {
@@ -116,7 +116,7 @@ describe("TimeCarousel seat bar", () => {
     const seats = tile!.findAll("[data-filled]");
     expect(seats).toHaveLength(10);
     expect(
-      seats.filter((s) => s.attributes("data-filled") === "true"),
+      seats.filter((s) => s.attributes("data-filled") === "true")
     ).toHaveLength(3);
     expect(seats[2]!.classes()).toContain("bg-emerald-500");
     expect(seats[3]!.classes()).not.toContain("bg-emerald-500");
@@ -191,7 +191,7 @@ describe("TimeCarousel tiles", () => {
     expect(neighbour!.classes()).toContain("border");
     for (const tile of [current!, neighbour!]) {
       expect(tile.element.querySelectorAll("[class*='slot-rim']")).toHaveLength(
-        0,
+        0
       );
     }
   });
@@ -260,7 +260,7 @@ describe("TimeCarousel tile sizes", () => {
     const w = mountStrip([slot(1, 3, 10)]);
     expect(buttons(w)).toHaveLength(3);
     expect(tiles(w)[0]!.find("li[aria-label$='more players']").exists()).toBe(
-      false,
+      false
     );
   });
 
@@ -309,7 +309,7 @@ describe("TimeCarousel features", () => {
     const group = first!.find("[data-features]");
     // Natural wrapping (no fixed per-row cap), lines left-aligned.
     expect(group.classes()).toEqual(
-      expect.arrayContaining(["flex-wrap", "justify-start"]),
+      expect.arrayContaining(["flex-wrap", "justify-start"])
     );
     expect(group.classes().some((c) => c.startsWith("max-w"))).toBe(false);
     // The row holding it right-aligns a single line in the corner.
@@ -318,7 +318,7 @@ describe("TimeCarousel features", () => {
     expect(first!.find(".slot-time [data-features]").exists()).toBe(false);
     const html = first!.html();
     expect(html.indexOf("data-features")).toBeLessThan(
-      html.indexOf("data-time"),
+      html.indexOf("data-time")
     );
     expect(first!.find("[data-time]").text()).toBe("11:00");
     expect(group.find("i").classes()).toContain("fa-futbol");
@@ -339,10 +339,10 @@ describe("TimeCarousel features", () => {
     const w = mountStrip([slot(1, 1, 10, ["ball"]), slot(2, 1, 10, ["ball"])]);
     const [current, side] = tiles(w);
     expect(current!.find("[data-features] > span").classes()).toContain(
-      "slot-chip",
+      "slot-chip"
     );
     expect(side!.find("[data-features] > span").classes()).toContain(
-      "bg-surface-900/5",
+      "bg-surface-900/5"
     );
     expect(w.html()).not.toMatch(/bg-(surface|slate|gray)-(700|800|900)(?!\/)/);
   });
@@ -365,11 +365,11 @@ describe("TimeCarousel features", () => {
   it("CARD-11: the tile's accessible name lists its features", () => {
     const w = mountStrip(
       [slot(1, 3, 10, ["ball", "showers"]), slot(2, 3, 10, [])],
-      { markers: { 11: "joined" } as never },
+      { markers: { 11: "joined" } as never }
     );
     const [first, second] = tiles(w);
     expect(first!.attributes("aria-label")).toBe(
-      "11:00, 3 of 10 players, features: ball, showers",
+      "11:00, 3 of 10 players, features: ball, showers"
     );
     expect(second!.attributes("aria-label")).toBe("12:00, 3 of 10 players");
   });
@@ -408,14 +408,20 @@ describe("TimeCarousel slot action", () => {
     vi.useRealTimers();
   });
 
-  it("CARD-31: the centred tile's last line says Hold to join, with the price only when there is one", () => {
-    const priced = mountStrip([joinable(6)]);
-    expect(line(priced).text()).toBe("Hold to join · 6€");
+  it("CARD-31: the centred tile's last line says Hold to join, never with the price", () => {
+    const w = mountStrip([joinable(6)]);
+    expect(line(w).text()).toBe("Hold to join");
+  });
+
+  it("CARD-11: a priced slot shows its price under the time on every tile, a free one shows none", () => {
+    const priced = mountStrip([joinable(6), { ...mine(), id: 2, price: 6 }]);
+    for (const tile of tiles(priced)) {
+      expect(tile.find(".slot-price").text()).toBe("6€");
+    }
     priced.unmount();
 
     const free = mountStrip([joinable()]);
-    expect(line(free).text()).toBe("Hold to join");
-    expect(line(free).text()).not.toContain("·");
+    expect(tiles(free)[0]!.find(".slot-price").exists()).toBe(false);
   });
 
   it("CARD-31: leaving reads Hold to leave in red, and never shows the price", () => {
@@ -481,15 +487,15 @@ describe("TimeCarousel slot action", () => {
   it("CARD-34: the button says how to join or leave, and the tile's own name doesn't repeat it", () => {
     const join = mountStrip([joinable()]);
     expect(press(join).attributes("aria-label")).toBe(
-      "Press and hold for one second to join",
+      "Press and hold for one second to join"
     );
     expect(tiles(join)[0]!.attributes("aria-label")).toBe(
-      "11:00, 1 of 10 players",
+      "11:00, 1 of 10 players"
     );
     join.unmount();
     const leave = mountStrip([mine()]);
     expect(press(leave).attributes("aria-label")).toBe(
-      "Press and hold for one second to leave",
+      "Press and hold for one second to leave"
     );
   });
 
@@ -684,7 +690,7 @@ describe("TimeCarousel swipe", () => {
     await nextTick();
     const scaleOf = (i: number) =>
       parseFloat(
-        /scale\(([\d.]+)\)/.exec(tiles(w)[i]!.attributes("style")!)![1]!,
+        /scale\(([\d.]+)\)/.exec(tiles(w)[i]!.attributes("style")!)![1]!
       );
     expect(scaleOf(0)).toBe(1);
     expect(scaleOf(1)).toBeCloseTo(0.86);
@@ -695,10 +701,10 @@ describe("TimeCarousel swipe", () => {
     expect(scaleOf(1)).toBeCloseTo(1 - 0.14 * 0.75);
     // Each shrinks towards the edge facing the centre.
     expect(tiles(w)[0]!.attributes("style")).toContain(
-      "transform-origin: right center",
+      "transform-origin: right center"
     );
     expect(tiles(w)[1]!.attributes("style")).toContain(
-      "transform-origin: left center",
+      "transform-origin: left center"
     );
   });
 
@@ -773,7 +779,7 @@ describe("TimeCarousel swipe", () => {
     });
     await nextTick();
     expect(
-      second.find(".slot-press").attributes("aria-disabled"),
+      second.find(".slot-press").attributes("aria-disabled")
     ).toBeUndefined();
 
     await fire(first.find(".slot-press").element, "pointerdown");
@@ -811,7 +817,7 @@ describe("TimeCarousel swipe", () => {
     const el = press(w).element;
     const fire = async (type: string, clientX: number) => {
       el.dispatchEvent(
-        new MouseEvent(type, { button: 0, clientX, bubbles: true }),
+        new MouseEvent(type, { button: 0, clientX, bubbles: true })
       );
       await nextTick();
     };
