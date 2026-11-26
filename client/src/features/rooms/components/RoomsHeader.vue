@@ -2,12 +2,10 @@
   <div>
     <div class="flex flex-col items-center">
       <!-- Title -->
-      <h1
-        class="text-2xl font-bold tracking-tight text-surface-900 sm:text-3xl"
-      >
+      <h1 class="text-xl! font-normal text-surface-900 sm:text-3xl mb-1">
         {{ isHostedRooms ? "Your Rooms" : undefined }}
       </h1>
-      <p class="text-sm text-surface-400 !mt-1">
+      <p class="text-sm text-surface-400">
         {{
           isHostedRooms ? "Manage and configure your hosted rooms" : undefined
         }}

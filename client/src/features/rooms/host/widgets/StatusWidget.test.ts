@@ -31,6 +31,16 @@ describe("StatusWidget panel", () => {
     });
   }
 
+  // Mounted, not stubbed: an unregistered StatusBadge renders nothing at all
+  // and takes the badge and the elapsed minutes with it, silently.
+  it("HCARD-01: the header carries the status badge and the elapsed minutes", () => {
+    const header = mount(StatusWidget, {
+      props: { status: "live", label: "18:00", elapsed: 12 },
+    }).find("[data-panel-header]");
+    expect(header.text()).toContain("Live");
+    expect(header.text()).toContain("12'");
+  });
+
   it("HCARD-02: the body under the header has no wash of its own", () => {
     const wrapper = mount(StatusWidget, {
       props: { status: "scheduled", label: "18:00" },
