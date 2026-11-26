@@ -50,8 +50,6 @@
 </template>
 
 <script lang="ts">
-import type { SlotStatusKind } from "@/components/StatusBadge.vue";
-
 // Failed and redistributed slots have their own notices, so the panel only
 // ever says what's live, what's next, or that there's nothing.
 export type PanelStatus = Extract<
@@ -62,7 +60,9 @@ export type PanelStatus = Extract<
 
 <script setup lang="ts">
 import { computed } from "vue";
-import StatusBadge from "@/components/StatusBadge.vue";
+// The template needs the component, PanelStatus above needs the type: one
+// import for both, because two from the same file is a lint error.
+import StatusBadge, { type SlotStatusKind } from "@/components/StatusBadge.vue";
 
 const props = withDefaults(
   defineProps<{

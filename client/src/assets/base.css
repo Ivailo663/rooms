@@ -61,6 +61,15 @@
   font-weight: normal;
 }
 
+/* Hide scrollbars everywhere; content still scrolls */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   min-height: 100vh;
   background-color: #f8fafc;
