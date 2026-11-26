@@ -16,7 +16,8 @@
     v-else
     class="flex min-h-screen bg-gradient-to-b from-slate-50 via-sky-50/40 to-emerald-50/30"
   >
-    <AppSidebar v-if="authStore.user" />
+    <!-- NAV-15: signing in sets the user before the app leaves /auth. -->
+    <AppSidebar v-if="authStore.user && route.name !== 'auth'" />
 
     <!-- Main content -->
     <div class="relative flex-1 h-[100dvh] overflow-y-auto !p-4">
@@ -42,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { RouterView } from "vue-router";
+import { RouterView, useRoute } from "vue-router";
 import { watch } from "vue";
 import ConfirmDialog from "primevue/confirmdialog";
 import { useAuthStore } from "./stores/auth";
@@ -50,13 +51,11 @@ import AppSidebar from "./components/AppSidebar.vue";
 import TermsGate from "./components/TermsGate.vue";
 import { useJoinRequestSync } from "./features/rooms/composables/useJoinRequestSync";
 import { useRoomView } from "./composables/useRoomView";
-import {
-  menuStartsOpen,
-  useMenuExpanded,
-} from "./composables/useMenuExpanded";
+import { menuStartsOpen, useMenuExpanded } from "./composables/useMenuExpanded";
 import { useIsPhone } from "./composables/useIsPhone";
 
 const authStore = useAuthStore();
+const route = useRoute();
 
 // Play mode is a focused, "in the game" surface — on desktop the sidebar starts
 // collapsed there and expanded in Host; on a phone the drawer starts closed.

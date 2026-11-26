@@ -828,3 +828,9 @@ describe("TimeCarousel swipe", () => {
     vi.useRealTimers();
   });
 });
+
+describe("TimeCarousel leaving for My games", () => {
+  it.todo(
+    "CARD-40: tiles don't flicker, resize or slide while the deck makes way for the hub"
+  );
+});

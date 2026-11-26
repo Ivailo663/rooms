@@ -82,6 +82,9 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
   at any height the card can have.
 - **CARD-19** The "spots left" text is emerald with 3 or more spots left,
   amber with 1 or 2, and grey when the squad is full.
+- **CARD-40** Leaving the deck for My games (MyGameHub) leaves the slot
+  picker as it was: its tiles don't flicker, resize or slide while the deck
+  makes way for the hub. `[gap]`
 
 ## Roster (SlotRoster + SlotAvatars, shared with MyGameHub)
 
