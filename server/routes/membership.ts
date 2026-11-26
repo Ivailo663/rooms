@@ -2,16 +2,17 @@ import type { Application, RequestHandler } from "express";
 import type { Server } from "socket.io";
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma.js";
-import type {
-  JoinedSlotSummary,
-  JoinRequestCreatedPayload,
-  JoinRequestResolvedPayload,
-  JoinRequestValidityChangedPayload,
-  JoinTimeslotRequest,
-  JoinTimeslotResponse,
-  MutationMessageResponse,
-  TenantSettings,
-  TimeslotMembershipChangedPayload,
+import {
+  Role,
+  type JoinedSlotSummary,
+  type JoinRequestCreatedPayload,
+  type JoinRequestResolvedPayload,
+  type JoinRequestValidityChangedPayload,
+  type JoinTimeslotRequest,
+  type JoinTimeslotResponse,
+  type MutationMessageResponse,
+  type TenantSettings,
+  type TimeslotMembershipChangedPayload,
 } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger, toOptionalDate } from "../utils/validation.js";
@@ -25,8 +26,8 @@ import {
   isRosterLocked,
   resolveCutoff,
 } from "../slotRules.js";
-import { assertRole } from "../tenantAccess.js";
 import { getCurrentAccount } from "../currentAccount.js";
+import { createGuardedRoutes } from "../utils/guardedRoutes.js";
 
 export const JOIN_REQUEST_CREATED_EVENT = "join-request:created";
 export const JOIN_REQUEST_RESOLVED_EVENT = "join-request:resolved";
@@ -45,7 +46,7 @@ const findClashingSlot = async (
   tx: Prisma.TransactionClient,
   accountId: number,
   day: string,
-  startTime: number
+  startTime: number,
 ) =>
   tx.timeslotPlayer.findFirst({
     where: {
@@ -76,7 +77,7 @@ const emitRequestValidityChanged = async (
   day: string,
   startTime: number,
   exceptTimeslotId: number,
-  valid: boolean
+  valid: boolean,
 ) => {
   const requests = await prisma.timeslotJoinRequest.findMany({
     where: {
@@ -173,7 +174,8 @@ const getJoinedSlots: RequestHandler = asyncHandler(async (_req, res) => {
         players,
         max_players: slot.max_players,
         lateJoinCutoff: resolveCutoff(
-          (slot.room.tenant?.settings ?? null) as Partial<TenantSettings> | null
+          (slot.room.tenant?.settings ??
+            null) as Partial<TenantSettings> | null,
         ),
         membership: (players.some((player) => player.id === account.id)
           ? "joined"
@@ -183,7 +185,7 @@ const getJoinedSlots: RequestHandler = asyncHandler(async (_req, res) => {
     .sort(
       (a, b) =>
         DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day) ||
-        a.start_time - b.start_time
+        a.start_time - b.start_time,
     );
 
   res.send(response);
@@ -263,7 +265,7 @@ const createJoinTimeslotHandler = (io: Server): RequestHandler =>
             timeslot.day,
             timeslot.start_time,
             resolveCutoff(lockSettings),
-            new Date()
+            new Date(),
           )
         ) {
           throw createHttpError(409, "Joining has closed for this game");
@@ -275,7 +277,7 @@ const createJoinTimeslotHandler = (io: Server): RequestHandler =>
           tx,
           account.id,
           timeslot.day,
-          timeslot.start_time
+          timeslot.start_time,
         );
 
         if (clash) {
@@ -284,7 +286,7 @@ const createJoinTimeslotHandler = (io: Server): RequestHandler =>
             409,
             room
               ? `You're already in the ${clash.room_timeslots.label} game at ${room}`
-              : "You're already in another game at this hour"
+              : "You're already in another game at this hour",
           );
         }
 
@@ -355,7 +357,7 @@ const createJoinTimeslotHandler = (io: Server): RequestHandler =>
           startTime: timeslot.start_time,
         };
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
     if (result.outcome === "joined") {
@@ -370,7 +372,7 @@ const createJoinTimeslotHandler = (io: Server): RequestHandler =>
         result.day,
         result.startTime,
         timeslotId,
-        false
+        false,
       );
 
       const response: JoinTimeslotResponse = {
@@ -440,9 +442,9 @@ const createLeaveTimeslotHandler = (io: Server): RequestHandler =>
         timeslot.start_time,
         resolveCutoff(
           (timeslot.room?.tenant?.settings ??
-            null) as Partial<TenantSettings> | null
+            null) as Partial<TenantSettings> | null,
         ),
-        new Date()
+        new Date(),
       )
     ) {
       throw createHttpError(409, "Leaving has closed for this game");
@@ -472,7 +474,7 @@ const createLeaveTimeslotHandler = (io: Server): RequestHandler =>
         timeslot.day,
         timeslot.start_time,
         timeslotId,
-        true
+        true,
       );
     }
 
@@ -507,7 +509,6 @@ const assertSlotOwner = async (timeslotId: number, accountId: number) => {
 const createApproveRequestHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
     const account = await getCurrentAccount(res.locals.user.uid);
-    assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
     const accountId = toInteger(req.params.accountId, "accountId");
 
@@ -533,13 +534,13 @@ const createApproveRequestHandler = (io: Server): RequestHandler =>
           tx,
           accountId,
           timeslot.day,
-          timeslot.start_time
+          timeslot.start_time,
         );
 
         if (clash) {
           throw createHttpError(
             409,
-            "This player is already in another game at this hour"
+            "This player is already in another game at this hour",
           );
         }
 
@@ -557,7 +558,7 @@ const createApproveRequestHandler = (io: Server): RequestHandler =>
 
         approved = true;
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
     if (approved) {
@@ -584,7 +585,7 @@ const createApproveRequestHandler = (io: Server): RequestHandler =>
         timeslot.day,
         timeslot.start_time,
         timeslotId,
-        false
+        false,
       );
     }
 
@@ -595,7 +596,6 @@ const createApproveRequestHandler = (io: Server): RequestHandler =>
 const createDenyRequestHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
     const account = await getCurrentAccount(res.locals.user.uid);
-    assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
     const accountId = toInteger(req.params.accountId, "accountId");
 
@@ -633,7 +633,6 @@ const createDenyRequestHandler = (io: Server): RequestHandler =>
 const createAcknowledgeRequestHandler = (io: Server): RequestHandler =>
   asyncHandler(async (req, res) => {
     const account = await getCurrentAccount(res.locals.user.uid);
-    assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
     const accountId = toInteger(req.params.accountId, "accountId");
 
@@ -643,13 +642,13 @@ const createAcknowledgeRequestHandler = (io: Server): RequestHandler =>
       prisma,
       accountId,
       timeslot.day,
-      timeslot.start_time
+      timeslot.start_time,
     );
 
     if (!clash) {
       throw createHttpError(
         409,
-        "This request is still open — approve or decline it"
+        "This request is still open — approve or decline it",
       );
     }
 
@@ -672,11 +671,10 @@ const createAcknowledgeRequestHandler = (io: Server): RequestHandler =>
   });
 
 const createRedestributePlayersBetweenTimeslotHandler = (
-  io: Server
+  io: Server,
 ): RequestHandler =>
   asyncHandler(async (req, res) => {
     const account = await getCurrentAccount(res.locals.user.uid);
-    assertRole(account, "clientAdmin");
     const timeslotId = toInteger(req.params.id, "id");
 
     await assertSlotOwner(timeslotId, account.id);
@@ -689,23 +687,40 @@ const createRedestributePlayersBetweenTimeslotHandler = (
   });
 
 export const registerMembershipRoutes = (app: Application, io: Server) => {
-  app.get("/timeslots/joined", getJoinedSlots);
-  app.post("/timeslots/:id/join", createJoinTimeslotHandler(io));
-  app.post("/timeslots/:id/leave", createLeaveTimeslotHandler(io));
-  app.post(
+  const routes = createGuardedRoutes(app);
+
+  routes.get("/timeslots/joined", Role.player, getJoinedSlots);
+  routes.post(
+    "/timeslots/:id/join",
+    Role.player,
+    createJoinTimeslotHandler(io),
+  );
+  routes.post(
+    "/timeslots/:id/leave",
+    Role.player,
+    createLeaveTimeslotHandler(io),
+  );
+  // Answering as the room's owner needs clientAdmin (ROLE-11). Answering as
+  // the slot's host (ROLE-12) needs no role, but slots have no host yet; when
+  // they do, these drop to Role.player and the handlers check owner-or-host.
+  routes.post(
     "/timeslots/:id/requests/:accountId/approve",
-    createApproveRequestHandler(io)
+    Role.clientAdmin,
+    createApproveRequestHandler(io),
   );
-  app.post(
+  routes.post(
     "/timeslots/:id/requests/:accountId/deny",
-    createDenyRequestHandler(io)
+    Role.clientAdmin,
+    createDenyRequestHandler(io),
   );
-  app.delete(
+  routes.delete(
     "/timeslots/:id/requests/:accountId",
-    createAcknowledgeRequestHandler(io)
+    Role.clientAdmin,
+    createAcknowledgeRequestHandler(io),
   );
-  app.post(
+  routes.post(
     "/timeslots/:id/redistribute",
-    createRedestributePlayersBetweenTimeslotHandler(io)
+    Role.clientAdmin,
+    createRedestributePlayersBetweenTimeslotHandler(io),
   );
 };

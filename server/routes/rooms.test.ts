@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Application, RequestHandler } from "express";
 
 const { prisma } = vi.hoisted(() => ({
   prisma: {
@@ -11,13 +10,12 @@ const { prisma } = vi.hoisted(() => ({
 
 vi.mock("../prisma.js", () => ({ default: prisma }));
 
+import { Role } from "../../packages/shared/index.js";
+import { createFakeApp } from "../testing/fakeApp.js";
 import { registerRoomRoutes } from "./rooms.js";
 
-const handlers = new Map<string, RequestHandler>();
-registerRoomRoutes({
-  get: (path: string, h: RequestHandler) => handlers.set(`GET ${path}`, h),
-  post: (path: string, h: RequestHandler) => handlers.set(`POST ${path}`, h),
-} as unknown as Application);
+const { app, handlers } = createFakeApp();
+registerRoomRoutes(app);
 
 const createRoom = async (role: string) => {
   prisma.account.findUnique.mockResolvedValue({ id: 7, role });
@@ -26,7 +24,7 @@ const createRoom = async (role: string) => {
   await handlers.get("POST /rooms")!(
     { body: { name: "Pitch", description: "", price: 10 } } as never,
     { locals: { user: { uid: "uid-1" } }, send: vi.fn() } as never,
-    next
+    next,
   );
   return next.mock.calls[0]?.[0];
 };
@@ -35,7 +33,7 @@ describe("POST /rooms", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("ROLE-10: a player gets 403 and no room is created", async () => {
-    const error = await createRoom("player");
+    const error = await createRoom(Role.player);
     expect(error).toMatchObject({
       status: 403,
       message: "Your role can't do this",
@@ -44,24 +42,27 @@ describe("POST /rooms", () => {
   });
 
   it("AUTH-01: the caller is looked up by Firebase uid", async () => {
-    await createRoom("clientAdmin");
+    await createRoom(Role.clientAdmin);
     expect(prisma.account.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { firebase_uid: "uid-1" } }),
     );
   });
 
   it("ROLE-10: a clientAdmin can create a room", async () => {
-    expect(await createRoom("clientAdmin")).toBeUndefined();
+    expect(await createRoom(Role.clientAdmin)).toBeUndefined();
     expect(prisma.room.create).toHaveBeenCalledTimes(1);
   });
 
   it("ROLE-10: a superAdmin can create a room", async () => {
-    expect(await createRoom("superAdmin")).toBeUndefined();
+    expect(await createRoom(Role.superAdmin)).toBeUndefined();
     expect(prisma.room.create).toHaveBeenCalledTimes(1);
   });
 
   it("SLOT-02: the caller owns the new room, whatever the body says", async () => {
-    prisma.account.findUnique.mockResolvedValue({ id: 7, role: "clientAdmin" });
+    prisma.account.findUnique.mockResolvedValue({
+      id: 7,
+      role: Role.clientAdmin,
+    });
     prisma.room.create.mockResolvedValue({ id: 1 });
     const next = vi.fn();
 
@@ -70,7 +71,7 @@ describe("POST /rooms", () => {
         body: { name: "Pitch", description: "", price: 10, creator_id: 99 },
       } as never,
       { locals: { user: { uid: "uid-1" } }, send: vi.fn() } as never,
-      next
+      next,
     );
 
     expect(next).not.toHaveBeenCalled();
@@ -78,7 +79,7 @@ describe("POST /rooms", () => {
       creatorId: 7,
     });
     expect(prisma.room.create.mock.calls[0][0].data).not.toHaveProperty(
-      "creator_id"
+      "creator_id",
     );
   });
 });
@@ -90,7 +91,7 @@ describe("GET /rooms/hosted", () => {
     await handlers.get("GET /rooms/hosted")!(
       { query: {} } as never,
       { locals: { user: { uid: "uid-1" } }, send } as never,
-      next
+      next,
     );
     expect(next).not.toHaveBeenCalled();
     return send.mock.calls[0][0];
@@ -106,7 +107,10 @@ describe("GET /rooms/hosted", () => {
   });
 
   it("SLOT-20: the live slot carries its roster (id and name only), counted from the same list", async () => {
-    prisma.account.findUnique.mockResolvedValue({ id: 7 });
+    prisma.account.findUnique.mockResolvedValue({
+      id: 7,
+      role: Role.clientAdmin,
+    });
     prisma.timeslotJoinRequest.findMany.mockResolvedValue([]);
     prisma.room.findMany.mockResolvedValue([
       room([
@@ -144,7 +148,10 @@ describe("GET /rooms/hosted", () => {
   });
 
   it("SLOT-20: a live slot with nobody in it has an empty roster", async () => {
-    prisma.account.findUnique.mockResolvedValue({ id: 7 });
+    prisma.account.findUnique.mockResolvedValue({
+      id: 7,
+      role: Role.clientAdmin,
+    });
     prisma.timeslotJoinRequest.findMany.mockResolvedValue([]);
     prisma.room.findMany.mockResolvedValue([
       room([
@@ -162,5 +169,44 @@ describe("GET /rooms/hosted", () => {
     const [hosted] = await getHosted();
 
     expect(hosted.liveSlot).toMatchObject({ players_count: 0, players: [] });
+  });
+});
+
+describe("ROLE-17: GET /rooms/hosted needs clientAdmin", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("ROLE-17: a player gets 403 before any room is looked up", async () => {
+    prisma.account.findUnique.mockResolvedValue({ id: 7, role: Role.player });
+    const send = vi.fn();
+    const next = vi.fn();
+
+    await handlers.get("GET /rooms/hosted")!(
+      { query: {} } as never,
+      { locals: { user: { uid: "uid-1" } }, send } as never,
+      next,
+    );
+
+    expect(next.mock.calls[0]?.[0]).toMatchObject({
+      status: 403,
+      message: "Your role can't do this",
+    });
+    expect(send).not.toHaveBeenCalled();
+    expect(prisma.room.findMany).not.toHaveBeenCalled();
+  });
+
+  it("ROLE-17: a player can still list playable rooms", async () => {
+    prisma.account.findUnique.mockResolvedValue({ id: 7, role: Role.player });
+    prisma.room.findMany.mockResolvedValue([]);
+    const next = vi.fn();
+
+    await handlers.get("GET /rooms/playable")!(
+      { query: {} } as never,
+      { locals: { user: { uid: "uid-1" } }, send: vi.fn() } as never,
+      next,
+    );
+
+    expect(next).not.toHaveBeenCalled();
+    // The handler's own lookup only: a player route adds none (ROLE-15).
+    expect(prisma.account.findUnique).toHaveBeenCalledTimes(1);
   });
 });

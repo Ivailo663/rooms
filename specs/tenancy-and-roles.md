@@ -36,7 +36,7 @@ Code: [server/prisma/schema.prisma](../server/prisma/schema.prisma),
 - **ROLE-08** A superAdmin manages tenants as entities (plan, owners,
   playgrounds). `[deferred]` — none of this is modelled yet.
 
-## What each mutating endpoint needs
+## What each endpoint needs
 
 - **ROLE-10** `POST /rooms` needs `rooms.create`: clientAdmin or above. A
   player gets 403 (ROLE-06).
@@ -46,9 +46,26 @@ Code: [server/prisma/schema.prisma](../server/prisma/schema.prisma),
   owner ([REQ-10](join-requests.md)) need clientAdmin or above **and** owning
   the room. The role check runs first (403); the ownership answers stay as
   they are (404 for slots, 403 for the others).
+- **ROLE-17** The host-dashboard reads (`GET /rooms/hosted` and `GET
+  /timeslots`, `/timeslots/enabled`, `/timeslots/enabled/days`,
+  `/timeslots/pending-days`) need clientAdmin or above. A player gets 403 "Your
+  role can't do this" before any room is looked up. The ownership answers stay
+  as they are.
 - **ROLE-12** These need no role beyond being signed in: `POST /user`,
   joining and leaving a slot, and answering join requests as the slot's host
   ([REQ-10](join-requests.md)).
+
+## How each endpoint states its role
+
+- **ROLE-15** Every endpoint is registered with the lowest role that may call
+  it, and there is no default: an endpoint registered without one doesn't
+  build. `player` is stated explicitly for endpoints any signed-in user may
+  call. A caller below the stated role gets 403 "Your role can't do this"
+  before the endpoint does anything (ROLE-06). The "Who" column in
+  [api.md](api.md) matches what each endpoint states.
+- **ROLE-16** Code names a role through one shared constant, on both server
+  and client, never as a string literal (`"clientAdmin"`). Its values are the
+  ROLE-01 roles and nothing else.
 
 ## Changing roles
 

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Application, RequestHandler } from "express";
 import type { Server } from "socket.io";
 
 const { prisma, redistributeSlot } = vi.hoisted(() => {
@@ -33,31 +32,31 @@ vi.mock("../redistribution.js", () => ({
   redistributeSlot,
 }));
 
+import { Role, type AccountRole } from "../../packages/shared/index.js";
+import { createFakeApp } from "../testing/fakeApp.js";
 import { registerMembershipRoutes } from "./membership.js";
 
 // Collects the registered handlers so a route can be called without a server.
-const handlers = new Map<string, RequestHandler>();
-const app = {
-  get: (path: string, h: RequestHandler) => handlers.set(`GET ${path}`, h),
-  post: (path: string, h: RequestHandler) => handlers.set(`POST ${path}`, h),
-  delete: (path: string, h: RequestHandler) =>
-    handlers.set(`DELETE ${path}`, h),
-} as unknown as Application;
+const { app, handlers } = createFakeApp();
 const io = { emit: vi.fn() } as unknown as Server;
 registerMembershipRoutes(app, io);
 
 const call = async (
   route: string,
   callerId: number,
-  role: string = "clientAdmin"
+  role: AccountRole = Role.clientAdmin,
 ) => {
-  prisma.account.findUnique.mockResolvedValue({ id: callerId, name: "x", role });
+  prisma.account.findUnique.mockResolvedValue({
+    id: callerId,
+    name: "x",
+    role,
+  });
   const res = { locals: { user: { uid: "uid-1" } }, send: vi.fn() };
   const next = vi.fn();
   await handlers.get(route)!(
     { params: { id: "5", accountId: "11" }, body: {} } as never,
     res as never,
-    next
+    next,
   );
   return { res, error: next.mock.calls[0]?.[0] };
 };
@@ -109,7 +108,7 @@ describe("POST /timeslots/:id/join", () => {
       status: "scheduled",
       enabled: false,
     });
-    const { error } = await call("POST /timeslots/:id/join", 9, "player");
+    const { error } = await call("POST /timeslots/:id/join", 9, Role.player);
     expect(error).toMatchObject({ status: 404, message: "Timeslot not found" });
     expect(prisma.timeslotPlayer.create).not.toHaveBeenCalled();
     expect(prisma.timeslotJoinRequest.create).not.toHaveBeenCalled();
@@ -130,7 +129,7 @@ describe("ROLE-11: owner-side slot routes need clientAdmin and owning the room",
   for (const route of routes) {
     it(`ROLE-11: a player who owns the room gets 403 on ${route}, before the ownership lookup`, async () => {
       prisma.roomTimeslot.findUnique.mockResolvedValue(slot({ creatorId: 7 }));
-      const { error } = await call(route, 7, "player");
+      const { error } = await call(route, 7, Role.player);
       expect(error).toMatchObject({
         status: 403,
         message: "Your role can't do this",
@@ -144,7 +143,7 @@ describe("ROLE-11: owner-side slot routes need clientAdmin and owning the room",
 
     it(`ROLE-11: a clientAdmin who doesn't own the room still gets "You do not manage this room" on ${route}`, async () => {
       prisma.roomTimeslot.findUnique.mockResolvedValue(slot({ creatorId: 7 }));
-      const { error } = await call(route, 9, "clientAdmin");
+      const { error } = await call(route, 9, Role.clientAdmin);
       expect(error).toMatchObject({
         status: 403,
         message: "You do not manage this room",
@@ -164,7 +163,7 @@ describe("ROLE-11: owner-side slot routes need clientAdmin and owning the room",
     const { error } = await call(
       "POST /timeslots/:id/requests/:accountId/approve",
       7,
-      "clientAdmin"
+      Role.clientAdmin,
     );
     expect(error).toMatchObject({ status: 404, message: "Request not found" });
     expect(prisma.$transaction).toHaveBeenCalled();
@@ -176,7 +175,7 @@ describe("ROLE-11: owner-side slot routes need clientAdmin and owning the room",
     const { error, res } = await call(
       "POST /timeslots/:id/requests/:accountId/deny",
       7,
-      "clientAdmin"
+      Role.clientAdmin,
     );
     expect(error).toBeUndefined();
     expect(prisma.timeslotJoinRequest.updateMany).toHaveBeenCalled();
@@ -202,7 +201,11 @@ describe("ROLE-12: joining needs only a sign-in", () => {
     prisma.timeslotPlayer.findFirst.mockResolvedValue(null);
     prisma.timeslotJoinRequest.findMany.mockResolvedValue([]);
 
-    const { error, res } = await call("POST /timeslots/:id/join", 9, "player");
+    const { error, res } = await call(
+      "POST /timeslots/:id/join",
+      9,
+      Role.player,
+    );
 
     expect(error).toBeUndefined();
     expect(prisma.timeslotPlayer.create).toHaveBeenCalled();

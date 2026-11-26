@@ -33,7 +33,9 @@ Code: [server/routes/tenants.ts](../server/routes/tenants.ts),
   answered 401 "No token" ([API-01](api.md)).
 - **SET-09** A caller may read or change a tenant only if they are a
   `clientAdmin` whose `accounts.tenantid` is that tenant, or a `superAdmin`.
-  Anyone else gets 403 "You do not manage this venue", and nothing changes.
+  A player gets 403 "Your role can't do this" before anything else is checked
+  ([ROLE-15](tenancy-and-roles.md)). A clientAdmin of another tenant gets 403
+  "You do not manage this venue". Either way, nothing changes.
   The tenant is `:tenantId` for the GET, and the body's `tenantId` for the two
   POSTs. An unknown tenant is 403 for a clientAdmin, and only a superAdmin can
   get its 404. ([ROLE-05](tenancy-and-roles.md)) This check is the server's

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Application, RequestHandler } from "express";
 
 const { prisma, getUser } = vi.hoisted(() => ({
   prisma: {
@@ -18,17 +17,14 @@ vi.mock("../firebase.js", () => ({
   default: { auth: () => ({ getUser, verifyIdToken: vi.fn() }) },
 }));
 
+import { Role } from "../../packages/shared/index.js";
+import { createFakeApp } from "../testing/fakeApp.js";
 import { registerUserRoutes } from "./users.js";
 import { registerPlayerRoutes } from "./players.js";
 import { registerCityRoutes } from "./cities.js";
 import { AUTHENTICATED_PATHS } from "../middleware/verifyFirebaseToken.js";
 
-const handlers = new Map<string, RequestHandler>();
-const app = {
-  get: (path: string, h: RequestHandler) => handlers.set(`GET ${path}`, h),
-  post: (path: string, h: RequestHandler) => handlers.set(`POST ${path}`, h),
-  patch: (path: string, h: RequestHandler) => handlers.set(`PATCH ${path}`, h),
-} as unknown as Application;
+const { app, handlers } = createFakeApp();
 registerUserRoutes(app);
 registerPlayerRoutes(app);
 registerCityRoutes(app);
@@ -344,7 +340,7 @@ describe("PATCH /user", () => {
         body: {
           id: 77,
           firebase_uid: "someone-else",
-          role: "superAdmin",
+          role: Role.superAdmin,
           name: " Ivan ",
           city: "Varna",
         },

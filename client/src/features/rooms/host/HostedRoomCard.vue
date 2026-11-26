@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white/50"
+    class="flex flex-col overflow-hidden rounded-2xl border border-surface-200 bg-white/65"
   >
     <!-- Card Header -->
     <div class="flex items-center justify-between !gap-3 !px-4 !py-3">
@@ -171,7 +171,9 @@ const nextSlot = computed(() => {
     todaySlots.value
       .filter(
         (s) =>
-          s.enabled && s.day === todayDay.value && s.start_time > currentMinutes
+          s.enabled &&
+          s.day === todayDay.value &&
+          s.start_time > currentMinutes,
       )
       .sort((a, b) => a.start_time - b.start_time)[0] ?? null
   );
@@ -232,7 +234,7 @@ const nextSlotInfo = computed(() => {
 });
 
 const primaryLabel = computed(
-  () => props.room.liveSlot?.label ?? nextSlotInfo.value?.label ?? null
+  () => props.room.liveSlot?.label ?? nextSlotInfo.value?.label ?? null,
 );
 
 const nextHint = computed(() => {
@@ -248,7 +250,7 @@ const nextHint = computed(() => {
 const { noticesForTimeslot, dismissNotice } = useRedistributionNotices();
 
 const redistributionNotices = computed(() =>
-  nextSlot.value ? noticesForTimeslot(nextSlot.value.id) : []
+  nextSlot.value ? noticesForTimeslot(nextSlot.value.id) : [],
 );
 
 // The panel only describes what's live or what's next. A failure or a
@@ -262,7 +264,7 @@ const roomStatus = computed<PanelStatus>(() => {
 const elapsed = computed(() =>
   props.room.liveSlot
     ? elapsedMinutes(props.room.liveSlot.start_time, now.value)
-    : 0
+    : 0,
 );
 
 const nextSlotTimeLabel = computed(() => {
@@ -293,6 +295,6 @@ const activeRoster = computed(
     props.room.liveSlot?.players ??
     nextSlot.value?.players ??
     nextEnabledDay.value?.players ??
-    []
+    [],
 );
 </script>

@@ -6,7 +6,8 @@ import { getCurrentAccount } from "../currentAccount.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger } from "../utils/validation.js";
 import type { AuthenticatedLocals } from "../types/auth.js";
-import type { MediaItem } from "../../packages/shared/index.js";
+import { Role, type MediaItem } from "../../packages/shared/index.js";
+import { createGuardedRoutes } from "../utils/guardedRoutes.js";
 
 // PROF-60. storage.rules already refuses other types at upload; this is the
 // server's own check that the declared kind matches what was actually stored.
@@ -173,7 +174,9 @@ const deleteMedia: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 export const registerMediaRoutes = (app: Application): void => {
-  app.get("/players/:id/media", listMedia);
-  app.post("/media", createMedia);
-  app.delete("/media/:id", deleteMedia);
+  const routes = createGuardedRoutes(app);
+
+  routes.get("/players/:id/media", Role.player, listMedia);
+  routes.post("/media", Role.player, createMedia);
+  routes.delete("/media/:id", Role.player, deleteMedia);
 };

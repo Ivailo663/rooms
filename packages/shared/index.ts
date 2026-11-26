@@ -1,5 +1,11 @@
-import { Prisma } from "@prisma/client";
-import type { MediaKind, PlayerPosition } from "@prisma/client";
+// Type-only on purpose: the client imports this file at runtime (Role), and a
+// value import here would pull @prisma/client into the browser bundle.
+import type {
+  AccountRole,
+  MediaKind,
+  PlayerPosition,
+  Prisma,
+} from "@prisma/client";
 
 export type {
   Account,
@@ -9,6 +15,15 @@ export type {
   PlayerPosition,
   MediaKind,
 } from "@prisma/client";
+
+// ROLE-16: the one way code names a role, lowest first. `satisfies` fails the
+// build if this and the generated AccountRole ever disagree, in either
+// direction (the live DB enum's unused `host` must not come back through here).
+export const Role = {
+  player: "player",
+  clientAdmin: "clientAdmin",
+  superAdmin: "superAdmin",
+} as const satisfies Record<AccountRole, AccountRole>;
 
 export interface GetRoomsParams {
   hosted: boolean;

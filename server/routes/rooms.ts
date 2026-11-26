@@ -1,20 +1,20 @@
 import type { Application, RequestHandler } from "express";
 import prisma from "../prisma.js";
-import type {
-  CreateRoomRequest,
-  CreateRoomResponse,
-  HostedRoomResponse,
-  PlayableRoomResponse,
-  TenantSettings,
+import {
+  Role,
+  type CreateRoomRequest,
+  type CreateRoomResponse,
+  type HostedRoomResponse,
+  type PlayableRoomResponse,
+  type TenantSettings,
 } from "../../packages/shared/index.js";
 import { asyncHandler } from "../utils/http.js";
 import { resolveCutoff } from "../slotRules.js";
-import { assertRole } from "../tenantAccess.js";
 import { getCurrentAccount } from "../currentAccount.js";
+import { createGuardedRoutes } from "../utils/guardedRoutes.js";
 
 const createRoom: RequestHandler = asyncHandler(async (req, res) => {
   const account = await getCurrentAccount(res.locals.user.uid);
-  assertRole(account, "clientAdmin");
   const { name, description, price } = req.body as CreateRoomRequest;
 
   const room = await prisma.room.create({
@@ -211,7 +211,8 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
           day: timeslot.day,
           start_time: timeslot.start_time,
           players,
-          requestStatusForCurrentUser: timeslot.join_requests[0]?.status ?? null,
+          requestStatusForCurrentUser:
+            timeslot.join_requests[0]?.status ?? null,
         };
       }),
     };
@@ -221,7 +222,9 @@ const getPlayableRooms: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 export const registerRoomRoutes = (app: Application) => {
-  app.post("/rooms", createRoom);
-  app.get("/rooms/hosted", getHostedRooms);
-  app.get("/rooms/playable", getPlayableRooms);
+  const routes = createGuardedRoutes(app);
+
+  routes.post("/rooms", Role.clientAdmin, createRoom);
+  routes.get("/rooms/hosted", Role.clientAdmin, getHostedRooms);
+  routes.get("/rooms/playable", Role.player, getPlayableRooms);
 };

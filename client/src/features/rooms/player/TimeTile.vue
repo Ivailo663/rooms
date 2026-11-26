@@ -53,7 +53,9 @@
       </span>
     </span>
 
-    <span class="slot-time flex flex-1 items-center justify-center">
+    <div
+      class="slot-time flex flex-col flex-1 gap-2 items-center justify-center"
+    >
       <span
         class="slot-time-text whitespace-nowrap font-medium leading-none tabular-nums"
         :class="tileSizeClasses.time"
@@ -61,7 +63,10 @@
       >
         {{ timeslot.label }}
       </span>
-    </span>
+      <span v-if="timeslot.price && !pending" class="slot-price font-medium!">
+        {{ timeslot.price }}€
+      </span>
+    </div>
 
     <span class="flex flex-col" :class="tileSizeClasses.gap" data-roster>
       <span
@@ -123,12 +128,6 @@
         :class="{ 'slot-shimmer': canHoldNow && !hold.releasedEarly.value }"
       >
         {{ bottomText.text }}
-      </span>
-      <span
-        v-if="timeslot.price && action.state === 'join' && !pending"
-        class="slot-price"
-      >
-        · {{ timeslot.price }}€
       </span>
     </span>
 
@@ -253,7 +252,7 @@ const currentUserId = computed(() => auth.user?.id);
 // Only confirmed seats clash; pending requests aren't commitments.
 const { data: joinedSlots } = useGetJoinedSlots();
 const heldSlots = computed(() =>
-  (joinedSlots.value ?? []).filter((slot) => slot.membership === "joined")
+  (joinedSlots.value ?? []).filter((slot) => slot.membership === "joined"),
 );
 
 // What holding the tile does, or why it does nothing (CARD-31, CARD-32).
@@ -263,13 +262,13 @@ const action = computed(() =>
     props.rules,
     now.value,
     heldSlots.value,
-    currentUserId.value
-  )
+    currentUserId.value,
+  ),
 );
 
 // This tile's own join or leave is in flight: spinner and "Joining…".
 const pending = computed(
-  () => joinMutation.isPending.value || leaveMutation.isPending.value
+  () => joinMutation.isPending.value || leaveMutation.isPending.value,
 );
 
 // A join or leave in flight on any tile, on any card, blocks holding here until
@@ -286,10 +285,10 @@ const features = computed(() => slotFeatures(props.timeslot.features));
 const holdSlotAction = computed<"join" | "leave" | null>(() =>
   action.value.state === "join" || action.value.state === "leave"
     ? action.value.state
-    : null
+    : null,
 );
 const canHoldNow = computed(
-  () => !!holdSlotAction.value && !pending.value && !blocked.value
+  () => !!holdSlotAction.value && !pending.value && !blocked.value,
 );
 
 const join = () => {
@@ -315,7 +314,7 @@ const bottomText = computed(() =>
   tileBottomText(action.value, {
     pending: pending.value,
     releasedEarly: hold.releasedEarly.value,
-  })
+  }),
 );
 
 // What a screen reader should hear change while the visible line is hidden
@@ -323,7 +322,7 @@ const bottomText = computed(() =>
 const announcement = computed(() =>
   holdSlotAction.value && (pending.value || hold.releasedEarly.value)
     ? bottomText.value.text
-    : ""
+    : "",
 );
 
 // A neighbour shrinks towards its inner edge, the one facing the centre:

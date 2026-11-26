@@ -14,8 +14,9 @@ Those types are the contract, so change them together with this table.
   characters. Otherwise it returns up to 100 accounts (`id`, `name`, `email`)
   whose name or email contains the term (case-insensitive), sorted by name,
   never including the caller.
-- **API-04** `GET /accounts` is admin-only, or masks emails. `[deferred]` — it
-  exposes every account's email to any signed-in user.
+- **API-04** `GET /accounts` needs clientAdmin or above. A player gets 403
+  "Your role can't do this", and no search runs, so a player can't read other
+  accounts' emails or test whether an email is registered.
 - **API-05** Request bodies and params are validated at the boundary. Integer
   params that aren't integers are 400 "`<field>` must be an integer".
 
@@ -31,14 +32,14 @@ Those types are the contract, so change them together with this table.
 | POST | `/media` | any, own folder only; body `{ kind, path, posterPath? }` | `MediaItem` | PROF-60, PROF-62, PROF-67 |
 | DELETE | `/media/:id` | the item's owner | 204 | PROF-62, PROF-64 |
 | GET | `/cities` | any | `string[]` | PROF-24 |
-| GET | `/accounts?search=` | any (should be admin) | `AccountSearchResult[]` | API-03 |
+| GET | `/accounts?search=` | clientAdmin or above | `AccountSearchResult[]` | API-03, API-04 |
 | POST | `/rooms` | clientAdmin or above | `CreateRoomResponse` | SLOT-01, ROLE-10 |
-| GET | `/rooms/hosted?day=` | host | `HostedRoomResponse[]` | SLOT-03 |
+| GET | `/rooms/hosted?day=` | clientAdmin or above | `HostedRoomResponse[]` | SLOT-03, ROLE-17 |
 | GET | `/rooms/playable?day=` | any | `PlayableRoomResponse[]` | SLOT-04 |
-| GET | `/timeslots?room_id&day` | room creator | `TimeslotResponse[]` | SLOT-15, REQ-14 |
-| GET | `/timeslots/enabled?room_id&day` | room creator | `TimeslotResponse[]` | SLOT-15, REQ-14 |
-| GET | `/timeslots/enabled/days?room_id` | room creator | `EnabledDaySummary[]` | SLOT-15 |
-| GET | `/timeslots/pending-days?room_id` | room creator | `string[]` | REQ-16 |
+| GET | `/timeslots?room_id&day` | clientAdmin or above, owning the room | `TimeslotResponse[]` | SLOT-15, REQ-14, ROLE-17 |
+| GET | `/timeslots/enabled?room_id&day` | clientAdmin or above, owning the room | `TimeslotResponse[]` | SLOT-15, REQ-14, ROLE-17 |
+| GET | `/timeslots/enabled/days?room_id` | clientAdmin or above, owning the room | `EnabledDaySummary[]` | SLOT-15, ROLE-17 |
+| GET | `/timeslots/pending-days?room_id` | clientAdmin or above, owning the room | `string[]` | REQ-16, ROLE-17 |
 | POST | `/timeslots` | clientAdmin or above, owning the room | `CreateTimeslotResponse` | SLOT-10, ROLE-11 |
 | PUT | `/timeslots` | clientAdmin or above, owning the room | `MutationMessageResponse` | SLOT-11, ROLE-11 |
 | DELETE | `/timeslots/:id` | clientAdmin or above, owning the room | `MutationMessageResponse` | SLOT-12, ROLE-11 |

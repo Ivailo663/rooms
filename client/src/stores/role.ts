@@ -1,7 +1,7 @@
 import { defineStore, storeToRefs } from "pinia";
 import { computed } from "vue";
 import { useAuthStore } from "./auth";
-import type { AccountRole } from "@football/shared";
+import { Role, type AccountRole } from "@football/shared";
 
 export const Cap = {
   rooms: {
@@ -28,23 +28,24 @@ export const Cap = {
   },
 } as const;
 
-type CapValue<T> = T extends Record<string, infer V>
-  ? V extends string
-    ? V
-    : CapValue<V>
-  : never;
+type CapValue<T> =
+  T extends Record<string, infer V>
+    ? V extends string
+      ? V
+      : CapValue<V>
+    : never;
 
 export type Capability = CapValue<typeof Cap>;
 
 const roleCapabilities: Record<AccountRole, readonly Capability[]> = {
-  player: [
+  [Role.player]: [
     Cap.rooms.view,
     Cap.rooms.join,
     Cap.timeslots.join,
     Cap.timeslots.leave,
   ],
   // Owning a room isn't a role (ROLE-01): venue admins create and run rooms.
-  clientAdmin: [
+  [Role.clientAdmin]: [
     Cap.rooms.create,
     Cap.rooms.edit,
     Cap.rooms.delete,
@@ -56,13 +57,14 @@ const roleCapabilities: Record<AccountRole, readonly Capability[]> = {
     Cap.admin.manageUsers,
     Cap.admin.manageRooms,
   ],
-  superAdmin: [
-    Cap.admin.systemSettings,
-    Cap.admin.assignRoles,
-  ],
+  [Role.superAdmin]: [Cap.admin.systemSettings, Cap.admin.assignRoles],
 };
 
-const roleHierarchy: AccountRole[] = ["player", "clientAdmin", "superAdmin"];
+const roleHierarchy: AccountRole[] = [
+  Role.player,
+  Role.clientAdmin,
+  Role.superAdmin,
+];
 
 export function getCapabilitiesForRole(role: AccountRole): Set<Capability> {
   const rank = roleHierarchy.indexOf(role);
@@ -82,8 +84,8 @@ export function getCapabilitiesForRole(role: AccountRole): Set<Capability> {
 export const canManageVenue = (
   account: { role?: AccountRole; tenantid?: number | null } | null,
 ): boolean =>
-  account?.role === "superAdmin" ||
-  (account?.role === "clientAdmin" && typeof account.tenantid === "number");
+  account?.role === Role.superAdmin ||
+  (account?.role === Role.clientAdmin && typeof account.tenantid === "number");
 
 export const useRoleStore = defineStore("role", () => {
   const authStore = useAuthStore();
@@ -100,9 +102,9 @@ export const useRoleStore = defineStore("role", () => {
   const can = (capability: Capability) =>
     allowedCapabilities.value.has(capability);
 
-  const isPlayer = computed(() => role.value === "player");
-  const isClientAdmin = computed(() => role.value === "clientAdmin");
-  const isSuperAdmin = computed(() => role.value === "superAdmin");
+  const isPlayer = computed(() => role.value === Role.player);
+  const isClientAdmin = computed(() => role.value === Role.clientAdmin);
+  const isSuperAdmin = computed(() => role.value === Role.superAdmin);
 
   const managesVenue = computed(() =>
     canManageVenue(

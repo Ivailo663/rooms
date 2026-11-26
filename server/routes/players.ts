@@ -1,8 +1,9 @@
 import type { Application, RequestHandler } from "express";
 import prisma from "../prisma.js";
-import type { PlayerProfile } from "../../packages/shared/index.js";
+import { Role, type PlayerProfile } from "../../packages/shared/index.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { toInteger } from "../utils/validation.js";
+import { createGuardedRoutes } from "../utils/guardedRoutes.js";
 
 // PROF-31/32: any signed-in user may read any profile, so the select is the
 // whole guard — email, uid, role and tenant must never be added to it.
@@ -33,5 +34,7 @@ const getPlayer: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 export const registerPlayerRoutes = (app: Application) => {
-  app.get("/players/:id", getPlayer);
+  const routes = createGuardedRoutes(app);
+
+  routes.get("/players/:id", Role.player, getPlayer);
 };

@@ -8,6 +8,8 @@ import type {
 import { syncSlot } from "../scheduler.js";
 import { asyncHandler, createHttpError } from "../utils/http.js";
 import { canManageTenant } from "../tenantAccess.js";
+import { createGuardedRoutes } from "../utils/guardedRoutes.js";
+import { Role } from "../../packages/shared/index.js";
 
 // Throws 403 unless the caller may manage this tenant (SET-09): a superAdmin,
 // or a clientAdmin whose own tenantid is this one.
@@ -15,7 +17,10 @@ import { canManageTenant } from "../tenantAccess.js";
 // Every failure is the same 403, including "no account", so a caller trying
 // tenant ids can't tell which venues exist. Call it before loading the tenant.
 // That's also why it doesn't use getCurrentAccount, which answers 404.
-const assertManagesTenant = async (uid: string | undefined, tenantId: number) => {
+const assertManagesTenant = async (
+  uid: string | undefined,
+  tenantId: number,
+) => {
   const account = uid
     ? await prisma.account.findUnique({
         where: { firebase_uid: uid },
@@ -68,7 +73,7 @@ const getTenantSettings: RequestHandler = asyncHandler(async (req, res) => {
         name: ta.account.name,
         requiresApproval: ta.requiresApproval,
         blacklisted: ta.blacklisted,
-      })
+      }),
     );
 
     return res.status(200).json({
@@ -106,7 +111,9 @@ const updateTenantSettings: RequestHandler = asyncHandler(async (req, res) => {
     });
     await Promise.all(slots.map((s) => syncSlot(s.id)));
 
-    console.log(`Settings updated: resynced ${slots.length} slot(s) for tenant ${tenantId}`);
+    console.log(
+      `Settings updated: resynced ${slots.length} slot(s) for tenant ${tenantId}`,
+    );
 
     return res
       .status(200)
@@ -171,7 +178,9 @@ const updateTenantAccount: RequestHandler = asyncHandler(async (req, res) => {
 });
 
 export const registerTenantRoutes = (app: Application) => {
-  app.get("/tenants/:tenantId", getTenantSettings);
-  app.post("/tenants", updateTenantSettings);
-  app.post("/tenants/accounts", updateTenantAccount);
+  const routes = createGuardedRoutes(app);
+
+  routes.get("/tenants/:tenantId", Role.clientAdmin, getTenantSettings);
+  routes.post("/tenants", Role.clientAdmin, updateTenantSettings);
+  routes.post("/tenants/accounts", Role.clientAdmin, updateTenantAccount);
 };
