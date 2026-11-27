@@ -1,45 +1,40 @@
 <template>
+  <!-- The island's right-hand block: "My games" over the soonest game. One
+       button, so a tap anywhere on it opens the hub (HEAD-09). -->
   <button
     v-if="nextGame"
     type="button"
-    class="!mb-3 flex w-full max-w-2xl cursor-pointer items-center justify-between rounded-2xl border !px-4 !py-2.5 text-sm shadow-sm transition-all outline-none !mx-auto"
+    data-my-games
+    :aria-label="ariaLabel"
+    class="flex min-h-11 shrink-0 cursor-pointer touch-manipulation flex-col items-end justify-center !items-center whitespace-nowrap rounded-tr-xl rounded-br-xl !px-3 text-right outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-inset !bg-surface-100"
     :class="
-      isLive
-        ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-        : 'border-emerald-200/70 bg-white/70 text-surface-700 backdrop-blur-sm hover:border-emerald-300 hover:bg-emerald-50/60'
+      isLive ? 'bg-emerald-50 hover:bg-emerald-100' : 'hover:bg-emerald-50'
     "
     @click="returnToGame"
   >
-    <span class="flex min-w-0 items-center !gap-2.5">
-      <span v-if="isLive" class="relative flex h-2 w-2 shrink-0">
+    <span class="text-[0.7rem]! font-medium leading-tight text-emerald-600">
+      My games
+    </span>
+
+    <span
+      class="flex items-center !gap-1.5 text-xs! font-semibold leading-tight text-surface-800"
+    >
+      <span
+        v-if="isLive"
+        data-live-dot
+        class="relative flex h-2 w-2 shrink-0"
+        aria-hidden="true"
+      >
         <span
-          class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
+          class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:animate-none"
         />
         <span
           class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"
         />
       </span>
-      <i
-        v-else
-        class="fa-solid fa-circle-check shrink-0 text-emerald-500"
-        style="font-size: 0.7rem"
-      />
-      <span class="truncate">
-        <template v-if="isLive">
-          Your game is live · {{ nextGame.roomName }}
-        </template>
-        <template v-else>
-          Your next game · {{ dayDisplay(nextGame, now) }}
-          {{ nextGame.label }} ·
-          {{ nextGame.roomName }}
-        </template>
-      </span>
-    </span>
-    <span
-      class="flex shrink-0 items-center !gap-1.5 text-xs font-medium text-emerald-600"
-    >
-      My games
-      <i class="fa-solid fa-arrow-right" style="font-size: 0.6rem" />
+
+      <template v-if="isLive">{{ nextGame.label }}</template>
+      <template v-else>{{ dayName }} {{ nextGame.label }}</template>
     </span>
   </button>
 </template>
@@ -49,11 +44,12 @@ import { computed } from "vue";
 import { useGameMode, returnToGame } from "../composables/useGameMode";
 import { useNow } from "../composables/useNow";
 import { isSlotLiveNow } from "../composables/isSlotLiveNow";
-import { dayDisplay, minutesUntil } from "../composables/gameTime";
+import { minutesUntil, shortDay } from "../composables/gameTime";
 
 const { confirmedSlots } = useGameMode();
 const now = useNow();
 
+// Same pick as always: the slot that starts soonest, a live one first.
 const nextGame = computed(
   () =>
     [...confirmedSlots.value].sort(
@@ -63,5 +59,18 @@ const nextGame = computed(
 
 const isLive = computed(
   () => !!nextGame.value && isSlotLiveNow(nextGame.value, now.value)
+);
+
+// The app's own relative label, as the hub's switcher chips use: "Today",
+// "Tmrw", "Thu", "Next Thu" (HEAD-06).
+const dayName = computed(() =>
+  nextGame.value ? shortDay(nextGame.value, now.value) : ""
+);
+
+// The live state is a dot and a colour only, so say it for screen readers.
+const ariaLabel = computed(() =>
+  isLive.value
+    ? `My games, game in progress, ${nextGame.value?.label}`
+    : `My games, ${dayName.value} ${nextGame.value?.label}`
 );
 </script>

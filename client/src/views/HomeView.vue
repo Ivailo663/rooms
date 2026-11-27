@@ -18,8 +18,8 @@
 
       <!-- Browsing (primary when free agent, secondary when in a game) -->
       <div v-else key="browse" class="flex flex-col flex-1 min-h-0">
-        <div class="shrink-0 w-full !mb-6">
-          <ReturnToGameBar v-if="!isHostedRooms && hasGame" />
+        <!-- Same side padding as the deck below, so the island's full width is the deck's (HEAD-03) -->
+        <div class="shrink-0 w-full !mb-5 sm:!px-6">
           <RoomsHeader v-model:search="search" />
         </div>
 
@@ -46,7 +46,6 @@ import PlayableRooms from "@/features/rooms/player/PlayableRooms.vue";
 import MyGameHub from "@/features/rooms/player/MyGameHub.vue";
 import CreateRoomDialog from "@/features/rooms/host/CreateRoomDialog.vue";
 import RoomsHeader from "@/features/rooms/components/RoomsHeader.vue";
-import ReturnToGameBar from "@/features/rooms/player/ReturnToGameBar.vue";
 import { useGameMode } from "@/features/rooms/composables/useGameMode";
 import { useRoomView } from "@/composables/useRoomView";
 import { useCreateRoom } from "@/composables/useCreateRoom";
@@ -62,7 +61,7 @@ const isHostedRooms = computed(
   () => roleStore.can(Cap.rooms.create) && roomView.value === RoomView.Host
 );
 
-const { hasGame, showGameHub, browseGames } = useGameMode();
+const { showGameHub, browseGames } = useGameMode();
 const showHub = computed(() => !isHostedRooms.value && showGameHub.value);
 
 const handleCreateRoom = async ({
