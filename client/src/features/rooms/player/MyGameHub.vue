@@ -106,17 +106,18 @@
 
             <template v-else>
               <span
-                class="text-xs font-bold uppercase tracking-[0.3em] text-surface-400"
+                class="text-xs font-bold uppercase tracking-[0.3em] text-surface-400 !mb-2"
               >
                 Kicks off in
               </span>
               <span
-                class="!mt-2 text-4xl font-bold tabular-nums text-surface-900 sm:text-7xl"
+                class="text-4xl font-bold tabular-nums text-surface-900 sm:text-7xl"
               >
                 {{ countdown }}
               </span>
-              <span class="!mt-1 text-sm text-surface-400">
-                {{ dayDisplay(primaryGame, now) }} at {{ primaryGame.label }}
+              <span class="text-xs text-surface-400">
+                ( {{ dayDisplay(primaryGame, now) }} at
+                {{ primaryGame.label }} )
               </span>
             </template>
 

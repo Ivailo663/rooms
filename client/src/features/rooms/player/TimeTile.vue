@@ -19,6 +19,16 @@
     :aria-current="chosen ? 'true' : undefined"
     :aria-label="label"
   >
+    <!-- Your seat: an emerald tint from the top edge, behind the content. The
+         tile wears it wherever it sits, so it never pops in or out mid-swipe;
+         peeking in from the side, the tile's own fade (see `style`) takes it
+         down with everything else. -->
+    <span
+      v-if="marker === 'joined'"
+      class="slot-wash pointer-events-none absolute inset-0"
+      data-wash
+      aria-hidden="true"
+    />
     <!-- Hold feedback: a faint shade rises from the bottom of the pane. -->
     <span
       v-if="centered && holdSlotAction"
@@ -131,13 +141,24 @@
       </span>
     </span>
 
+    <!-- A seat held is a check circle, a request awaiting approval a dot. -->
     <span
-      v-if="marker"
-      class="absolute h-2 w-2 rounded-full"
-      :class="[
-        tileSizeClasses.dot,
-        marker === 'joined' ? 'bg-emerald-400' : 'bg-amber-400',
-      ]"
+      v-if="marker === 'joined'"
+      class="absolute flex size-4 items-center justify-center rounded-full bg-emerald-500 text-white"
+      :class="tileSizeClasses.marker"
+      data-marker="joined"
+    >
+      <i
+        class="fa-solid fa-check"
+        style="font-size: 0.5rem"
+        aria-hidden="true"
+      />
+    </span>
+    <span
+      v-else-if="marker === 'pending'"
+      class="absolute h-2 w-2 rounded-full bg-amber-400"
+      :class="tileSizeClasses.dot"
+      data-marker="pending"
     />
 
     <template v-if="centered">
@@ -201,6 +222,7 @@ const TILE_SIZE_CLASSES = {
     bottomGap: "!mt-3",
     bottomText: "text-[13px]",
     dot: "left-4 top-[22px]",
+    marker: "left-4 top-[18px]",
   },
   compact: {
     tile: "!p-3",
@@ -210,6 +232,7 @@ const TILE_SIZE_CLASSES = {
     bottomGap: "!mt-2",
     bottomText: "text-xs",
     dot: "left-3 top-[18px]",
+    marker: "left-3 top-[14px]",
   },
   tight: {
     tile: "!p-2",
@@ -219,6 +242,7 @@ const TILE_SIZE_CLASSES = {
     bottomGap: "!mt-1.5",
     bottomText: "text-xs",
     dot: "left-2 top-3.5",
+    marker: "left-2 top-2.5",
   },
 } as const;
 
@@ -449,6 +473,18 @@ const label = computed(() => {
   100% {
     background-position: 0% 0;
   }
+}
+
+/* Your seat (CARD-41): a tint fading out from the top edge. It is a child, not
+   a background on the tile, so the tile itself stays plain white (CARD-04),
+   and it sits at -1 with the hold shade, which comes later and so on top. */
+.slot-wash {
+  z-index: -1;
+  background: radial-gradient(
+    140% 80% at 50% 0%,
+    rgba(16, 185, 129, 0.16) 0%,
+    transparent 72%
+  );
 }
 
 /* Holding: a faint neutral shade rises inside the pane, under the content. */

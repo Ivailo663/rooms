@@ -18,12 +18,13 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
 - **CARD-03** The "You're in" / "Requested" pill is small and centred on the
   card's top edge, half outside it. It isn't clipped when a card snaps into
   view. "You're in" wins when both apply.
-- **CARD-04** Nothing has a dark fill, and the slot tiles have no hue of their
-  own. The centred tile is a plain white card with a hairline border and a
-  soft shadow; there is no glass, 3D or tilt effect. Colour on a tile appears
-  only as signals: the seat bar and spots-left text (CARD-15, CARD-19), the
-  joined/pending dot, the red leave line (CARD-34) and the current user's
-  avatar.
+- **CARD-04** Nothing has a dark fill. A tile has no hue of its own, with one
+  exception: the tile whose slot the user holds a seat in (CARD-41). The centred
+  tile is otherwise a plain white card with a hairline border and a soft
+  shadow; there is no glass, 3D or tilt effect. Colour on a tile appears only
+  as signals: the seat bar and spots-left text (CARD-15, CARD-19), the joined
+  check circle and pending dot (CARD-15), that wash, the red leave line
+  (CARD-34) and the current user's avatar.
 - **CARD-05** The header adapts in steps to the card's own height, not the
   screen's. Roomy: everything. Compact: the description is cut to one line.
   Tight: no description and no slot message.
@@ -31,8 +32,11 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
   runs past the card's bottom padding, at any card height the deck can
   produce.
 - **CARD-07** The card's background has texture around the slot tiles. Its
-  top-edge tint (faint indigo, emerald once the user holds a seat here) covers
-  the whole card and is strongest low down, behind the picker.
+  top-edge tint is a faint indigo covering the whole card, strongest low down
+  behind the picker. The tint never turns emerald: a seat held in this room
+  shows on the card as the pill alone (CARD-03), and on the seat's own tile
+  (CARD-41). The card carries no other membership colour: no emerald tint, no
+  emerald hairline and no emerald shadow.
 
 ## Slot picker (TimeCarousel)
 
@@ -67,8 +71,9 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
   drawer swipe, and vertical scrolling of the deck still works.
 - **CARD-14** On load, the selection is the user's joined slot, else their
   pending one, else the first slot.
-- **CARD-15** A slot shows a dot in the tile's top-left corner for joined
-  (emerald) or pending (amber). How
+- **CARD-15** A slot marks the user's standing in the tile's top-left corner:
+  an emerald check circle for a seat held, an amber dot for a request awaiting
+  approval. A seat held is a circle, not a dot, and never both. How
   full it is shows as a seat bar: one segment per seat, filled for a taken
   seat and empty for an open one. Above 14 seats it's one continuous bar
   instead. A full slot's bar is grey.
@@ -85,6 +90,13 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
 - **CARD-40** Leaving the deck for My games (MyGameHub) leaves the slot
   picker as it was: its tiles don't flicker, resize or slide while the deck
   makes way for the hub. `[gap]`
+- **CARD-41** The tile whose slot the user holds a seat in carries the emerald
+  wash the card used to (CARD-07), wherever it sits in the strip: a tint from
+  the tile's top edge, over its white card and behind its content, never a
+  fill that dims the text. It never appears or vanishes mid-swipe. Peeking in
+  from the side it rides the tile's own fade, so it reads fainter there and the
+  tile still passes for CARD-10's flatter card. A pending request gets no wash
+  at all.
 
 ## Roster (SlotRoster + SlotAvatars, shared with MyGameHub)
 

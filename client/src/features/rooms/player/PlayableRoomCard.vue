@@ -7,20 +7,13 @@
 
     <div
       ref="cardEl"
-      class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-white/65 transition-shadow"
+      class="room-card relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-surface-200/70 bg-white/65 transition-shadow"
       :data-header-size="headerSize"
-      :class="
-        hasJoinedSlot
-          ? 'room-card--joined border-emerald-200'
-          : 'border-surface-200/70'
-      "
     >
       <!-- Soft wash bleeding down from the top edge — the card's only mood
-         lighting, tinted emerald once the user holds a seat here. -->
-      <div
-        class="pointer-events-none absolute inset-0"
-        :class="hasJoinedSlot ? 'card-glow--joined' : 'card-glow'"
-      />
+         lighting. It never reacts to membership: a seat shows as the pill and
+         on its own tile (CARD-07). -->
+      <div class="card-glow pointer-events-none absolute inset-0" />
 
       <div
         class="relative flex min-h-0 flex-1 flex-col !p-6 sm:!p-7"
@@ -222,14 +215,8 @@ const initialSlotIndex = computed(() => {
   box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.22);
 }
 
-.room-card--joined,
-.room-card--joined:hover {
-  box-shadow: 0 12px 32px -12px rgba(16, 185, 129, 0.3);
-}
-
-/* A cool halo bleeding down from the top edge, turning emerald once the user
-   holds a seat — the same language as the match hub. It reaches down behind
-   the slot picker, strongest there. */
+/* A cool halo bleeding down from the top edge, reaching down behind the slot
+   picker, strongest there. */
 .card-glow {
   background:
     radial-gradient(
@@ -240,20 +227,6 @@ const initialSlotIndex = computed(() => {
     radial-gradient(
       120% 70% at 30% 85%,
       rgba(99, 102, 241, 0.14) 0%,
-      transparent 70%
-    );
-}
-
-.card-glow--joined {
-  background:
-    radial-gradient(
-      140% 75% at 50% 0%,
-      rgba(16, 185, 129, 0.16) 0%,
-      transparent 72%
-    ),
-    radial-gradient(
-      120% 70% at 30% 85%,
-      rgba(16, 185, 129, 0.18) 0%,
       transparent 70%
     );
 }

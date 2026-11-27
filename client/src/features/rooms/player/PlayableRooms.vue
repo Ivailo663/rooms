@@ -62,8 +62,12 @@ onBeforeUnmount(() =>
 <style scoped>
 .deck-scroll {
   scroll-snap-type: y mandatory;
-  padding-top: 0.5rem;
-  scroll-padding-top: 0.5rem;
+  /* The status pill hangs half its height (~8px) above its card, and this
+     scroller clips. Both paddings are that overhang plus slack: padding-top
+     clears the pill on the first card, scroll-padding-top on every card the
+     deck snaps to (CARD-03). */
+  padding-top: 0.75rem;
+  scroll-padding-top: 0.75rem;
   width: 100%;
   max-width: 42rem;
   margin: 0 auto;

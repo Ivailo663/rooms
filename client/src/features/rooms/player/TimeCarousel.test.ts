@@ -138,24 +138,74 @@ describe("TimeCarousel seat bar", () => {
     }
   });
 
-  it("CARD-15: the joined and pending dots stay", () => {
+  it("CARD-15: a seat held is a check circle, a pending request an amber dot, never both", () => {
     const w = mountStrip([slot(1, 1, 10), slot(2, 1, 10)], {
       markers: { 1: "joined", 2: "pending" },
     });
     const [joined, pending] = tiles(w);
-    expect(joined!.find(".bg-emerald-400.absolute").exists()).toBe(true);
-    expect(pending!.find(".bg-amber-400.absolute").exists()).toBe(true);
+    const check = joined!.find('[data-marker="joined"]');
+    expect(check.exists()).toBe(true);
+    expect(check.find("i.fa-check").exists()).toBe(true);
+    expect(joined!.find(".bg-emerald-400").exists()).toBe(false);
+    expect(joined!.find(".bg-amber-400").exists()).toBe(false);
+
+    const dot = pending!.find('[data-marker="pending"]');
+    expect(dot.classes()).toContain("bg-amber-400");
+    expect(pending!.find("i.fa-check").exists()).toBe(false);
+    expect(pending!.findAll("[data-marker]")).toHaveLength(1);
   });
 
-  it("CARD-15: the dot sits in the top-left corner at every tile size", () => {
+  it("CARD-15: the marker sits in the top-left corner at every tile size", () => {
     for (const side of [240, 190, 150]) {
       setSide(side);
       const w = mountStrip([slot(1, 1, 10)], { markers: { 1: "joined" } });
-      const dot = tiles(w)[0]!.find(".bg-emerald-400.absolute");
-      expect(dot.classes().some((c) => c.startsWith("left-"))).toBe(true);
-      expect(dot.classes().some((c) => c.startsWith("right-"))).toBe(false);
+      const marker = tiles(w)[0]!.find('[data-marker="joined"]');
+      expect(marker.classes().some((c) => c.startsWith("left-"))).toBe(true);
+      expect(marker.classes().some((c) => c.startsWith("right-"))).toBe(false);
       w.unmount();
     }
+  });
+});
+
+describe("TimeCarousel seat wash", () => {
+  it("CARD-41: the centred tile of a held seat has the wash, behind the content", () => {
+    const w = mountStrip([slot(1, 1, 10)], { markers: { 1: "joined" } });
+    const tile = tiles(w)[0]!;
+    const wash = tile.find("[data-wash]");
+    expect(wash.exists()).toBe(true);
+    expect(wash.attributes("aria-hidden")).toBe("true");
+    // A child, so the tile's own background stays plain white (CARD-04).
+    expect(tile.element.contains(wash.element)).toBe(true);
+    expect(tile.classes()).not.toContain("slot-wash");
+    expect(tile.attributes("aria-label")).toContain("you're in");
+  });
+
+  // Nothing mounts or unmounts as the strip moves, which is what made the
+  // wash flick when it was centred-only.
+  it("CARD-41: the wash stays with its tile from the side to the centre", async () => {
+    const w = mountStrip([slot(1, 1, 10), slot(2, 1, 10)], {
+      markers: { 2: "joined" },
+    });
+    const tile = tiles(w)[1]!;
+    expect(tile.classes()).toContain("slot-tile--side");
+    expect(tile.find("[data-wash]").exists()).toBe(true);
+    expect(tile.find('[data-marker="joined"]').exists()).toBe(true);
+
+    fakeEmbla.swipeTo(1);
+    await nextTick();
+    expect(tiles(w)[1]!.find("[data-wash]").exists()).toBe(true);
+    // The tile without the seat never has one, centred or not.
+    expect(tiles(w)[0]!.find("[data-wash]").exists()).toBe(false);
+  });
+
+  it("CARD-41: a pending request gets no wash", () => {
+    const w = mountStrip([slot(1, 1, 10)], { markers: { 1: "pending" } });
+    expect(tiles(w)[0]!.find("[data-wash]").exists()).toBe(false);
+  });
+
+  it("CARD-41: a tile with no marker gets no wash", () => {
+    const w = mountStrip([slot(1, 1, 10)]);
+    expect(tiles(w)[0]!.find("[data-wash]").exists()).toBe(false);
   });
 });
 

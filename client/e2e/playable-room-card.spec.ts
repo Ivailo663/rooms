@@ -293,7 +293,7 @@ test.describe("stubbed states", () => {
       const cs = (node: Element) => getComputedStyle(node);
       const current = el.querySelectorAll<HTMLElement>(".slot-tile")[10];
       const neighbour = el.querySelectorAll<HTMLElement>(".slot-tile")[9];
-      const dot = current.querySelector("span.absolute") as HTMLElement | null;
+      const dot = current.querySelector("[data-marker]") as HTMLElement | null;
       return {
         currentBg: cs(current).backgroundColor,
         currentImage: cs(current).backgroundImage,
@@ -563,7 +563,7 @@ test.describe("stubbed states", () => {
       const t = rect(el);
       const feats = el.querySelector<HTMLElement>("[data-features]");
       const chips = feats ? Array.from(feats.children).map(rect) : [];
-      const dot = el.querySelector<HTMLElement>("span.absolute.rounded-full:not([data-features])");
+      const dot = el.querySelector<HTMLElement>("[data-marker]");
       const d = dot && rect(dot);
       const roster = el.querySelector<HTMLElement>("[data-roster]")!;
       const overlaps = chips.some(
@@ -668,13 +668,13 @@ test.describe("stubbed states", () => {
     }
   });
 
-  test("CARD-15: the joined and pending dots sit in the tile's top-left corner", async ({ page }) => {
+  test("CARD-15: the joined check circle and pending dot sit in the tile's top-left corner", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 900 });
     const joined = card(page, "QA Joined And Pending");
     await joined.scrollIntoViewIfNeeded();
     for (const [c, index] of [[joined, 0], [joined, 1]] as const) {
       const g = await corner(tiles(c).nth(index));
-      expect(g.dot, `dot on tile ${index}`).not.toBeNull();
+      expect(g.dot, `marker on tile ${index}`).not.toBeNull();
       expect(g.dot!.left - g.tile.left, "dot inset from left").toBeLessThan(24);
       expect(g.dot!.top - g.tile.top, "dot inset from top").toBeLessThan(32);
     }

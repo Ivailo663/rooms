@@ -1,23 +1,31 @@
 <template>
-  <div>
-    <div class="flex flex-col items-center">
-      <!-- Title -->
-      <h1 class="text-xl! font-normal text-surface-900 sm:text-3xl mb-1">
-        {{ isHostedRooms ? "Your Rooms" : undefined }}
-      </h1>
-      <p class="text-sm text-surface-400">
-        {{
-          isHostedRooms ? "Manage and configure your hosted rooms" : undefined
-        }}
-      </p>
+  <!-- Host view: just the title -->
+  <div v-if="isHostedRooms" class="flex flex-col items-center">
+    <h1 class="text-xl! font-normal text-surface-900 sm:text-3xl mb-1">
+      Your Rooms
+    </h1>
+    <p class="text-sm text-surface-400">
+      Manage and configure your hosted rooms
+    </p>
+  </div>
 
-      <!-- Unified search + day bar -->
-      <div
-        v-if="!isHostedRooms"
-        class="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white/70 backdrop-blur-xl border border-surface-200/40 shadow-sm transition-all focus-within:shadow-md focus-within:border-primary-300/50"
-      >
-        <!-- Search row -->
-        <!-- <div class="flex items-center">
+  <!-- Play view: one island holding the days and, with a game, the way back to it (HEAD-01).
+       The width is a length on both sides so it can transition: hugging, it's
+       the day row (7 buttons plus their gaps) plus this box's left padding and
+       border; with a game it's the deck's own width. `mx-auto` centres it in
+       both states (HEAD-02), and matches the deck below, which is also
+       42rem centred. -->
+  <div
+    v-else
+    data-island
+    class="relative mx-auto flex items-center justify-between overflow-hidden rounded-2xl border border-surface-200/40 bg-white/70 pl-1.5 shadow-sm backdrop-blur-xl transition-[width,box-shadow,border-color] duration-300 ease-out focus-within:border-primary-300/50 focus-within:shadow-md motion-reduce:transition-none"
+    :class="
+      hasGame
+        ? 'w-[min(100%,42rem)]'
+        : 'w-[calc(13rem+0.375rem+2px)] sm:w-[calc(16.5rem+0.375rem+2px)]'
+    "
+  >
+    <!-- <div class="flex items-center">
           <i
             class="fa-solid fa-magnifying-glass !ml-4 text-surface-300"
             style="font-size: 0.75rem"
@@ -39,59 +47,36 @@
           </div>
         </div> -->
 
-        <!-- Day selector row -->
-        <div class="flex flex-wrap justify-center px-2">
-          <div
-            class="flex items-center justify-center !gap-0.5 border-t border-surface-100/50 !py-1.5 !px-1 sm:!px-3"
-          >
-            <Button
-              v-for="day in DAYS"
-              :key="day.value"
-              type="button"
-              size="small"
-              :variant="activeDay === day.value ? undefined : 'text'"
-              :severity="activeDay === day.value ? undefined : 'secondary'"
-              :aria-pressed="activeDay === day.value"
-              :aria-label="day.full"
-              class="!relative !h-7 !w-7 sm:!w-9 !p-0 !rounded-lg !border-none !text-xs !font-semibold"
-              @click="selectDay(day.value)"
-            >
-              {{ day.label }}
-              <span
-                v-if="day.value === todayValue"
-                class="absolute right-1 top-0.5 h-1 w-1 rounded-full"
-                :class="activeDay === day.value ? 'bg-white' : 'bg-primary-400'"
-              />
-            </Button>
-          </div>
-
-          <!-- Quick filters -->
-          <!-- <div class="flex flex-wrap items-center justify-center !gap-2">
-            <Button
-              v-for="filter in quickFilters"
-              :key="filter.value"
-              type="button"
-              size="small"
-              variant="outlined"
-              :severity="
-                activeFilters.includes(filter.value) ? undefined : 'secondary'
-              "
-              :aria-pressed="activeFilters.includes(filter.value)"
-              class="!gap-1.5 !rounded-xl !px-3 !py-1 !text-xs !font-medium"
-              :class="
-                activeFilters.includes(filter.value)
-                  ? '!bg-primary-50 shadow-sm'
-                  : '!bg-white/60 backdrop-blur-sm'
-              "
-              @click="toggleFilter(filter.value)"
-            >
-              <i :class="filter.icon" style="font-size: 0.6rem" />
-              {{ filter.label }}
-            </Button>
-          </div> -->
-        </div>
-      </div>
+    <!-- shrink-0 keeps the days one row at their own size while the island
+           resizes around them (HEAD-04, HEAD-10) -->
+    <div data-days class="flex shrink-0 items-center !gap-0.5">
+      <Button
+        v-for="day in DAYS"
+        :key="day.value"
+        type="button"
+        size="small"
+        :variant="activeDay === day.value ? undefined : 'text'"
+        :severity="activeDay === day.value ? undefined : 'secondary'"
+        :aria-pressed="activeDay === day.value"
+        :aria-label="day.full"
+        class="!relative !h-7 !w-7 sm:!w-9 !p-0 !rounded-lg !border-none !text-xs !font-semibold"
+        @click="selectDay(day.value)"
+      >
+        {{ day.label }}
+        <span
+          v-if="day.value === todayValue"
+          class="absolute right-1 top-0.5 h-1 w-1 rounded-full"
+          :class="activeDay === day.value ? 'bg-white' : 'bg-primary-400'"
+        />
+      </Button>
     </div>
+
+    <Transition
+      enter-active-class="transition-opacity duration-300 motion-reduce:transition-none"
+      enter-from-class="opacity-0"
+    >
+      <ReturnToGameBar v-if="hasGame" />
+    </Transition>
   </div>
 </template>
 
@@ -101,12 +86,16 @@ import { Button } from "primevue";
 import { useRoomView } from "@/composables/useRoomView";
 import { useActiveDay } from "@/composables/useActiveDay";
 import { RoomView, DAYS, getTodayValue } from "@/constants";
+import ReturnToGameBar from "../player/ReturnToGameBar.vue";
+import { useGameMode } from "../composables/useGameMode";
 
 defineProps<{ search: string }>();
 
 // const emit = defineEmits<{
 //   "update:search": [value: string];
 // }>();
+
+const { hasGame } = useGameMode();
 
 const roomView = useRoomView();
 const isHostedRooms = computed(() => roomView.value === RoomView.Host);

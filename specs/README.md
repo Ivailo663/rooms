@@ -57,6 +57,7 @@ Each criterion is one bullet that starts with a bold id:
 | PROF | [player-profile.md](player-profile.md) | Player details card, profiles, ratings consent, player database |
 | CARD | [ui/playable-room-card.md](ui/playable-room-card.md) | Player browse card |
 | HCARD | [ui/hosted-room-card.md](ui/hosted-room-card.md) | Host dashboard room card |
+| HEAD | [ui/browse-header.md](ui/browse-header.md) | The browse island: day selector and the way back to a game |
 | NAV | [ui/navigation.md](ui/navigation.md) | Sidebar and mobile drawer |
 | APP | [native-app.md](native-app.md) | iOS and Android apps built with Capacitor |
 
