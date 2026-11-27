@@ -23,8 +23,8 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
   tile is otherwise a plain white card with a hairline border and a soft
   shadow; there is no glass, 3D or tilt effect. Colour on a tile appears only
   as signals: the seat bar and spots-left text (CARD-15, CARD-19), the joined
-  check circle and pending dot (CARD-15), that wash, the red leave line
-  (CARD-34) and the current user's avatar.
+  check circle and pending dot (CARD-15), that wash, the join hold wash
+  (CARD-33), the red leave line (CARD-34) and the current user's avatar.
 - **CARD-05** The header adapts in steps to the card's own height, not the
   screen's. Roomy: everything. Compact: the description is cut to one line.
   Tight: no description and no slot message.
@@ -97,6 +97,10 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
   from the side it rides the tile's own fade, so it reads fainter there and the
   tile still passes for CARD-10's flatter card. A pending request gets no wash
   at all.
+- **CARD-42** Leaving the last game from MyGameHub hands over to the deck
+  with the seat already gone: the card opens without the "You're in" pill,
+  and the slot's tile without its wash and check circle. The old seat never
+  shows, even for a moment, while the deck's own data refreshes.
 
 ## Roster (SlotRoster + SlotAvatars, shared with MyGameHub)
 
@@ -154,21 +158,48 @@ Code: `client/src/features/rooms/player/` (`PlayableRooms.vue`,
   under the picker when there is one), the reason the player can't join, and
   the reason they can't leave.
 - **CARD-33** The player joins by pressing and holding the centred tile for
-  1 s. Over the hold a faint neutral shade rises inside the tile, behind its
-  content; the tile itself doesn't move. Letting go early cancels with nothing sent, and the line reads
+  1 s. Over the hold an emerald wash rises from the tile's bottom edge to its
+  top, behind its content; the tile itself doesn't move. It is the joined
+  wash's hue (CARD-41), a shade darker and clearly stronger, so it reads as
+  "you're about to be in", and it is soft at its leading edge, never a hard
+  line. Letting go early drops it back quickly. Once the full second is
+  held the wash stays full while the line shows the spinner and "Joining…",
+  until the join has landed and the result shows: MyGameHub taking over for
+  a confirmed seat, or the tile's "Awaiting approval" line for a request. If
+  the join fails, the wash drops back. Letting go early cancels with nothing sent, and the line reads
   "Keep holding…" for a moment. A sideways swipe of more than 8px cancels; a
   smaller shift (the browser nudging the strip as the tile takes focus)
   doesn't. While the join is in flight the line shows a spinner and
   "Joining…".
 - **CARD-34** Leaving works the same way: hold the centred tile for 1 s,
-  early release cancels with "Keep holding…", and "Leaving…" shows while it's
-  in flight. For both actions, mouse, touch and keyboard (holding Enter or
+  and early release cancels with "Keep holding…". Over the hold the tile
+  fades out instead: its whole face,
+  avatars included, goes to plain white, fastest at the start so the fade
+  shows from the first moment, and "Leaving game" with "(Keep holding)"
+  under it comes up in the tile's centre in its place. The tile itself
+  doesn't move or shrink. Letting go early brings it back quickly. Once the
+  full second is held the tile stays faded, and a spinner with "Leaving…"
+  takes the place of "(Keep holding)" until the leave has landed and the
+  tile shows the result: its new line (usually "Hold to join"), with no seat
+  wash or check.
+  The tile never shows its old face in between. If the leave fails, the tile
+  fades back in as it was. When a join or
+  leave goes through and the tile's action flips, neither the join wash nor
+  the leave fade flashes on the way. For both actions, mouse, touch and keyboard (holding Enter or
   Space on the focused tile) all work, a long press never opens the browser's
   context menu or selects text, and assistive tech hears "Press and hold for
   one second to join" (or "to leave") with no separate confirm step.
 - **CARD-35** MyGameHub keeps its own footer for leaving (the hub has no
   slot tile to hold). It uses the same states as CARD-32 and the same 1 s
-  hold-to-leave on red text.
+  hold-to-leave on red text. The button always reads "Hold to leave", with
+  no icon and no spinner of its own (it is disabled and dimmed while the
+  leave is in flight), and no visible hint after a short tap, since it
+  already says that. Over the hold the whole hub card fades out with
+  "Leaving game" in its centre, exactly as the tile does (CARD-34); the
+  button itself carries no fill of its own. Once the hold completes the card
+  stays faded with the spinner and "Leaving…" until the hub has moved on: to
+  the deck (CARD-42), or to the player's next game if they have one. If the
+  leave fails, the card fades back in as it was.
 - **CARD-36** In MyGameHub, the leave action or its status sits alone and
   centred under the roster, with no slot facts beside it, because the hub
   already shows them in large type. The way back to the deck ("More") sits in

@@ -4,15 +4,11 @@
        button. -->
   <div
     role="group"
-    class="slot-tile relative flex flex-col overflow-hidden rounded-2xl border"
+    class="slot-tile relative isolate flex flex-col overflow-hidden rounded-2xl border"
     :class="[
       tileSizeClasses.tile,
       centered
-        ? [
-            'slot-tile--current border-transparent',
-            canHoldNow && 'slot-tile--actionable',
-            hold.holding.value && 'slot-tile--holding',
-          ]
+        ? 'slot-tile--current border-transparent'
         : 'slot-tile--side cursor-pointer text-surface-700',
     ]"
     :style="style"
@@ -29,11 +25,15 @@
       data-wash
       aria-hidden="true"
     />
-    <!-- Hold feedback: a faint shade rises from the bottom of the pane. -->
-    <span
+    <!-- Hold feedback: join rises from the bottom, leave fades the tile out.
+         Keyed by the action, so a join or leave that goes through brings in a
+         fresh one instead of animating the old one into the new look. -->
+    <HoldWash
       v-if="centered && holdSlotAction"
-      class="slot-hold-fill pointer-events-none absolute inset-0"
-      aria-hidden="true"
+      :key="holdSlotAction"
+      :action="holdSlotAction"
+      :active="hold.holding.value || committed"
+      :committed="committed"
     />
     <!-- The features are the tile's first row, in the flow, so the time below
          it centres in whatever height the row actually takes: one line, or
@@ -73,7 +73,7 @@
       >
         {{ timeslot.label }}
       </span>
-      <span v-if="timeslot.price && !pending" class="slot-price font-medium!">
+      <span v-if="timeslot.price && !busy" class="slot-price font-medium">
         {{ timeslot.price }}€
       </span>
     </div>
@@ -125,7 +125,7 @@
       :aria-hidden="holdSlotAction ? 'true' : undefined"
     >
       <i
-        v-if="pending"
+        v-if="busy"
         class="fa-solid fa-spinner fa-spin"
         style="font-size: 0.7rem"
       />
@@ -169,7 +169,7 @@
         type="button"
         class="slot-press absolute inset-0 z-[1] cursor-pointer rounded-[inherit] border-none bg-transparent !p-0 outline-none"
         :aria-label="`Press and hold for one second to ${holdSlotAction}`"
-        :aria-disabled="pending || blocked || undefined"
+        :aria-disabled="busy || blocked || undefined"
         v-on="hold.handlers"
       />
       <span class="sr-only" role="status">{{ announcement }}</span>
@@ -178,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useIsMutating } from "@tanstack/vue-query";
 import type { PlayableRoomResponse } from "@football/shared";
 import { useAuthStore } from "@/stores/auth";
@@ -199,6 +199,7 @@ import {
   spotsLeftTone,
   type SpotsTone,
 } from "../composables/spotsLeft";
+import HoldWash from "./HoldWash.vue";
 import SlotAvatars from "./SlotAvatars.vue";
 import SpotsTakenBar from "./SpotsTakenBar.vue";
 
@@ -311,12 +312,24 @@ const holdSlotAction = computed<"join" | "leave" | null>(() =>
     ? action.value.state
     : null,
 );
+
+// The full second was held: the wash stays up and the line keeps its spinner
+// until the action has landed, which is when the tile's own action flips (a
+// seat taken or given up, or a request awaiting approval) or the hub takes
+// over. A failure drops it. The flip also swaps the keyed HoldWash for a fresh
+// one, so the old wash never animates out onto the new face.
+const committed = ref(false);
+const busy = computed(() => pending.value || committed.value);
+
+watch(holdSlotAction, () => (committed.value = false));
+
 const canHoldNow = computed(
-  () => !!holdSlotAction.value && !pending.value && !blocked.value,
+  () => !!holdSlotAction.value && !busy.value && !blocked.value,
 );
 
 const join = () => {
   joinMutation.mutate(props.timeslot.id, {
+    onError: () => (committed.value = false),
     onSuccess: (data) => {
       // A confirmed join flips the play view back to the match hub, the
       // "you're in" moment. Pending approvals stay in browse mode.
@@ -327,16 +340,20 @@ const join = () => {
 
 const hold = useHoldPress({
   onHold: () => {
+    if (!holdSlotAction.value) return;
+    committed.value = true;
     if (holdSlotAction.value === "join") join();
-    else if (holdSlotAction.value === "leave")
-      leaveMutation.mutate(props.timeslot.id);
+    else
+      leaveMutation.mutate(props.timeslot.id, {
+        onError: () => (committed.value = false),
+      });
   },
   enabled: () => props.centered && canHoldNow.value,
 });
 
 const bottomText = computed(() =>
   tileBottomText(action.value, {
-    pending: pending.value,
+    pending: busy.value,
     releasedEarly: hold.releasedEarly.value,
   }),
 );
@@ -344,7 +361,7 @@ const bottomText = computed(() =>
 // What a screen reader should hear change while the visible line is hidden
 // from it.
 const announcement = computed(() =>
-  holdSlotAction.value && (pending.value || hold.releasedEarly.value)
+  holdSlotAction.value && (busy.value || hold.releasedEarly.value)
     ? bottomText.value.text
     : "",
 );
@@ -352,8 +369,8 @@ const announcement = computed(() =>
 // A neighbour shrinks towards its inner edge, the one facing the centre:
 // scaling about its middle would pull that edge out of the sliver of strip it
 // peeks through, and the peek is what tells you there's more to swipe to. The
-// hold's shade is CSS on .slot-tile--holding and never moves the tile, so it
-// doesn't fight this per-frame transform.
+// hold's wash (HoldWash) only scales itself, never the tile, so it doesn't
+// fight this per-frame transform.
 const style = computed(() => {
   const reach = Math.abs(props.howFar);
   return {
@@ -379,16 +396,16 @@ const label = computed(() => {
 </script>
 
 <style scoped>
+/* The hold's wash has its own component (HoldWash.vue). This file styles the
+   tile, its seat wash and its text. */
+
+/* ---- Tile shell (CARD-04) -------------------------------------------------
+   A plain white card with a hairline and a soft shadow; side tiles are the
+   same, flatter. No hue, no 3D. */
 .slot-tile {
   width: 100%;
   height: 100%;
   will-change: transform;
-}
-
-/* ---- Calm card (CARD-04) -------------------------------------------------
-   The centred tile is a plain white card with a hairline and a soft shadow;
-   side tiles are the same, flatter. No hue, no 3D. */
-.slot-tile {
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -404,6 +421,13 @@ const label = computed(() => {
   user-select: none;
 }
 
+.slot-tile--side {
+  border-color: rgba(0, 0, 0, 0.07);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  color: rgb(90, 90, 90);
+}
+
 /* The focus ring belongs to the tile, not to the button laid over it. */
 .slot-press {
   -webkit-tap-highlight-color: transparent;
@@ -413,6 +437,20 @@ const label = computed(() => {
   outline-offset: 2px;
 }
 
+/* ---- Seat wash (CARD-41) --------------------------------------------------
+   Your seat: a tint fading out from the top edge. It is a child, not a
+   background on the tile, so the tile itself stays plain white (CARD-04).
+   The hold wash comes later in the markup, so it paints on top of this. */
+.slot-wash {
+  z-index: -1;
+  background: radial-gradient(
+    140% 80% at 50% 0%,
+    rgba(16, 185, 129, 0.16) 0%,
+    transparent 72%
+  );
+}
+
+/* ---- Text ------------------------------------------------------------------ */
 .slot-time-text {
   letter-spacing: -0.04em;
 }
@@ -420,19 +458,16 @@ const label = computed(() => {
   color: rgb(40, 40, 40);
 }
 
-.slot-tile--side {
-  border-color: rgba(0, 0, 0, 0.07);
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  color: rgb(90, 90, 90);
-}
-
 .slot-chip {
   color: rgb(90, 90, 90);
   background: #f4f4f5;
 }
 
-/* The bottom line: neutral text with a soft light sweep through it. */
+.slot-price {
+  color: rgb(115, 115, 115);
+}
+
+/* The bottom line, coloured by what holding does (CARD-31, CARD-32). */
 .slot-hint {
   color: rgb(50, 50, 50);
 }
@@ -447,9 +482,8 @@ const label = computed(() => {
 .slot-hint[data-tone="cantLeave"] {
   color: rgb(107, 107, 107);
 }
-.slot-price {
-  color: rgb(115, 115, 115);
-}
+
+/* While the tile can be held, a soft light sweeps through the line (CARD-31). */
 .slot-shimmer {
   background: linear-gradient(
     100deg,
@@ -475,47 +509,10 @@ const label = computed(() => {
   }
 }
 
-/* Your seat (CARD-41): a tint fading out from the top edge. It is a child, not
-   a background on the tile, so the tile itself stays plain white (CARD-04),
-   and it sits at -1 with the hold shade, which comes later and so on top. */
-.slot-wash {
-  z-index: -1;
-  background: radial-gradient(
-    140% 80% at 50% 0%,
-    rgba(16, 185, 129, 0.16) 0%,
-    transparent 72%
-  );
-}
-
-/* Holding: a faint neutral shade rises inside the pane, under the content. */
-.slot-hold-fill {
-  z-index: -1;
-  transform: scaleY(0);
-  transform-origin: bottom;
-  transition: transform 180ms ease-out;
-  /* Fades out at its top, so the rising edge is soft, not a line. */
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.07),
-    rgba(0, 0, 0, 0.03) 70%,
-    rgba(0, 0, 0, 0)
-  );
-}
-.slot-tile--holding .slot-hold-fill {
-  transform: scaleY(1);
-  transition: transform 1000ms cubic-bezier(0.4, 0, 0.6, 1);
-}
-
-/* Reduced motion: no sweep and no travel animation; the shade just
-   appears while the press is held, and the full second is still required. */
+/* Reduced motion: no sweep. */
 @media (prefers-reduced-motion: reduce) {
   .slot-shimmer {
     animation: none;
-  }
-  .slot-tile--current,
-  .slot-hold-fill,
-  .slot-tile--holding .slot-hold-fill {
-    transition: none;
   }
 }
 </style>

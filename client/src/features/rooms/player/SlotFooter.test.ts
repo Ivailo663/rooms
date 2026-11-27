@@ -57,7 +57,8 @@ describe("CARD-35: hold to leave", () => {
   it("CARD-35: leaves after a 1s pointer hold", async () => {
     const w = leave();
     await pointer(w.get("button"), "pointerdown", 0);
-    expect(w.get("button").classes()).toContain("leave-button--holding");
+    // The hub draws the wash; the footer only says the press is down.
+    expect(w.emitted("holding")).toEqual([[true]]);
     vi.advanceTimersByTime(999);
     expect(w.emitted("leave")).toBeUndefined();
     vi.advanceTimersByTime(1);
@@ -71,7 +72,7 @@ describe("CARD-35: hold to leave", () => {
     await pointer(w.get("button"), "pointerup");
     vi.advanceTimersByTime(2000);
     expect(w.emitted("leave")).toBeUndefined();
-    expect(w.get("button").classes()).not.toContain("leave-button--holding");
+    expect(w.emitted("holding")).toEqual([[true], [false]]);
   });
 
   it("CARD-35: pointercancel and pointerleave cancel without the hint", async () => {
@@ -82,18 +83,25 @@ describe("CARD-35: hold to leave", () => {
       vi.advanceTimersByTime(2000);
     }
     expect(w.emitted("leave")).toBeUndefined();
-    expect(w.get("button").text()).toBe("Leave game");
+    expect(w.emitted("holding")).toEqual([[true], [false], [true], [false]]);
+    expect(w.get("button").text()).toBe("Hold to leave");
   });
 
-  it("CARD-35: a plain tap shows Hold to leave for a moment", async () => {
+  it("CARD-35: the button always reads Hold to leave, with no icon, and a short tap adds no hint", async () => {
     const w = leave();
+    expect(w.get("button").text()).toBe("Hold to leave");
+    expect(w.find("button i").exists()).toBe(false);
+
     await pointer(w.get("button"), "pointerdown", 0);
     await pointer(w.get("button"), "pointerup");
     expect(w.get("button").text()).toBe("Hold to leave");
     expect(w.emitted("leave")).toBeUndefined();
+    // Nothing visible and nothing announced changes either.
+    expect(w.findAll("[role='status']")).toHaveLength(1);
+    expect(w.get("[role='status']").classes()).toContain("sr-only");
     vi.advanceTimersByTime(2000);
-    await w.vm.$nextTick();
-    expect(w.get("button").text()).toBe("Leave game");
+    await nextTick();
+    expect(w.get("button").text()).toBe("Hold to leave");
   });
 
   it("CARD-35: holding Enter for 1s leaves; key repeat doesn't restart it", async () => {
@@ -133,15 +141,25 @@ describe("CARD-35: hold to leave", () => {
     expect(w.emitted("leave")).toBeUndefined();
   });
 
-  it("CARD-35: shows a spinner and can't be held while pending", () => {
-    const b = render({ state: "leave", pending: true }).get("button");
-    expect(b.find("i.fa-spinner").exists()).toBe(true);
+  it("CARD-35: in flight there is no spinner, the button is disabled and dimmed, and can't be held", async () => {
+    const w = render({ state: "leave", pending: true });
+    const b = w.get("button");
+    expect(b.find("i").exists()).toBe(false);
+    expect(b.text()).toBe("Hold to leave");
     expect(b.attributes("disabled")).toBeDefined();
+    expect(b.classes()).toContain("disabled:opacity-50");
+
+    await pointer(b, "pointerdown", 0);
+    vi.advanceTimersByTime(2000);
+    expect(w.emitted("holding")).toBeUndefined();
+    expect(w.emitted("leave")).toBeUndefined();
   });
 
   it("CARD-35: tells assistive tech about the hold", () => {
     const w = leave();
     const id = w.get("button").attributes("aria-describedby")!;
-    expect(w.get(`[id="${id}"]`).text()).toContain("hold for one second");
+    const status = w.get(`[id="${id}"]`);
+    expect(status.text()).toContain("hold for one second");
+    expect(status.attributes("role")).toBe("status");
   });
 });

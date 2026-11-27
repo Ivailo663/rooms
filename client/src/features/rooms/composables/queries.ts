@@ -268,11 +268,33 @@ export const useAcknowledgeJoinRequest = () => {
 
 export const useLeaveTimeslot = () => {
   const queryClient = useQueryClient();
+  const authStore = useAuthStore();
 
   return useMutation<MutationMessageResponse, Error, number>({
     mutationKey: SLOT_MEMBERSHIP_KEY,
     mutationFn: leaveTimeslot,
-    onSuccess: () => {
+    onSuccess: (_data, timeslotId) => {
+      // Leaving the last game swaps the hub for the deck as soon as
+      // joined-slots refetches, and the deck mounts on whatever playable-rooms
+      // it has cached, which still shows the seat. Take the player out of that
+      // slot in the cache first, so the deck never flashes the old seat.
+      const userId = authStore.user?.id;
+      queryClient.setQueriesData<PlayableRoomResponse[]>(
+        { queryKey: ["playable-rooms"] },
+        (rooms) =>
+          rooms?.map((room) => ({
+            ...room,
+            timeslots: room.timeslots.map((slot) =>
+              slot.id === timeslotId
+                ? {
+                    ...slot,
+                    players: slot.players.filter((p) => p.id !== userId),
+                  }
+                : slot
+            ),
+          }))
+      );
+
       queryClient.invalidateQueries({ queryKey: ["playable-rooms"] });
       queryClient.invalidateQueries({ queryKey: ["joined-slots"] });
     },
