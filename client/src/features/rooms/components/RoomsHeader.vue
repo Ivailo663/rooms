@@ -9,21 +9,11 @@
     </p>
   </div>
 
-  <!-- Play view: one island holding the days and, with a game, the way back to it (HEAD-01).
-       The width is a length on both sides so it can transition: hugging, it's
-       the day row (7 buttons plus their gaps) plus this box's left padding and
-       border; with a game it's the deck's own width. `mx-auto` centres it in
-       both states (HEAD-02), and matches the deck below, which is also
-       42rem centred. -->
+  <!-- Play view: one island holding the days and, with a game, the way back to it (HEAD-01). -->
   <div
     v-else
     data-island
-    class="relative mx-auto flex items-center justify-between overflow-hidden rounded-2xl border border-surface-200/40 bg-white/70 pl-1.5 shadow-sm backdrop-blur-xl transition-[width,box-shadow,border-color] duration-300 ease-out focus-within:border-primary-300/50 focus-within:shadow-md motion-reduce:transition-none"
-    :class="
-      hasGame
-        ? 'w-[min(100%,42rem)]'
-        : 'w-[calc(13rem+0.375rem+2px)] sm:w-[calc(16.5rem+0.375rem+2px)]'
-    "
+    class="relative !mx-auto w-fit flex items-center justify-between overflow-hidden rounded-2xl border border-surface-200/40 bg-white/70 shadow-sm backdrop-blur-xl transition-[width,box-shadow,border-color] duration-300 ease-out focus-within:border-primary-300/50 focus-within:shadow-md motion-reduce:transition-none"
   >
     <!-- <div class="flex items-center">
           <i
@@ -49,7 +39,7 @@
 
     <!-- shrink-0 keeps the days one row at their own size while the island
            resizes around them (HEAD-04, HEAD-10) -->
-    <div data-days class="flex shrink-0 items-center !gap-0.5">
+    <div data-days class="flex shrink-0 items-center !gap-0.5 py-[8px] px-2">
       <Button
         v-for="day in DAYS"
         :key="day.value"

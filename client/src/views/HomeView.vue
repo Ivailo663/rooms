@@ -19,7 +19,7 @@
       <!-- Browsing (primary when free agent, secondary when in a game) -->
       <div v-else key="browse" class="flex flex-col flex-1 min-h-0">
         <!-- Same side padding as the deck below, so the island's full width is the deck's (HEAD-03) -->
-        <div class="shrink-0 w-full !mb-5 sm:!px-6">
+        <div class="shrink-0 w-full !mb-5 sm:!px-6 !mx-auto">
           <RoomsHeader v-model:search="search" />
         </div>
 
