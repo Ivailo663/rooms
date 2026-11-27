@@ -37,15 +37,22 @@
       <CardStatusPill :status="isFailed ? 'off' : 'joined'" />
 
       <div
-        class="hub-card relative w-full overflow-hidden rounded-3xl border bg-white"
+        class="hub-card relative isolate w-full overflow-hidden rounded-3xl border bg-white"
         :class="
           isLive ? 'hub-card--live border-emerald-200' : 'border-surface-200/70'
         "
       >
-        <!-- Emerald wash from the top: the accent carries the moment, not darkness -->
+        <!-- Emerald glow from the top: the accent carries the moment, not
+             darkness. Brighter while the game is live. -->
         <div
-          class="pointer-events-none absolute inset-x-0 top-0 h-56"
-          :class="isLive ? 'hub-glow-live' : 'hub-glow'"
+          class="hub-glow pointer-events-none absolute inset-x-0 top-0 h-56"
+          :class="{ 'hub-glow--live': isLive }"
+        />
+        <!-- Holding the leave button fades the whole card to a veil (CARD-35). -->
+        <HoldWash
+          action="leave"
+          :active="leaveHolding || leaving"
+          :committed="leaving"
         />
 
         <div class="flex h-full flex-col overflow-y-auto !p-3 sm:!p-8">
@@ -189,8 +196,9 @@
             :state="leavability.canLeave ? 'leave' : 'cantLeave'"
             :label="leavability.label"
             :icon="leavability.icon"
-            :pending="leaveMutation.isPending.value"
+            :pending="leaving || leaveMutation.isPending.value"
             @leave="handleLeave"
+            @holding="leaveHolding = $event"
           />
         </div>
       </div>
@@ -199,7 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { useQueryClient } from "@tanstack/vue-query";
 import { socket } from "@/socket";
 import type { JoinedSlotSummary } from "@football/shared";
@@ -222,6 +230,7 @@ import {
 import CardStatusPill from "../components/CardStatusPill.vue";
 import SlotRoster from "./SlotRoster.vue";
 import SlotFooter from "./SlotFooter.vue";
+import HoldWash from "./HoldWash.vue";
 
 const TIMESLOT_MEMBERSHIP_CHANGED_EVENT = "timeslot-membership:changed";
 const TIMESLOT_STATUS_CHANGED_EVENT = "timeslot-status:changed";
@@ -300,8 +309,24 @@ const leavability = computed<Leavability>(() =>
     : { canLeave: true }
 );
 
+// The footer's leave press is down; the card shows the hold's wash.
+const leaveHolding = ref(false);
+
+// The hold completed: the card stays faded, and the button disabled, until the
+// hub has moved on (to the deck, or to the next game). A failure fades it back.
+const leaving = ref(false);
+
+watch(
+  () => primaryGame.value?.timeslotId,
+  () => (leaving.value = false)
+);
+
 const handleLeave = () => {
-  if (primaryGame.value) leaveMutation.mutate(primaryGame.value.timeslotId);
+  if (!primaryGame.value) return;
+  leaving.value = true;
+  leaveMutation.mutate(primaryGame.value.timeslotId, {
+    onError: () => (leaving.value = false),
+  });
 };
 
 // The browse deck (which normally keeps membership fresh) is not mounted in
@@ -321,18 +346,19 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* A single soft shadow to lift the card off the surface-50 page — just enough
-   separation, not a spotlight. */
+/* ---- Card shell -------------------------------------------------------------
+   One soft shadow lifts the card off the surface-50 page: separation, not a
+   spotlight. Tinted emerald while the game is live. */
 .hub-card {
   box-shadow: 0 8px 24px -12px rgba(15, 23, 42, 0.15);
 }
-
 .hub-card--live {
   box-shadow: 0 8px 24px -12px rgba(16, 185, 129, 0.28);
 }
 
-/* A soft emerald halo bleeding down from the top edge — enough to feel like a
-   "matchday" moment without leaving the app's light surface. */
+/* ---- Top glow ---------------------------------------------------------------
+   A soft emerald halo from the top edge, a "matchday" moment on the app's
+   light surface. Stronger while live. The hold-to-leave wash is HoldWash.vue. */
 .hub-glow {
   background: radial-gradient(
     120% 100% at 50% 0%,
@@ -340,8 +366,7 @@ onBeforeUnmount(() => {
     transparent 70%
   );
 }
-
-.hub-glow-live {
+.hub-glow--live {
   background: radial-gradient(
     120% 100% at 50% 0%,
     rgba(16, 185, 129, 0.22) 0%,

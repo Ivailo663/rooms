@@ -553,11 +553,15 @@ describe("TimeCarousel slot action", () => {
     const w = mountStrip([joinable()]);
     expect(line(w).attributes("aria-hidden")).toBe("true");
     const before = tiles(w)[0]!.attributes("style");
+    expect(w.get("[data-hold-wash]").classes()).not.toContain(
+      "hold-wash--active"
+    );
     await fire(press(w).element, "pointerdown");
-    expect(tiles(w)[0]!.classes()).toContain("slot-tile--holding");
-    // Only the shade rises; the tile itself doesn't move.
+    // Only the join wash rises; the tile itself doesn't move.
+    const wash = w.get("[data-hold-wash]");
+    expect(wash.attributes("data-hold-wash")).toBe("join");
+    expect(wash.classes()).toContain("hold-wash--active");
     expect(tiles(w)[0]!.attributes("style")).toBe(before);
-    expect(w.find(".slot-hold-fill").exists()).toBe(true);
     vi.advanceTimersByTime(999);
     expect(joinTimeslot).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
@@ -567,8 +571,11 @@ describe("TimeCarousel slot action", () => {
     expect(leaveTimeslot).not.toHaveBeenCalled();
   });
 
-  it("CARD-34: holding the tile for 1s leaves its slot", async () => {
+  it("CARD-34: holding the tile for 1s leaves its slot, under the falling leave wash", async () => {
     const w = mountStrip([mine()]);
+    expect(w.get("[data-hold-wash]").attributes("data-hold-wash")).toBe(
+      "leave"
+    );
     await hold(w);
     expect(leaveTimeslot).toHaveBeenCalledTimes(1);
     expect(leaveTimeslot.mock.calls[0]![0]).toBe(1);
@@ -624,6 +631,164 @@ describe("TimeCarousel slot action", () => {
     expect(line(w).text()).toBe("Leaving…");
   });
 
+  it("CARD-33: the join wash is a plain emerald rise with no words, and follows the hold", async () => {
+    const w = mountStrip([joinable()]);
+    const wash = w.get('[data-hold-wash="join"]');
+    expect(wash.text()).toBe("");
+    expect(wash.attributes("aria-hidden")).toBe("true");
+
+    await fire(press(w).element, "pointerdown");
+    expect(wash.classes()).toContain("hold-wash--active");
+    vi.advanceTimersByTime(400);
+    await fire(press(w).element, "pointerup");
+    expect(wash.classes()).not.toContain("hold-wash--active");
+  });
+
+  it("CARD-34: the leave veil carries Leaving game and Keep holding, and follows the hold", async () => {
+    const w = mountStrip([mine()]);
+    const veil = w.get('[data-hold-wash="leave"]');
+    expect(veil.text()).toContain("Leaving game");
+    expect(veil.text()).toContain("(Keep holding)");
+    expect(veil.attributes("aria-hidden")).toBe("true");
+    expect(w.find('[data-hold-wash="join"]').exists()).toBe(false);
+    expect(veil.classes()).not.toContain("hold-wash--active");
+    const before = tiles(w)[0]!.attributes("style");
+
+    await fire(press(w).element, "pointerdown");
+    expect(veil.classes()).toContain("hold-wash--active");
+    // The tile fades, it doesn't move.
+    expect(tiles(w)[0]!.attributes("style")).toBe(before);
+
+    vi.advanceTimersByTime(400);
+    await fire(press(w).element, "pointerup");
+    expect(veil.classes()).not.toContain("hold-wash--active");
+    expect(leaveTimeslot).not.toHaveBeenCalled();
+  });
+
+  it("CARD-34: when a leave goes through the tile gets a fresh wash, not the old veil animating out", async () => {
+    leaveTimeslot.mockResolvedValueOnce({ message: "left" });
+    const w = mountStrip([mine()]);
+    const veil = w.get('[data-hold-wash="leave"]').element;
+
+    await hold(w);
+    await flushPromises();
+    // The refetch brings the slot back without the user: the action flips.
+    await w.setProps({ timeslots: [joinable()] });
+
+    const wash = w.get("[data-hold-wash]");
+    expect(wash.attributes("data-hold-wash")).toBe("join");
+    expect(wash.element).not.toBe(veil);
+    expect(wash.classes()).not.toContain("hold-wash--active");
+  });
+
+  it("CARD-34: when a join goes through the tile gets a fresh veil, not the join wash shrinking away", async () => {
+    joinTimeslot.mockResolvedValueOnce({ status: "joined" });
+    const w = mountStrip([joinable()]);
+    const rise = w.get('[data-hold-wash="join"]').element;
+
+    await hold(w);
+    await flushPromises();
+    await w.setProps({ timeslots: [mine()] });
+
+    const veil = w.get("[data-hold-wash]");
+    expect(veil.attributes("data-hold-wash")).toBe("leave");
+    expect(veil.element).not.toBe(rise);
+    expect(veil.classes()).not.toContain("hold-wash--active");
+  });
+
+  it("CARD-33: once held the wash stays full with Joining… until the request shows as Awaiting approval", async () => {
+    joinTimeslot.mockResolvedValueOnce({ status: "pending" });
+    const w = mountStrip([joinable()]);
+    const wash = w.get('[data-hold-wash="join"]');
+    await fire(press(w).element, "pointerdown");
+    vi.advanceTimersByTime(1000);
+    await nextTick();
+    expect(wash.classes()).toContain("hold-wash--active");
+    expect(line(w).text()).toBe("Joining…");
+    expect(line(w).find("i.fa-spinner").exists()).toBe(true);
+
+    // Letting go after the full second changes nothing.
+    await fire(press(w).element, "pointerup");
+    expect(wash.classes()).toContain("hold-wash--active");
+
+    // The join has landed but the tile hasn't caught up yet.
+    await flushPromises();
+    expect(wash.classes()).toContain("hold-wash--active");
+    expect(line(w).text()).toBe("Joining…");
+
+    await w.setProps({
+      timeslots: [
+        slot(1, 1, 10, [], null, { requestStatusForCurrentUser: "pending" }),
+      ],
+    });
+    expect(w.find("[data-hold-wash]").exists()).toBe(false);
+    expect(line(w).text()).toBe("Awaiting approval");
+  });
+
+  it("CARD-33: if the join fails the wash drops back and the tile can be held again", async () => {
+    let fail!: (error: Error) => void;
+    joinTimeslot.mockReturnValueOnce(
+      new Promise((_, reject) => (fail = reject))
+    );
+    const w = mountStrip([joinable()]);
+    await hold(w);
+    expect(w.get("[data-hold-wash]").classes()).toContain("hold-wash--active");
+
+    fail(new Error("full"));
+    await flushPromises();
+    await settle();
+    expect(w.get("[data-hold-wash]").classes()).not.toContain(
+      "hold-wash--active"
+    );
+    expect(line(w).text()).toBe("Hold to join");
+    expect(press(w).attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("CARD-34: once held the veil stays fully faded with a spinner and Leaving… until the tile shows its new line", async () => {
+    leaveTimeslot.mockResolvedValueOnce({ message: "left" });
+    const w = mountStrip([mine()]);
+    const veil = w.get('[data-hold-wash="leave"]');
+    await fire(press(w).element, "pointerdown");
+    vi.advanceTimersByTime(1000);
+    await nextTick();
+
+    expect(veil.classes()).toContain("hold-wash--active");
+    expect(veil.text()).toContain("Leaving…");
+    expect(veil.find("i.fa-spinner").exists()).toBe(true);
+    expect(veil.text()).not.toContain("Keep holding");
+
+    await fire(press(w).element, "pointerup");
+    await flushPromises();
+    // The leave landed, but the tile still has the old face under the veil.
+    expect(veil.classes()).toContain("hold-wash--active");
+
+    await w.setProps({ timeslots: [joinable()] });
+    const wash = w.get("[data-hold-wash]");
+    expect(wash.element).not.toBe(veil.element);
+    expect(wash.attributes("data-hold-wash")).toBe("join");
+    expect(wash.classes()).not.toContain("hold-wash--active");
+    expect(line(w).text()).toBe("Hold to join");
+    expect(w.find("[data-wash]").exists()).toBe(false);
+  });
+
+  it("CARD-34: if the leave fails the veil fades back in as the tile was", async () => {
+    let fail!: (error: Error) => void;
+    leaveTimeslot.mockReturnValueOnce(
+      new Promise((_, reject) => (fail = reject))
+    );
+    const w = mountStrip([mine()]);
+    await hold(w);
+    expect(w.get("[data-hold-wash]").classes()).toContain("hold-wash--active");
+
+    fail(new Error("locked"));
+    await flushPromises();
+    await settle();
+    const veil = w.get('[data-hold-wash="leave"]');
+    expect(veil.classes()).not.toContain("hold-wash--active");
+    expect(veil.text()).toContain("(Keep holding)");
+    expect(line(w).text()).toBe("Hold to leave");
+  });
+
   it("CARD-34: holding Enter on the focused tile works, and no context menu opens", async () => {
     const w = mountStrip([joinable()]);
     const menu = new Event("contextmenu", { cancelable: true, bubbles: true });
@@ -640,7 +805,9 @@ describe("TimeCarousel slot action", () => {
     const w = mountStrip([slot(1, 2, 10)]);
     const avatar = tiles(w)[0]!.find("ul button");
     await fire(avatar.element, "pointerdown");
-    expect(tiles(w)[0]!.classes()).not.toContain("slot-tile--holding");
+    expect(w.get("[data-hold-wash]").classes()).not.toContain(
+      "hold-wash--active"
+    );
     vi.advanceTimersByTime(2000);
     expect(joinTimeslot).not.toHaveBeenCalled();
   });

@@ -14,13 +14,15 @@ container changes shape with what it holds.
   return-to-game bar stops being its own element in `HomeView`.
 - **HEAD-02** With no confirmed game the island holds the day buttons alone
   and hugs them, centred on the page.
-- **HEAD-03** With a confirmed game the island spans the full width of the
-  deck below it, the day buttons at its left end and the game block at its
-  right. The days are not centred in this state.
-- **HEAD-04** The island animates between those two widths: gaining the block
-  it grows and the days slide left, losing it it shrinks back around the
-  centred days. The day buttons keep their size and never re-wrap while it
-  moves. With reduced motion the width changes without animating.
+- **HEAD-03** With a confirmed game the island still hugs its contents and
+  stays centred on the page: the day buttons, then the game block right after
+  them. It doesn't stretch to the deck's width.
+- **HEAD-04** Gaining or losing the block, the island grows or shrinks around
+  its contents and stays centred. The island's size snaps; the block itself
+  fades and slides in as it arrives and out as it goes, so the change reads
+  as the block coming and going rather than a jump. The day buttons keep
+  their size and never re-wrap while it changes. With reduced motion the
+  block appears and disappears without animating.
 - **HEAD-05** The game block is two stacked lines: "My games" on top, the game
   itself underneath.
 - **HEAD-06** For a game that hasn't started, the line underneath is its day
@@ -34,9 +36,9 @@ container changes shape with what it holds.
 - **HEAD-09** The block is one control: a tap anywhere on it opens My games
   (`MyGameHub`). It works by tap, not only by mouse, and it is the only way
   back to the hub from the deck.
-- **HEAD-10** On a phone (390px) the island still spans the width with the
-  days at one end and the block at the other, and neither the day row nor
-  either line of the block wraps.
+- **HEAD-10** On a phone (390px) the island with the block still fits on the
+  screen, centred, and neither the day row nor either line of the block
+  wraps.
 - **HEAD-11** In Host view the header stays what it is today: the title and
   its subtitle, with no island, no day selector and no way back to a game.
 
