@@ -9,11 +9,11 @@
     </p>
   </div>
 
-  <!-- Play view: one island holding the days and, with a game, the way back to it (HEAD-01). -->
+  <!-- Play view: one island holding the days and, with a game, the way back to it (HEAD-01). It hugs its contents and stays centred (HEAD-02, HEAD-03). -->
   <div
     v-else
     data-island
-    class="relative !mx-auto w-fit flex items-center justify-between overflow-hidden rounded-2xl border border-surface-200/40 bg-white/70 shadow-sm backdrop-blur-xl transition-[width,box-shadow,border-color] duration-300 ease-out focus-within:border-primary-300/50 focus-within:shadow-md motion-reduce:transition-none"
+    class="relative !mx-auto w-fit flex items-center overflow-hidden rounded-2xl border border-surface-200/40 bg-white/70 shadow-sm backdrop-blur-xl transition-[box-shadow,border-color] duration-300 ease-out focus-within:border-primary-300/50 focus-within:shadow-md motion-reduce:transition-none"
   >
     <!-- <div class="flex items-center">
           <i
@@ -61,9 +61,15 @@
       </Button>
     </div>
 
+    <!-- The island's size snaps; the block fades and slides, so it reads as
+         coming and going. The island's overflow-hidden clips the slide. With
+         reduced motion the transition has no duration, so it just
+         appears and disappears (HEAD-04). -->
     <Transition
-      enter-active-class="transition-opacity duration-300 motion-reduce:transition-none"
-      enter-from-class="opacity-0"
+      enter-active-class="transition duration-300 ease-out motion-reduce:transition-none"
+      leave-active-class="transition duration-300 ease-out motion-reduce:transition-none"
+      enter-from-class="opacity-0 translate-x-3"
+      leave-to-class="opacity-0 translate-x-3"
     >
       <ReturnToGameBar v-if="hasGame" />
     </Transition>

@@ -55,60 +55,81 @@ afterEach(() => {
 // jsdom does no layout, so the geometry below is read from the classes that
 // decide it. What the painted island looks like needs a real browser.
 describe("RoomsHeader island", () => {
-  it("HEAD-02: with no game the island hugs the days and the block is absent", () => {
+  it("HEAD-02: with no game the island hugs the days, centred, and the block is absent", () => {
     const w = mountHeader();
     const island = w.get("[data-island]");
 
-    expect(island.classes().join(" ")).toContain("w-[calc(");
-    expect(island.classes()).not.toContain("w-[min(100%,42rem)]");
+    expect(island.classes()).toContain("w-fit");
+    // Centred by its own auto margins.
+    expect(island.classes()).toContain("!mx-auto");
     expect(w.find("[data-my-games]").exists()).toBe(false);
-    // Centred by its own auto margins, at either width.
-    expect(island.classes()).toContain("mx-auto");
+    expect(island.element.firstElementChild).toBe(w.get("[data-days]").element);
   });
 
-  it("HEAD-03: with a game the island spans the deck, days at the left, block at the right", () => {
+  it("HEAD-03: with a game the island still hugs and is centred, days first and the block right after", () => {
     joinedSlots.value = [slot];
     const w = mountHeader();
     const island = w.get("[data-island]");
 
-    expect(island.classes()).toContain("w-[min(100%,42rem)]");
-    expect(island.classes()).toContain("justify-between");
+    expect(island.classes()).toContain("w-fit");
+    expect(island.classes()).toContain("!mx-auto");
+    // Not stretched to the deck's width, and nothing pushes the block away.
+    expect(island.classes().join(" ")).not.toMatch(
+      /\bw-\[|\bw-full|justify-between/
+    );
 
     const days = w.get("[data-days]").element;
     const block = w.get("[data-my-games]").element;
-
-    // The block follows the days in the row, so justify-between pins it right.
-    expect(days.compareDocumentPosition(block)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
     expect(island.element.firstElementChild).toBe(days);
+    // The block sits in the Transition right after the days (test-utils
+    // renders it as a stub element).
+    expect(days.nextElementSibling?.contains(block)).toBe(true);
   });
 
-  it("HEAD-04: the width transitions, the days never shrink, and reduced motion drops it", () => {
+  it("HEAD-04: the block comes and goes through a fade-and-slide Transition, the island's size doesn't animate", () => {
     joinedSlots.value = [slot];
     const w = mountHeader();
     const island = w.get("[data-island]");
 
-    expect(island.classes().join(" ")).toContain("transition-[width");
-    expect(island.classes()).toContain("motion-reduce:transition-none");
-    // The days keep their natural size, so they cannot re-wrap mid-resize.
-    expect(w.get("[data-days]").classes()).toContain("shrink-0");
-    expect(w.get("[data-days]").classes()).not.toContain("flex-wrap");
+    expect(island.classes().join(" ")).not.toContain("transition-[width");
+    const transition = w.findComponent({ name: "Transition" });
+    const props = transition.props() as Record<string, string>;
+    for (const cls of [props.enterActiveClass, props.leaveActiveClass]) {
+      expect(cls).toContain("transition");
+      // Reduced motion: no transition, so no duration and it just appears.
+      expect(cls).toContain("motion-reduce:transition-none");
+    }
+    expect(props.enterFromClass).toContain("opacity-0");
+    expect(props.enterFromClass).toContain("translate-x-");
+    expect(props.leaveToClass).toContain("opacity-0");
+    expect(props.leaveToClass).toContain("translate-x-");
   });
 
-  it("HEAD-04: losing the game goes back to the hugging width", async () => {
+  it("HEAD-04: the days keep their size and never wrap while the block changes", async () => {
+    const w = mountHeader();
+    const days = w.get("[data-days]");
+    expect(days.classes()).toContain("shrink-0");
+    expect(days.classes()).not.toContain("flex-wrap");
+
+    joinedSlots.value = [slot];
+    await w.vm.$nextTick();
+    expect(w.get("[data-days]").element).toBe(days.element);
+    expect(w.find("[data-my-games]").exists()).toBe(true);
+  });
+
+  it("HEAD-04: losing the game takes the block away and the island still hugs", async () => {
     joinedSlots.value = [slot];
     const w = mountHeader();
 
     joinedSlots.value = [];
     await w.vm.$nextTick();
 
-    expect(w.get("[data-island]").classes()).not.toContain(
-      "w-[min(100%,42rem)]"
-    );
+    // test-utils stubs transitions, so the leave completes at once.
+    expect(w.find("[data-my-games]").exists()).toBe(false);
+    expect(w.get("[data-island]").classes()).toContain("w-fit");
   });
 
-  it("HEAD-10: neither the day row nor the block can wrap", () => {
+  it("HEAD-10: with the block neither the day row nor either line of it can wrap, and the island fits", () => {
     joinedSlots.value = [slot];
     const w = mountHeader();
 
@@ -116,6 +137,9 @@ describe("RoomsHeader island", () => {
     const block = w.get("[data-my-games]").classes();
     expect(block).toContain("whitespace-nowrap");
     expect(block).toContain("shrink-0");
+    // Hugging, never wider than its contents; the 390px fit itself needs a
+    // real browser, where the days (7 x 28px) plus the block are ~330px.
+    expect(w.get("[data-island]").classes()).toContain("w-fit");
   });
 
   it("HEAD-09: tapping the block brings the hub back", async () => {
